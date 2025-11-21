@@ -6,4 +6,4 @@ Other improvements/adjustments are the MAX_ALLOWED_PACKET variable in the config
 
 The next big change needed is autonomous or asynchronous refactoring of the deltas table to only track differences generated with diff_match_patch, for an extreme efficiency upgrade compared to tracking the entire file's previous content. It needs to be asynchronous/autonomous because the atomic-y of the current config would face trouble attempting to compute the diff while doing an all-or-nothing upload.
 
-Check out the snql3 repository for the history and more information on this program/MySQL for this project.
+Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
