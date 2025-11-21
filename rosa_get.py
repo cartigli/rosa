@@ -38,54 +38,62 @@ delete old ones.
 if __name__ == "__main__":
     logging.info('Rosa [get] executed.')
     start = datetime.datetime.now(datetime.UTC).timestamp()
-    logging.info('Timer started.')
+    if start:
+        logging.info('Timer started.')
 
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn: # context manager for peace of mind
         raw_heaven = scope_rem(conn) # raw remote files & hash_id's
-        heaven_dirs = ping_cass(conn) # raw remote dirs' rpats
+        heaven_dirs = ping_cass(conn) # raw remote dirs' rpath's
 
         heaven_data = [raw_heaven, heaven_dirs]
-        if heaven_data:
+        if heaven_data: # remote hashes & rpath's
             logging.info('Data returned from heaven.')
 
-            cherubs, serpents, stags, souls = contrast(raw_heaven, raw_hell) # new files, dead files, changed files
+            cherubs, serpents, stags, souls = contrast(raw_heaven, raw_hell) 
+            # new, old, unchanged, changed file[s]
+
+            # f_delta = altered file data
             f_delta = [cherubs, serpents, souls]
 
-            gates, caves = compare(heaven_dirs, hell_dirs) # new folders, dead folders
-            d_delta = [gates, caves]
+            gates, caves = compare(heaven_dirs, hell_dirs) # new dir[s], old dir[s]
+            d_delta = [gates, caves] # altered directory data
 
-            if any(f_delta) or any(d_delta):
+            if any(f_delta) or any(d_delta): # if file or folder data has been changed, continue to processing
                 logging.info('Discrepancies found; processing.')
-                with fat_boy(abs_path) as (tmp_, backup):
+                with fat_boy(abs_path) as (tmp_, backup): # context manager [atomic]
                     try:
+                        # deal with local file data first; then make directories, then make new and altered files
                         if stags:
                             logging.info(f"{len(stags)} unchanged files in both places.")
-                            save_people(stags, backup, tmp_)
+                            save_people(stags, backup, tmp_) # hard link unchanged files - fast
                             logging.info('Linked unchanged files to tmp_ directory.')
 
                         if serpents:
                             logging.debug(f"Ignoring {len(serpents)} local-only files.")
+                            # files only found locally can be ignored; they will remain in the backup dir
+                            # and be deleted when the atomic wr completes w.o exception
 
                         if any(d_delta):
 
                             if gates:
                                 logging.debug(f"{len(gates)} remote-only directories found.")
-                                mk_dir(gates, tmp_) # write dir heirarchy to tmp_
+                                mk_dir(gates, tmp_) # write directory heirarchy to tmp_ directory
                                 logging.info('New directories written to disk.')
 
                             if caves:
-                                logging.debug(f"Ignoring {len(caves)} local-only files.")
+                                logging.debug(f"Ignoring {len(caves)} local-only directories.")
 
                         if any(f_delta):
                             try:
                                 try:
+                                    # ensure connection is present before conitnuing with meat & potatoes
                                     conn.ping(reconnect=True, attempts=3, delay=0.5)
                                     batch_size = calc_batch(conn)
 
-                                except mysql.connector.Error as mce:
-                                    logging.critical(f"Connection to server is faulty: {mce}.", exc_info=True)
+                                except (mysql.connector.Error, ConnectionError, TimeoutError) as nce:
+                                    logging.critical(f"Connection to server is faulty: {nce}.", exc_info=True)
                                     raise
                                 else:
                                     logging.info('Connection confirmed.')
@@ -93,33 +101,27 @@ if __name__ == "__main__":
                                     if cherubs:
                                         logging.info(f"{len(cherubs)} Remote-only files found; downloading.")
                                         download_batches(cherubs, conn, batch_size, tmp_)
+                                        # handles pulling new file data, giving it batch by batch
+                                        # to the wr batches function, and continuing until list is empty
 
                                     if souls:
                                         logging.debug(f"{len(souls)} files with hash discrepancies found.")
                                         download_batches(souls, conn, batch_size, tmp_)
+                                        # same here as w.cherubs but for altered file[s] (hash discrepancies)
 
-                                    # context manager deals with apply atomicy now
+                                    # context manager applies atomicy now - renamed tmp_ directory and deletes backup if no exceptions
 
-                            except PermissionError as p:
-                                logging.critical('Permission Error encountered while attempting atomic download & write.', exc_info=True)
-                                raise
-                            except KeyboardInterrupt as kb:
-                                logging.critical('Atomic wr interupted.', exc_info=True)
+                            except (PermissionError, KeyboardInterrupt) as p:
+                                logging.critical('Exception encountered while attempting atomic download & write.', exc_info=True)
                                 raise
                             except Exception as e:
                                 logging.critical(f"Exception encountered while attempting atomic download & write: {e}.", exc_info=True)
                                 raise
-                            except:
-                                logging.critical('Exception encountered while attempting atomic download & wr.', exc_info=True)
-                                raise
                             else:
                                 logging.info('Batched atomic download completed without exception.')
 
-                    except PermissionError as p:
-                        logging.error('Permission Error encountered while attempting atomic write.', exc_info=True)
-                        raise
-                    except KeyboardInterrupt as kb:
-                        logging.error('Keyboard Interrupted attempt at atomic write.', exc_info=True)
+                    except (PermissionError, KeyboardInterrupt) as p:
+                        logging.error('Exception encountered while attempting atomic write.', exc_info=True)
                         raise
                     except Exception as e:
                         logging.error('Exception encountered while attempting atomic write.', exc_info=True)
@@ -140,9 +142,9 @@ if __name__ == "__main__":
         proc_time = end - start 
         if proc_time > 60:
             min_time = proc_time / 60
-            logging.info(f"Processing time [in minutes] for rosa [get]: {min_time}.")
+            logging.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
         else:
-            logging.info(f"Processing time [in seconds] for rosa [get]: {proc_time}.")
+            logging.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
 
     logging.info('[get] completed.')
     print('All set.')
