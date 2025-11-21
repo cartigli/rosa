@@ -1,0 +1,6 @@
+.DS_Store
+config.py
+rosa.log
+__pycache__/
+.vscode/
+.git/
