@@ -1,0 +1,154 @@
+import sys
+import logging
+import datetime
+from config import *
+import mysql.connector
+from rosa_lib import(
+    scope_loc, scope_rem, ping_cass,
+    contrast, compare,
+    phone_duty #, init_conn
+)
+
+f_handler = logging.FileHandler('rosa.log', mode='a')
+f_handler.setLevel(logging.DEBUG)
+
+cons_handler = logging.StreamHandler()
+cons_handler.setLevel(logging.INFO)
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[f_handler, cons_handler]
+)
+
+"""
+Compare local data to server, report back.
+"""
+
+
+def ucheck(cherubs, serpents, stags, souls): # only contrast
+    if cherubs:
+        decis0 = input(f"Found {len(cherubs)} cherubs. Do you want details? y/n: ")
+        if decis0 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
+            c = []
+            [c.append(cherub['frp']) for cherub in cherubs]
+            print(f"Cherubs ( In the server but not found locally ):\n{list(c)}")
+
+        elif decis0 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
+            print('Heard.')
+        else:
+            logging.info('Unkown response, no details; proceding.')
+
+    if serpents:
+        decis1 = input(f"Found {len(serpents)} serpents. Do you want details? y/n: ")
+        if decis1 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
+            s = []
+            [s.append(serpent['frp']) for serpent in serpents]
+            print(f"Serpents ( On the local disk but not in the server ):\n{list(s)}")
+
+        elif decis1 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
+            print('Heard.')
+        else:
+            logging.info('Unkown response, no details; proceding.')
+    
+    if souls:
+        decis2 = input(f"Found {len(souls)} souls. Do you want details? y/n: ")
+        if decis2 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
+            ss = []
+            [ss.append(soul['frp']) for soul in souls]
+            print(f"Souls ( Files whose contents were altered. Human soul\'s natural state is transient, like water, buddy. ):\n{list(ss)}")            
+        elif decis2 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
+            print('Heard.')
+        else:
+            logging.info('Unkown response, no details; proceding.')
+    
+    logging.info('Showing user file discrepancies completed.')
+    
+
+def udcheck(gates, caves):
+    if caves:
+        decis3 = input(f"Found {len(caves)} local-only directories. Do you want details? y/n: ")
+        if decis3 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
+            print(f"Caves (directories on the disk but not seen in server): {caves}.")
+        elif decis3 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
+            print('Bet.')
+            pass
+        else:
+            print('Couldn\'nt catch that.')
+
+    if gates:
+        decis4 = input(f"Found {len(gates)} local-only directories. Do you want to see details? y/n: ")
+        if decis4 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
+            print(f"Gates (directories on the disk but not seen in server): {gates}.")
+        elif decis4 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
+            print('Bet.')
+            pass
+        else:
+            print('Couldn\'nt catch that.')
+
+    logging.info('Showing user directory discrepancies completed.')
+
+
+if __name__ == "__main__":
+    logging.info('Rosa [contrast] executed.')
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    logging.info('Timer started.')
+
+    raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
+
+    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+        try:
+            raw_heaven = scope_rem(conn)
+            heaven_dirs = ping_cass(conn)
+
+            relics = contrast(raw_heaven, raw_hell)
+            hallowed = compare(heaven_dirs, hell_dirs)
+
+            if any(relics) or any(hallowed):
+                logging.info('Discrepancies found; showing to user.')
+
+                if any(relics):
+                    ucheck(*relics)
+
+                if any(hallowed):
+                    udcheck(*hallowed)
+            else:
+                print('No dif; All set.')
+
+        except (mysql.connector.Error, ConnectionError, Exception) as e:
+            logging.error(f"Exception occured while contrasting directories:{e}.", exc_info=True)
+            if conn and conn.is_connected():
+                try:
+                    conn.ping(reconnect=True, attempts=3, delay=0.5)
+                except(mysql.connector.Error, ConnectionError, Exception) as e:
+                    logging.error(f"Couldn't reconnect to server in three attempts: {e}.", exc_info=True)
+                    raise
+                else:
+                    logging.info('Main function failed but connection reconnected on error handling; will retry.')
+                    raw_heaven = scope_rem(conn)
+                    heaven_dirs = ping_cass(conn)
+
+                    if raw_heaven or heaven_dirs:
+                        relics(raw_heaven, raw_hell)
+                        hallowed = contrast(heaven_dirs, hell_dirs)
+
+                        if any(relics) or any(hallowed):
+                            logging.info('Discrepancies found during error handling; showing to user.')
+
+                            if any(relics):
+                                ucheck(*relics)
+
+                            if any(hallowed):
+                                udcheck(*hallowed)
+                        else:
+                            logging.info('No dif found during re-attempt.')
+            raise
+
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start
+
+        logging.info(f"Processing time for rosa [contrast]: {proc_time}.")
+
+    logging.info('[contrast] completed.')
+    print('All set.')
