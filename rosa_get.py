@@ -20,13 +20,14 @@ f_handler = logging.FileHandler('rosa.log', mode='a')
 f_handler.setLevel(logging.DEBUG)
 
 cons_handler = logging.StreamHandler()
-cons_handler.setLevel(logging.INFO)
+# cons_handler.setLevel(logging.INFO)
+cons_handler.setLevel(LOGGING_LEVEL.upper())
 
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[f_handler, cons_handler]
-)
+) # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
@@ -42,22 +43,20 @@ if __name__ == "__main__":
         logging.info('Timer started.')
 
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
+    # files, directories, folder full path
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn: # context manager for peace of mind
         raw_heaven = scope_rem(conn) # raw remote files & hash_id's
         heaven_dirs = ping_cass(conn) # raw remote dirs' rpath's
 
         heaven_data = [raw_heaven, heaven_dirs]
-        if heaven_data: # remote hashes & rpath's
+        if heaven_data: # remote hashes & relative paths
             logging.info('Data returned from heaven.')
 
-            cherubs, serpents, stags, souls = contrast(raw_heaven, raw_hell) 
-            # new, old, unchanged, changed file[s]
+            cherubs, serpents, stags, souls = contrast(raw_heaven, raw_hell) # new, old, unchanged, changed file[s]
+            f_delta = [cherubs, serpents, souls] # f_delta = altered file data
 
-            # f_delta = altered file data
-            f_delta = [cherubs, serpents, souls]
-
-            gates, caves = compare(heaven_dirs, hell_dirs) # new dir[s], old dir[s]
+            gates, caves = compare(heaven_dirs, hell_dirs) # new directory[s], old directory[s]
             d_delta = [gates, caves] # altered directory data
 
             if any(f_delta) or any(d_delta): # if file or folder data has been changed, continue to processing

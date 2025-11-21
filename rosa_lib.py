@@ -558,6 +558,7 @@ def collect_info(dicts_, abs_path): # give - a
 	"""
 	curr_batch = 0
 	total_size = 0
+
 	batch_items = []
 	all_batches = []
 	
@@ -622,7 +623,7 @@ def collect_data(dicts_, abs_path): # give - redundant
 				c_content = cmpr.compress(content)
 
 				size = len(c_content)
-				c_size += size
+				c_size += size # this and the line above are only for the size comparison; this should be moved to the collect_info fx for DRY
 
 				# hasher = hashlib.sha256()
 				hasher = xxhash.xxh64()
