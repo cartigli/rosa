@@ -8,7 +8,7 @@ import datetime
 from pathlib import Path # built into 3.4
 from contextlib import closing
 
-import mysql.connector
+# import mysql.connector - holy hell, removing this uneeded import cut down the time scan & check for changes in half
 
 from config import *
 from rosa_lib import (scope_loc, scope_rem,
@@ -19,18 +19,18 @@ from rosa_lib import (scope_loc, scope_rem,
     mk_dir, phone_duty #, init_conn
 )
 
-f_handler = logging.FileHandler('rosa.log', mode='a')
-f_handler.setLevel(logging.DEBUG)
+# f_handler = logging.FileHandler('rosa.log', mode='a')
+# f_handler.setLevel(logging.DEBUG)
 
-cons_handler = logging.StreamHandler()
-# cons_handler.setLevel(logging.INFO)
-cons_handler.setLevel(LOGGING_LEVEL.upper())
+# cons_handler = logging.StreamHandler()
+# # cons_handler.setLevel(logging.INFO)
+# cons_handler.setLevel(LOGGING_LEVEL.upper())
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[f_handler, cons_handler]
-) # DEBUG, INFO, WARNING, ERROR, CRITICAL
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[f_handler, cons_handler]
+# ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
@@ -39,7 +39,8 @@ delete old ones.
 """
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+def main():
     logging.info('Rosa [get] executed.')
     start = datetime.datetime.now(datetime.UTC).timestamp()
     if start:
@@ -150,3 +151,23 @@ if __name__ == "__main__":
 
     logging.info('[get] completed.')
     print('All set.')
+
+
+def init_logger():
+    f_handler = logging.FileHandler('rosa.log', mode='a')
+    f_handler.setLevel(logging.DEBUG)
+
+    cons_handler = logging.StreamHandler()
+    # cons_handler.setLevel(logging.INFO)
+    cons_handler.setLevel(LOGGING_LEVEL.upper())
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[f_handler, cons_handler]
+    ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+
+if __name__=="__main__":
+    init_logger()
+    main()

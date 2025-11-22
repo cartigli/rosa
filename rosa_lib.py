@@ -8,9 +8,10 @@ import datetime
 import contextlib
 from pathlib import Path
 
-import xxhash
-import mysql.connector
-import zstandard as zstd
+# these three are the only external packages required
+import xxhash # this one is optional and can be replaced with hashlib which is more secure & in the native python library
+import mysql.connector # to connect with the mysql server - helps prevent injection while building queries as well
+import zstandard as zstd # compressor for files before uploading and decompressing after download
 
 from queries import ASSESS
 from config import MAX_ALLOWED_PACKET # why am I not importing variables from the config directly into here? No point in having a middle-man - or is it better for tracing errors? Ig not seeing what is being passed could be sketch, but for the conn it does not change.

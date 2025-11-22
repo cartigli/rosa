@@ -7,7 +7,7 @@ import datetime
 from pathlib import Path
 from contextlib import closing
 
-# import mysql.connector
+import mysql.connector
 
 from config import *
 from rosa_lib import(scope_loc, scope_rem, 
@@ -99,7 +99,7 @@ def main():
                                     logging.critical(f"Exception while altering database: {c}. Will attempt to roll back on exit.", exc_info=True)
                                     raise
 
-                    if any(f_delta): # these next three lines initiate the variables to avoid an UnboundLocalError
+                    if any(f_delta): # these three lines just initiate the variables for UnboundLocalError avoidance
                         soul_size = serpent_size = 0 # before compression
                         csoul_size = cserpent_size = 0 # after compression
                         t_compression_size = 0 # count diff
@@ -160,29 +160,28 @@ def main():
                                             logging.critical(f"Exception while uploading local-only files: {c}. Will attempt roll back on exit.", exc_info=True)
                                             raise
                             
-                            if soul_size or serpent_size:
-                                t_size = soul_size + serpent_size # float 4 for both
-                                print(f"Total size before compression: {t_size:.4f}.")
+                            # if soul_size or serpent_size:
+                            t_size = soul_size + serpent_size # float 4 for both
+                            print(f"Total size before compression: {t_size:.4f}.")
+                            # if csoul_size or cserpent_size:
+                            ct_size = t_compression_size
+                            print(f"Total size after compression: {ct_size:.4f}.")
                             
-                            if csoul_size or cserpent_size:
-                                ct_size = t_compression_size
-                                print(f"Total size after compression: {ct_size:.4f}.")
-                            
-                            if ct_size and t_size:
-                                compressed = t_size - ct_size
-                                if compressed > 1024:
-                                    comp_kb = compressed / 1024
-                                    if comp_kb > 1000:
-                                        comp_mb = comp_kb / 1000
-                                        if comp_mb > 1000:
-                                            comp_gb = comp_mb / 1000
-                                            print(f"Disk space [in gb] saved by compression: {comp_gb:.4f}.")
-                                        else:
-                                            print(f"Disk space [in mb] saved by compression: {comp_mb:.4f}.")
+                            # if ct_size and t_size:
+                            compressed = t_size - ct_size
+                            if compressed > 1024:
+                                comp_kb = compressed / 1024
+                                if comp_kb > 1000:
+                                    comp_mb = comp_kb / 1000
+                                    if comp_mb > 1000:
+                                        comp_gb = comp_mb / 1000
+                                        print(f"Disk space [in gb] saved by compression: {comp_gb:.4f}.")
                                     else:
-                                        print(f"Disk space [in kb] saved by compression: {comp_kb:.4f}.")
+                                        print(f"Disk space [in mb] saved by compression: {comp_mb:.4f}.")
                                 else:
-                                    print(f"Disk space [in bytes] saved by compression: {compressed:.4f}.")
+                                    print(f"Disk space [in kb] saved by compression: {comp_kb:.4f}.")
+                            else:
+                                print(f"Disk space [in bytes] saved by compression: {compressed:.4f}.")
 
                     if start:
                         end = datetime.datetime.now(datetime.UTC).timestamp()
@@ -219,7 +218,7 @@ def main():
     print('All set.')
 
 
-def init_logger():
+def init_logging():
     f_handler = logging.FileHandler('rosa.log', mode='a')
     f_handler.setLevel(logging.DEBUG)
 
@@ -234,5 +233,5 @@ def init_logger():
 
 
 if __name__=="__main__":
-    init_logger()
+    init_logging()
     main()

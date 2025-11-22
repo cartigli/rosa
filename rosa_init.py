@@ -10,18 +10,18 @@ from config import *
 from queries import *
 from rosa_lib import phone_duty, confirm, init_conn
 
-f_handler = logging.FileHandler('rosa.log', mode='a')
-f_handler.setLevel(logging.DEBUG)
+# f_handler = logging.FileHandler('rosa.log', mode='a')
+# f_handler.setLevel(logging.DEBUG)
 
-cons_handler = logging.StreamHandler()
-# cons_handler.setLevel(logging.INFO)
-cons_handler.setLevel(LOGGING_LEVEL.upper())
+# cons_handler = logging.StreamHandler()
+# # cons_handler.setLevel(logging.INFO)
+# cons_handler.setLevel(LOGGING_LEVEL.upper())
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[f_handler, cons_handler]
-) # DEBUG, INFO, WARNING, ERROR, CRITICAL
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[f_handler, cons_handler]
+# ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 """
 Helper for executing the queries for:
@@ -155,7 +155,23 @@ def trigger_helper(conn):
                 print('Couldn\'t catch that.')
 
 
-if __name__=="__main__":
+def init_logger():
+    f_handler = logging.FileHandler('rosa.log', mode='a')
+    f_handler.setLevel(logging.DEBUG)
+
+    cons_handler = logging.StreamHandler()
+    # cons_handler.setLevel(logging.INFO)
+    cons_handler.setLevel(LOGGING_LEVEL.upper())
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[f_handler, cons_handler]
+    ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+
+# if __name__=="__main__":
+def main():
     logging.info('Rosa [init] executed.')
     start = datetime.datetime.now(datetime.UTC).timestamp()
     logging.info('Timer started.')
@@ -182,3 +198,8 @@ if __name__=="__main__":
 
     logging.info('[init] complete.')
     print('All set.')
+
+
+if __name__=="__main__":
+    init_logger()
+    main()

@@ -9,17 +9,17 @@ from rosa_lib import(
     phone_duty #, init_conn
 )
 
-f_handler = logging.FileHandler('rosa.log', mode='a')
-f_handler.setLevel(logging.DEBUG)
+# f_handler = logging.FileHandler('rosa.log', mode='a')
+# f_handler.setLevel(logging.DEBUG)
 
-cons_handler = logging.StreamHandler()
-cons_handler.setLevel(logging.INFO)
+# cons_handler = logging.StreamHandler()
+# cons_handler.setLevel(logging.INFO)
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[f_handler, cons_handler]
-)
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[f_handler, cons_handler]
+# )
 
 """
 Compare local data to server, report back.
@@ -89,7 +89,8 @@ def udcheck(gates, caves):
     logging.info('Showing user directory discrepancies completed.')
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+def main():
     logging.info('Rosa [contrast] executed.')
     start = datetime.datetime.now(datetime.UTC).timestamp()
     logging.info('Timer started.')
@@ -152,3 +153,22 @@ if __name__ == "__main__":
 
     logging.info('[contrast] completed.')
     print('All set.')
+
+
+def init_logger():
+    f_handler = logging.FileHandler('rosa.log', mode='a')
+    f_handler.setLevel(logging.DEBUG)
+
+    cons_handler = logging.StreamHandler()
+    cons_handler.setLevel(logging.INFO)
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[f_handler, cons_handler]
+    )
+
+
+if __name__=="__main__":
+    init_logger()
+    main()

@@ -1,6 +1,6 @@
 import os
 
-LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'info')
+LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
 # .upper() is applied so don't worry about capitilization
 
 DB_USER = os.getenv('DB_USER','username')

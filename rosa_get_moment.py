@@ -1,23 +1,27 @@
 import sys
 import logging
-from config import *
-import mysql.connector
+# from config import *
+# import mysql.connector
 from pathlib import Path
 from queries import SNAP
 from contextlib import closing
+
+import mysql.connector
+
+from config import *
 from rosa_lib import fat_boy, download_batches, phone_duty #, init_conn #, wr_data4
 
-f_handler = logging.FileHandler('rosa.log', mode='a')
-f_handler.setLevel(logging.DEBUG)
+# f_handler = logging.FileHandler('rosa.log', mode='a')
+# f_handler.setLevel(logging.DEBUG)
 
-cons_handler = logging.StreamHandler()
-cons_handler.setLevel(logging.ERROR)
+# cons_handler = logging.StreamHandler()
+# cons_handler.setLevel(logging.ERROR)
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[f_handler, cons_handler]
-)
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[f_handler, cons_handler]
+# )
 
 def get_snap(conn, SNAP):
     """
@@ -64,7 +68,8 @@ def get_dest(LOCAL_DIR):
         return snap_dest
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+def main():
     logging.info('Rosa [get] [moment] executed.')
     start = datetime.datetime.now(datetime.UTC).timestamp()
     logging.info('Timer started.')
@@ -112,3 +117,22 @@ if __name__ == "__main__":
     
     logging.info('[get] [moment] complete.')
     print('All set.')
+
+
+def init_logger():
+    f_handler = logging.FileHandler('rosa.log', mode='a')
+    f_handler.setLevel(logging.DEBUG)
+
+    cons_handler = logging.StreamHandler()
+    cons_handler.setLevel(logging.ERROR)
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[f_handler, cons_handler]
+    )
+
+
+if __name__=="__main__":
+    init_logger()
+    main()
