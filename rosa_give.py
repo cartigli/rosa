@@ -3,10 +3,13 @@ import sys
 import hashlib
 import logging
 import datetime
-from config import *
-import mysql.connector
+# import mysql.connector
 from pathlib import Path
 from contextlib import closing
+
+import mysql.connector
+
+from config import *
 from rosa_lib import(scope_loc, scope_rem, 
     ping_cass, contrast, compare, rm_remdir, 
     rm_remfile, collect_info, collect_data, 
@@ -161,11 +164,11 @@ if __name__ == "__main__":
                                             raise
                             
                             if soul_size or serpent_size:
-                                t_size = soul_size + serpent_size
+                                t_size = soul_size + serpent_size # float 4 for both
                                 print(f"Total size before compression: {t_size:.4f}.")
                             
                             if csoul_size or cserpent_size:
-                                ct_size = t_compression_size # float 4 for both
+                                ct_size = t_compression_size
                                 print(f"Total size after compression: {ct_size:.4f}.")
                             
                             if ct_size and t_size:

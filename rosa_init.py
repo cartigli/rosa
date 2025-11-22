@@ -2,10 +2,12 @@ import os
 import sys
 import logging
 import datetime
+from contextlib import closing
+
+import mysql.connector
+
 from config import *
 from queries import *
-import mysql.connector
-from contextlib import closing
 from rosa_lib import phone_duty, confirm, init_conn
 
 f_handler = logging.FileHandler('rosa.log', mode='a')

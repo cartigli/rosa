@@ -4,10 +4,13 @@ import shutil
 import hashlib
 import logging
 import datetime
-from config import *
-import mysql.connector
-from pathlib import Path
+# import mysql.connector
+from pathlib import Path # built into 3.4
 from contextlib import closing
+
+import mysql.connector
+
+from config import *
 from rosa_lib import (scope_loc, scope_rem,
     ping_cass, contrast, compare,
     calc_batch, # configure,

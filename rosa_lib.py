@@ -1,17 +1,16 @@
 import os
 import sys
 import shutil
-
-import zstandard as zstd
-# import hashlib
-import xxhash
 import logging
 import tempfile
 import datetime
-
+# import hashlib
 import contextlib
-import mysql.connector
 from pathlib import Path
+
+import xxhash
+import mysql.connector
+import zstandard as zstd
 
 from queries import ASSESS
 from config import MAX_ALLOWED_PACKET # why am I not importing variables from the config directly into here? No point in having a middle-man - or is it better for tracing errors? Ig not seeing what is being passed could be sketch, but for the conn it does not change.
