@@ -155,21 +155,6 @@ def trigger_helper(conn):
                 print('Couldn\'t catch that.')
 
 
-def init_logger():
-    f_handler = logging.FileHandler('rosa.log', mode='a')
-    f_handler.setLevel(logging.DEBUG)
-
-    cons_handler = logging.StreamHandler()
-    # cons_handler.setLevel(logging.INFO)
-    cons_handler.setLevel(LOGGING_LEVEL.upper())
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[f_handler, cons_handler]
-    ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
-
-
 # if __name__=="__main__":
 def main():
     logging.info('Rosa [init] executed.')
@@ -198,6 +183,21 @@ def main():
 
     logging.info('[init] complete.')
     print('All set.')
+
+
+def init_logger():
+    f_handler = logging.FileHandler('rosa.log', mode='a')
+    f_handler.setLevel(logging.DEBUG)
+
+    cons_handler = logging.StreamHandler()
+    # cons_handler.setLevel(logging.INFO)
+    cons_handler.setLevel(LOGGING_LEVEL.upper())
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[f_handler, cons_handler]
+    ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 
 if __name__=="__main__":

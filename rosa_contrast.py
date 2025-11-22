@@ -1,25 +1,13 @@
 import sys
 import logging
 import datetime
+
 from config import *
-import mysql.connector
 from rosa_lib import(
     scope_loc, scope_rem, ping_cass,
     contrast, compare,
     phone_duty #, init_conn
 )
-
-# f_handler = logging.FileHandler('rosa.log', mode='a')
-# f_handler.setLevel(logging.DEBUG)
-
-# cons_handler = logging.StreamHandler()
-# cons_handler.setLevel(logging.INFO)
-
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#     handlers=[f_handler, cons_handler]
-# )
 
 """
 Compare local data to server, report back.
@@ -93,7 +81,8 @@ def udcheck(gates, caves):
 def main():
     logging.info('Rosa [contrast] executed.')
     start = datetime.datetime.now(datetime.UTC).timestamp()
-    logging.info('Timer started.')
+    if start:
+        logging.info('Timer started.')
 
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
 
@@ -116,33 +105,8 @@ def main():
             else:
                 print('No dif; All set.')
 
-        except (mysql.connector.Error, ConnectionError, Exception) as e:
+        except (ConnectionError, Exception) as e:
             logging.error(f"Exception occured while contrasting directories:{e}.", exc_info=True)
-            if conn and conn.is_connected():
-                try:
-                    conn.ping(reconnect=True, attempts=3, delay=0.5)
-                except(mysql.connector.Error, ConnectionError, Exception) as e:
-                    logging.error(f"Couldn't reconnect to server in three attempts: {e}.", exc_info=True)
-                    raise
-                else:
-                    logging.info('Main function failed but connection reconnected on error handling; will retry.')
-                    raw_heaven = scope_rem(conn)
-                    heaven_dirs = ping_cass(conn)
-
-                    if raw_heaven or heaven_dirs:
-                        relics(raw_heaven, raw_hell)
-                        hallowed = contrast(heaven_dirs, hell_dirs)
-
-                        if any(relics) or any(hallowed):
-                            logging.info('Discrepancies found during error handling; showing to user.')
-
-                            if any(relics):
-                                ucheck(*relics)
-
-                            if any(hallowed):
-                                udcheck(*hallowed)
-                        else:
-                            logging.info('No dif found during re-attempt.')
             raise
 
     if start:
@@ -160,7 +124,7 @@ def init_logger():
     f_handler.setLevel(logging.DEBUG)
 
     cons_handler = logging.StreamHandler()
-    cons_handler.setLevel(logging.INFO)
+    cons_handler.setLevel(LOGGING_LEVEL.upper())
 
     logging.basicConfig(
         level=logging.DEBUG,

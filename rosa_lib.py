@@ -422,6 +422,47 @@ def download_batches(flist, conn, batch_size, tmp_): # get
 			logger.info('Atomic wr w batched download complete.')
 
 
+def download_batches2(flist, conn, batch_size, tmp_): # get
+	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
+	dictionaries from contrast and makes them into queries for the given file[s]. *Executemany() cannot be used with SELECT; it is for DML quries only.
+	This function passes the found data to the wr_data function, which writes the new data structure to the disk.
+	"""
+	paths = [item[0] for item in flist]
+	params = ', '.join(['%s']* len(paths))
+
+	batch_size = batch_size
+	offset = 0
+
+	with conn.cursor() as cursor:
+		try:
+			while True:
+				query = f"SELECT frp, content FROM notes WHERE frp IN ({params}) LIMIT {batch_size} OFFSET {offset};"
+
+				try:
+					cursor.execute(query, paths)
+					batch = cursor.fetchall()
+					logger.info('Got one batch of data.')
+
+				except (mysql.connector.Error, ConnectionError, KeyboardInterrupt) as c:
+					logger.critical(f"Error while trying to download data: {c}.", exc_info=True)
+					raise
+				else:
+					if batch:
+						wr_batches(batch, tmp_)
+						logger.info('Wrote batch to disk.')
+
+					if len(batch) < batch_size:
+						break
+
+					offset += batch_size
+
+		except: # tout de monde
+			logger.critical('Error while attempting batched atomic write.', exc_info=True)
+			raise
+		else:
+			logger.info('Atomic wr w batched download complete.')
+
+
 def wr_batches(data, tmp_):
 	"""Writes each batch to the _tmp directory as they are pulled. Each file has it and its parent directory flushed from memory for assurance of atomicy."""
 	dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh

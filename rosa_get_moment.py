@@ -1,27 +1,17 @@
 import sys
 import logging
-# from config import *
-# import mysql.connector
+import datetime
 from pathlib import Path
 from queries import SNAP
 from contextlib import closing
 
-import mysql.connector
-
 from config import *
-from rosa_lib import fat_boy, download_batches, phone_duty #, init_conn #, wr_data4
+from rosa_lib import fat_boy, calc_batch, download_batches2, phone_duty #, init_conn #, wr_data4
 
-# f_handler = logging.FileHandler('rosa.log', mode='a')
-# f_handler.setLevel(logging.DEBUG)
+"""
+Downloads the servers contents from a given moment using recorded UTC timestamps.
+"""
 
-# cons_handler = logging.StreamHandler()
-# cons_handler.setLevel(logging.ERROR)
-
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#     handlers=[f_handler, cons_handler]
-# )
 
 def get_snap(conn, SNAP):
     """
@@ -33,14 +23,11 @@ def get_snap(conn, SNAP):
         logging.info('Getting a date to grab a snapshot from.')
         moment = input(f"Please provide a time to get the state of your server from that moment (ex: [1999-12-31 24:60:60]): ")
 
-        # for i in range(6): # x
-        #     secs['moment']=moment # x
-
         moments = (moment,)*6
         try:
             cursor.execute(SNAP, moments)
 
-        except (mysql.connector.Error, ConnectionError, Exception) as c:
+        except (ConnectionError, Exception) as c:
             logging.error(f"Exception encountered while attempting to get moment: {c}.")
             raise
         else:
@@ -55,10 +42,10 @@ def get_snap(conn, SNAP):
 
 
 def get_dest(LOCAL_DIR):
-    """
-    Ask the user for a moment to get a snapshot from; pass it forward to get_snap.
-    """
-    snap_dest = Path( LOCAL_DIR / snapshot ).resolve()
+    # """
+    # Ask the user for a path to write the moment's contents to. Default is LOCAL_DIR from config.
+    # """
+    snap_dest = Path(LOCAL_DIR).resolve()
     upath = input(f"Where do you want this written to? The default is: {snap_dest} and will overwrite your files. If you want another location, enter here: ")
     if upath:
         logging.info('User provided a new path.')
@@ -82,28 +69,26 @@ def main():
             if snapshot:
                 upath = get_dest(LOCAL_DIR)
                 with fat_boy(upath) as (tmp_, backup):
-                    try:
-                        conn.ping(reconnect=True, attempts=3, delay=0.5)
+                    batch_size = calc_batch(conn)
 
-                    except (mysql.connector.Error, ConnectionError, Exception) as e:
+                    if batch_size:
+                        logging.info(f"Found batch size: {batch_size}.")
+                    try:
+                        download_batches2(snapshot, conn, batch_size, tmp_)
+
+                    except (PermissionError, FileNotFoundError, Exception) as e:
                         logging.error(f"Exception encountered while attempting atomic wr for [get] [moment]: {e}.", exc_info=True)
                         raise
                     else:
-                        try:
-                            download_batches(snapshot, tmp_)
-
-                        except (PermissionError, FileNotFoundError, Exception) as e:
-                            logging.error(f"Exception encountered while attempting atomic wr for [get] [moment]: {e}.", exc_info=True)
-                            raise
-                        else:
-                            logging.info('No exceptions caught during atomic wr for [get] [moment].')
+                        logging.info('No exceptions caught during atomic wr for [get] [moment].')
                 
                 logging.info('Fat boy closed & cleaned.')
             
             else:
                 logging.warning('No data returned from moment; do records exist at this time?')
         
-        except (mysql.connector.Error, ConnectionError, Exception) as e:
+        # except (mysql.connector.Error, ConnectionError, Exception) as e:
+        except (ConnectionError, Exception) as e:
             logging.error(f"Error encountered while obtaining moment: {e}.", exc_info=True)
             raise
         else:
@@ -124,7 +109,7 @@ def init_logger():
     f_handler.setLevel(logging.DEBUG)
 
     cons_handler = logging.StreamHandler()
-    cons_handler.setLevel(logging.ERROR)
+    cons_handler.setLevel(LOGGING_LEVEL.upper())
 
     logging.basicConfig(
         level=logging.DEBUG,
