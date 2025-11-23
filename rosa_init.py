@@ -4,7 +4,7 @@ import logging
 import datetime
 from contextlib import closing
 
-import mysql.connector
+# import mysql.connector
 
 from config import *
 from queries import *
@@ -157,9 +157,9 @@ def trigger_helper(conn):
 
 # if __name__=="__main__":
 def main():
-    logging.info('Rosa [init] executed.')
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    logging.info('Timer started.')
+    # logging.info('Rosa [init] executed.')
+    # start = datetime.datetime.now(datetime.UTC).timestamp()
+    # logging.info('Timer started.')
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
         try:
@@ -169,17 +169,17 @@ def main():
             confirm(conn)
             logging.info('Decision made, and relayed to the server.')
 
-        except (mysql.connector.Error, ConnectionError, Exception) as e:
+        # except (mysql.connector.Error, ConnectionError, Exception) as e:
+        except (ConnectionError, Exception) as e:
             logging.error(f"Exception encountered while initiating server: {e}.", exc_info=True)
             raise
         else:
             logging.info('Initiation faced no exceptions.')
 
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start
-
-        logging.info(f"Processing time for rosa [init]: {proc_time}.")
+    # if start:
+    #     end = datetime.datetime.now(datetime.UTC).timestamp()
+    #     proc_time = end - start
+    #     logging.info(f"Processing time for rosa [init]: {proc_time}.")
 
     logging.info('[init] complete.')
     print('All set.')
@@ -202,4 +202,19 @@ def init_logger():
 
 if __name__=="__main__":
     init_logger()
+    logging.info('Rosa [init] executed.')
+
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    if start:
+        logging.info('[init] timer started.')
+
     main()
+
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start
+        if proc_time > 60:
+            mins = proc_time / 60
+            logging.info(f"Total processing time [in minutes] for rosa [init]: {mins:.3f}.")
+        else:
+            logging.info(f"Total processing time [in seconds] for rosa [init]: {proc_time:.3f}.")

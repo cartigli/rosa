@@ -15,7 +15,7 @@ from rosa_lib import (scope_loc, scope_rem,
     ping_cass, contrast, compare,
     calc_batch, # configure,
     download_batches, # apply_atomicy, 
-    fat_boy,
+    fat_boy, save_people,
     mk_dir, phone_duty #, init_conn
 )
 
@@ -41,10 +41,10 @@ delete old ones.
 
 # if __name__ == "__main__":
 def main():
-    logging.info('Rosa [get] executed.')
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    if start:
-        logging.info('Timer started.')
+    # logging.info('Rosa [get] executed.')
+    # start = datetime.datetime.now(datetime.UTC).timestamp()
+    # if start:
+    #     logging.info('Timer started.')
 
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
     # files, directories, folder full path
@@ -140,14 +140,14 @@ def main():
         else:
             logging.info('Server is devoid of data.')
     
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start 
-        if proc_time > 60:
-            min_time = proc_time / 60
-            logging.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
-        else:
-            logging.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
+    # if start:
+    #     end = datetime.datetime.now(datetime.UTC).timestamp()
+    #     proc_time = end - start 
+    #     if proc_time > 60:
+    #         min_time = proc_time / 60
+    #         logging.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
+    #     else:
+    #         logging.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
 
     logging.info('[get] completed.')
     print('All set.')
@@ -170,4 +170,19 @@ def init_logger():
 
 if __name__=="__main__":
     init_logger()
+    logigng.info('Rosa [get] executed.')
+
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    if start:
+        logging.info('[get] timer started.')
+
     main()
+
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start 
+        if proc_time > 60:
+            min_time = proc_time / 60
+            logging.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
+        else:
+            logging.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")

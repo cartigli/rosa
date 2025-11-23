@@ -58,8 +58,8 @@ def get_dest(LOCAL_DIR):
 # if __name__ == "__main__":
 def main():
     logging.info('Rosa [get] [moment] executed.')
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    logging.info('Timer started.')
+    # start = datetime.datetime.now(datetime.UTC).timestamp()
+    # logging.info('Timer started.')
 
     abs_path = Path(LOCAL_DIR).resolve()
 
@@ -94,11 +94,10 @@ def main():
         else:
             logging.info('[moment] main function complete without exception.')
 
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start
-
-        logging.info(f"Processing time for rosa [get] [moment]: {proc_time}.")
+    # if start:
+    #     end = datetime.datetime.now(datetime.UTC).timestamp()
+    #     proc_time = end - start
+    #     logging.info(f"Processing time for rosa [get] [moment]: {proc_time}.")
     
     logging.info('[get] [moment] complete.')
     print('All set.')
@@ -120,4 +119,19 @@ def init_logger():
 
 if __name__=="__main__":
     init_logger()
+    logging.info('Rosa [get] [moment] executed.')
+
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    if start:
+        logging.info('[get] [moment] timer started.')
+
     main()
+
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start 
+        if proc_time > 60:
+            min_time = proc_time / 60
+            logging.info(f"Processing time [in minutes] for rosa [get] [moment]: {min_time:.4f}.")
+        else:
+            logging.info(f"Processing time [in seconds] for rosa [get] [moment]: {proc_time:.4f}.")

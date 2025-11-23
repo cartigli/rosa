@@ -79,10 +79,10 @@ def udcheck(gates, caves):
 
 # if __name__ == "__main__":
 def main():
-    logging.info('Rosa [contrast] executed.')
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    if start:
-        logging.info('Timer started.')
+    # logging.info('Rosa [contrast] executed.')
+    # start = datetime.datetime.now(datetime.UTC).timestamp()
+    # if start:
+    #     logging.info('Timer started.')
 
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
 
@@ -109,11 +109,10 @@ def main():
             logging.error(f"Exception occured while contrasting directories:{e}.", exc_info=True)
             raise
 
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start
-
-        logging.info(f"Processing time for rosa [contrast]: {proc_time}.")
+    # if start:
+    #     end = datetime.datetime.now(datetime.UTC).timestamp()
+    #     proc_time = end - start
+    #     logging.info(f"Processing time for rosa [contrast]: {proc_time}.")
 
     logging.info('[contrast] completed.')
     print('All set.')
@@ -135,4 +134,19 @@ def init_logger():
 
 if __name__=="__main__":
     init_logger()
+    logging.info('Rosa [contrast] executed.')
+
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    if start:
+        logging.info('[contrast] timer started.')
+
     main()
+
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start
+        if proc_time > 60:
+            mins = proc_time / 60
+            logging.info(f"Total processing time [in minutes] for rosa [contrast]: {mins:.3f}.")
+        else:
+            logging.info(f"Total processing time [in seconds] for rosa [contrast]: {proc_time:.3f}.")

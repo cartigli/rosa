@@ -10,10 +10,11 @@ from contextlib import closing
 # import mysql.connector
 
 from config import *
+# from rosa_addfxs import batcher
 from rosa_lib import(scope_loc, scope_rem, 
     ping_cass, contrast, compare, rm_remdir, 
     rm_remfile, collect_info, collect_data, 
-    upload_dirs, upload_created, 
+    upload_dirs, upload_created, # calc_compression,
     upload_edited, confirm, 
     phone_duty #,init_conn
 )
@@ -39,11 +40,6 @@ of directories if not found locally, and add new ones.
 
 # if __name__ == "__main__":
 def main():
-    logging.info('Rosa [give] executed.')
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    if start:
-        logging.info('Timer started.')
-
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
     # files, directories, folder full path
 
@@ -69,7 +65,8 @@ def main():
                         try:
                             conn.ping(reconnect=True, attempts=3, delay=0.5)
 
-                        except (mysql.connector.Error, ConnectionError, Exception) as mce:
+                        # except (mysql.connector.Error, ConnectionError, Exception) as mce:
+                        except (ConnectionError, Exception) as mce:
                             logging.critical(f"Connection to server is faulty: {mce}.", exc_info=True)
                             raise
                         else:
@@ -82,7 +79,8 @@ def main():
                                     rm_remdir(conn, gates) # delete remote-only[s] from server
                                     logging.info('Removed remote-only directories.')
 
-                                except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                # except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                except (ConnectionError, Exception) as c:
                                     logging.critical(f"Exception while altering database: {c}. Will attempt to roll back on exit.", exc_info=True)
                                     raise
 
@@ -95,20 +93,22 @@ def main():
                                     upload_dirs(conn, caves) # upload local-only[s] to server
                                     logging.info('Local-only directories uploaded.')
                         
-                                except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                # except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                except (ConnectionError, Exception) as c:
                                     logging.critical(f"Exception while altering database: {c}. Will attempt to roll back on exit.", exc_info=True)
                                     raise
 
                     if any(f_delta): # these next three lines initiate the variables to avoid an UnboundLocalError
-                        soul_size = serpent_size = 0 # before compression
-                        csoul_size = cserpent_size = 0 # after compression
-                        t_compression_size = 0 # count diff
+                        # soul_size = serpent_size = 0 # before compression
+                        # csoul_size = cserpent_size = 0 # after compression
+                        # t_compression_size = ct_size = t_size = 0 # count diff
 
                         try:
                             # reconfirm connection again; meat & potatoes are here
                             conn.ping(reconnect=True, attempts=3, delay=0.5)
 
-                        except (mysql.connector.Error, ConnectionError, Exception) as mce:
+                        # except (mysql.connector.Error, ConnectionError, Exception) as mce:
+                        except (ConnectionError, Exception) as mce:
                             logging.critical(f"Connection to server is faulty: {mce}.", exc_info=True)
                             raise
                         else:
@@ -121,79 +121,92 @@ def main():
                                     rm_remfile(conn, cherubs) # delete remote-only file[s]
                                     logging.info('Removed remote-only files.')
 
-                                except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                # except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                except (ConnectionError, Exception) as c:
                                     logging.critical(f"Exception while deleting remote-only files: {c}. Will attempt roll back on exit.", exc_info=True)
                                     raise
 
                             if souls:
                                 # create lists of files to upload based on their size & the MAX_ALLOWED_PACKET
-                                soul_batches, soul_size = collect_info(souls, abs_path) # returns batches
+                                # soul_batches, soul_size = collect_info(souls, abs_path) # returns batches
+                                soul_batches = collect_info(souls, abs_path) # returns batches
                                 for batch in soul_batches:
                                     # batch by batch, collect the content/hashes/relative paths into memory . . .
-                                    soul_data, csoul_size = collect_data(batch, abs_path)
-                                    t_compression_size += csoul_size # count size rq
+                                    # soul_data, csoul_size = collect_data(batch, abs_path)
+                                    soul_data = collect_data(batch, abs_path)
+                                    # t_compression_size += csoul_size # count size rq
                                     if soul_data:
+                                # soul_data = batcher(souls, abs_path)
                                         logging.info('Obtained batched data for files with hash discrepancies.')
                                         try:
                                             # and upload the batch tp the server; repeat
                                             upload_edited(conn, soul_data)
                                             logging.info('Wrote batch to server.')
 
-                                        except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                        # except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                        except (ConnectionError, Exception) as c:
                                             logging.critical(f"Exception while uploading altered files: {c}. Will attempt roll back on exit.", exc_info=True)
                                             raise
 
                             if serpents:
                                 # identical to souls upload block
-                                serpent_batches, serpent_size = collect_info(serpents, abs_path)
+                                # serpent_batches, serpent_size = collect_info(serpents, abs_path)
+                                serpent_batches = collect_info(serpents, abs_path)
                                 for batch in serpent_batches:
-                                    serpent_data, cserpent_size = collect_data(batch, abs_path)
-                                    t_compression_size += cserpent_size # count compressed size
+                                    # serpent_data, cserpent_size = collect_data(batch, abs_path)
+                                    serpent_data = collect_data(batch, abs_path)
+                                    # t_compression_size += cserpent_size # count compressed size
                                     if serpent_data:
+                                # serpent_data = batcher(serpents, abs_path)
                                         logging.info('Obtained batched data for local-only files.')
                                         try:
                                             # upload the current batch
                                             upload_created(conn, serpent_data)
                                             logging.info('Wrote batch to server.')
 
-                                        except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                        # except (mysql.connector.Error, ConnectionError, Exception) as c:
+                                        except (ConnectionError, Exception) as c:
                                             logging.critical(f"Exception while uploading local-only files: {c}. Will attempt roll back on exit.", exc_info=True)
                                             raise
                             
-                            if soul_size or serpent_size:
-                                t_size = soul_size + serpent_size # float 4 for both
-                                print(f"Total size before compression: {t_size:.4f}.")
+                            # if soul_size or serpent_size:
+                                # t_size = soul_size + serpent_size # float 4 for both
+                                # print(f"Total size before compression: {t_size:.4f}.")
                             
-                            if csoul_size or cserpent_size:
-                                ct_size = t_compression_size
-                                print(f"Total size after compression: {ct_size:.4f}.")
+                            # if csoul_size or cserpent_size:
+                            #     ct_size = t_compression_size
+                                # print(f"Total size after compression: {ct_size:.4f}.")
                             
-                            if ct_size and t_size:
-                                compressed = t_size - ct_size
-                                if compressed > 1024:
-                                    comp_kb = compressed / 1024
-                                    if comp_kb > 1000:
-                                        comp_mb = comp_kb / 1000
-                                        if comp_mb > 1000:
-                                            comp_gb = comp_mb / 1000
-                                            print(f"Disk space [in gb] saved by compression: {comp_gb:.4f}.")
-                                        else:
-                                            print(f"Disk space [in mb] saved by compression: {comp_mb:.4f}.")
-                                    else:
-                                        print(f"Disk space [in kb] saved by compression: {comp_kb:.4f}.")
-                                else:
-                                    print(f"Disk space [in bytes] saved by compression: {compressed:.4f}.")
+                            # if ct_size and t_size:
+                                # calc_compression(t_size, ct_size)
+                                # compressed = t_size - ct_size
+                                # if compressed > 1024:
+                                #     comp_kb = compressed / 1024
+                                #     if comp_kb > 1000:
+                                #         comp_mb = comp_kb / 1000
+                                #         if comp_mb > 1000:
+                                #             comp_gb = comp_mb / 1000
+                                #             print(f"Disk space [in gb] saved by compression: {comp_gb:.4f}.")
+                                #         else:
+                                #             print(f"Disk space [in mb] saved by compression: {comp_mb:.4f}.")
+                                #     else:
+                                #         print(f"Disk space [in kb] saved by compression: {comp_kb:.4f}.")
+                                # else:
+                                #     print(f"Disk space [in bytes] saved by compression: {compressed:.4f}.")
 
                     if start:
                         end = datetime.datetime.now(datetime.UTC).timestamp()
                         proc_time = end - start
                         if proc_time > 60:
                             min_time = proc_time / 60
-                            logging.info(f"Upload time [in minutes] for rosa [give]: {min_time:.3f}.")
+                            # logging.info(f"Upload time [in minutes] for rosa [give]: {min_time:.3f}.")
+                            print(f"Upload time [in minutes] for rosa [give]: {min_time:.3f}.")
                         else:
-                            logging.info(f"Upload time [in seconds] for rosa [give]: {proc_time:.3f}.")
+                            # logging.info(f"Upload time [in seconds] for rosa [give]: {proc_time:.3f}.")
+                            print(f"Upload time [in seconds] for rosa [give]: {proc_time:.3f}.")
 
-                except (mysql.connector.Error, ConnectionError, Exception) as c:
+                # except (mysql.connector.Error, ConnectionError, Exception) as c:
+                except (ConnectionError, Exception) as c:
                     logging.critical('Exception encountered while attempting to upload data.', exc_info=True)
                     raise
                 else:
@@ -205,15 +218,6 @@ def main():
 
         else: # if server is empty, let us know
             logging.info('Server is devoid of data.')
-
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start
-        if proc_time > 60:
-            mins = proc_time / 60
-            logging.info(f"Total processing time [in minutes] for rosa [give]: {mins:.3f}.")
-        else:
-            logging.info(f"Total processing time [in seconds] for rosa [give]: {proc_time:.3f}.")
 
     logging.info('[give] complete.')
     print('All set.')
@@ -235,4 +239,19 @@ def init_logger():
 
 if __name__=="__main__":
     init_logger()
+    logging.info('Rosa [give] executed.')
+
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    if start:
+        logging.info('[give] timer started.')
+
     main()
+
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start
+        if proc_time > 60:
+            mins = proc_time / 60
+            logging.info(f"Total processing time [in minutes] for rosa [give]: {mins:.3f}.")
+        else:
+            logging.info(f"Total processing time [in seconds] for rosa [give]: {proc_time:.3f}.")
