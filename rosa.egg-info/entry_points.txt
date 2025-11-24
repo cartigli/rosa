@@ -1,0 +1,2 @@
+[console_scripts]
+rosa = rosa.router:main

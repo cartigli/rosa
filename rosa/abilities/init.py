@@ -1,27 +1,11 @@
-import os
-import sys
+#!/usr/bin/env python3
 import logging
 import datetime
-from contextlib import closing
 
-# import mysql.connector
+from rosa.abilities.config import *
+from rosa.abilities.queries import *
+from rosa.abilities.lib import phone_duty, confirm, init_conn
 
-from config import *
-from queries import *
-from rosa_lib import phone_duty, confirm, init_conn
-
-# f_handler = logging.FileHandler('rosa.log', mode='a')
-# f_handler.setLevel(logging.DEBUG)
-
-# cons_handler = logging.StreamHandler()
-# # cons_handler.setLevel(logging.INFO)
-# cons_handler.setLevel(LOGGING_LEVEL.upper())
-
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#     handlers=[f_handler, cons_handler]
-# ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 """
 Helper for executing the queries for:
@@ -37,12 +21,14 @@ Asks to user to confirm before committing to the server, just like rosa_give.
 """
 
 def table_helper(conn):
+    logger = logging.getLogger(__name__)
+
     with conn.cursor() as cursor:
         cursor.execute(T_CHECK)
         qtables = cursor.fetchall()
 
     if qtables:
-        logging.info('Obtained table data from db.')
+        logger.info('Obtained table data from db.')
         decis = input(f"Found these tables: {qtables} in the db; do you want to [t] truncate data, [d] drop tables, or [p] pass? ")
         
         if decis in ('t', 'T', 'truncate', 'Truncate', 'TRUNCATE'):
@@ -54,10 +40,10 @@ def table_helper(conn):
                         pass
 
                 except ConnectionError as c:
-                    logging.error(f"Connection Error encountered while attempting to truncate tables: {c}. Rolling back.", exc_info=True)
+                    logger.error(f"Connection Error encountered while attempting to truncate tables: {c}. Rolling back.", exc_info=True)
                     raise
                 else:
-                    logging.info('Tables truncated.')
+                    logger.info('Tables truncated.')
 
         elif decis in ('d', 'D', 'drop', 'Drop', 'DROP'):
             with conn.cursor() as cursor:
@@ -68,12 +54,12 @@ def table_helper(conn):
                         pass
 
                 except ConnectionError as c:
-                    logging.error(f"Connection Error encountered while attempting to drop tables: {c}. Rolling back.", exc_info=True)
+                    logger.error(f"Connection Error encountered while attempting to drop tables: {c}. Rolling back.", exc_info=True)
                     raise
                 else:
-                    logging.info('Tables dropped.')
+                    logger.info('Tables dropped.')
         else:
-            logging.info('No selection made.')
+            logger.info('No selection made.')
             print('Moving on.')
             pass
     else:
@@ -88,16 +74,18 @@ def table_helper(conn):
                         pass
 
                 except ConnectionError as c:
-                    logging.error(f"Connection Error encountered while attempting to initiate database: {c}. Rolling back.", exc_info=True)
+                    logger.error(f"Connection Error encountered while attempting to initiate database: {c}. Rolling back.", exc_info=True)
                     raise
                 else:
-                    logging.info('Created tables.')
+                    logger.info('Created tables.')
         else:
-            logging.info('No selection made.')
+            logger.info('No selection made.')
             print('For sure.')
 
 
 def trigger_helper(conn):
+    logger = logging.getLogger(__name__)
+
     with conn.cursor() as cursor:
         cursor.execute(TRIG_CHECK)
         trigs = cursor.fetchall()
@@ -112,12 +100,12 @@ def trigger_helper(conn):
                         cursor.execute(f)
 
                 except ConnectionError as c:
-                    logging.error(f"Connection Error encountered while attempting to replace triggers: {c}. Rolling back.", exc_info=True)
+                    logger.error(f"Connection Error encountered while attempting to replace triggers: {c}. Rolling back.", exc_info=True)
                     raise
                 else:
                     cursor.execute(EDIT_TRIGGER)
                     cursor.execute(DELETE_TRIGGER)
-                    logging.info('Dropped & replaced triggers.')
+                    logger.info('Dropped & replaced triggers.')
             
             elif decis2 in ('e', 'E', 'erase', 'Erase', 'ERASE'):
                 try:
@@ -126,13 +114,13 @@ def trigger_helper(conn):
                         cursor.execute(f)
 
                 except ConnectionError as c:
-                    logging.error(f"Connection Error encountered while attempting to erase triggers: {c}. Rolling back.", exc_info=True)
+                    logger.error(f"Connection Error encountered while attempting to erase triggers: {c}. Rolling back.", exc_info=True)
                     raise
                 else:
-                    logging.info('Dropped triggers.')
+                    logger.info('Dropped triggers.')
 
             else:
-                logging.info('No selection made.')
+                logger.info('No selection made.')
                 print('Cool.')
 
         else:
@@ -144,10 +132,10 @@ def trigger_helper(conn):
                     cursor.execute(DELETE_TRIGGER)
 
                 except ConnectionError as c:
-                    logging.error(f"Connection Error encountered while attempting to create triggers: {c}. Rolling back.", exc_info=True)
+                    logger.error(f"Connection Error encountered while attempting to create triggers: {c}. Rolling back.", exc_info=True)
                     raise
                 else:
-                    logging.info('Triggers created.')
+                    logger.info('Triggers created.')
 
             elif decis3 in ('n', 'N', 'no', 'No', 'NO', 'nope', 'hell no', 'naw'):
                 print('Got it.')
@@ -155,11 +143,13 @@ def trigger_helper(conn):
                 print('Couldn\'t catch that.')
 
 
-# if __name__=="__main__":
 def main():
-    # logging.info('Rosa [init] executed.')
-    # start = datetime.datetime.now(datetime.UTC).timestamp()
-    # logging.info('Timer started.')
+    logger = logging.getLogger(__name__)
+    logger.info('Rosa [init] executed.')
+
+    start = datetime.datetime.now(datetime.UTC).timestamp()
+    if start:
+        logger.info('[init] timer started.')
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
         try:
@@ -167,21 +157,26 @@ def main():
             trigger_helper(conn)
         
             confirm(conn)
-            logging.info('Decision made, and relayed to the server.')
+            logger.info('Decision made, and relayed to the server.')
 
         # except (mysql.connector.Error, ConnectionError, Exception) as e:
         except (ConnectionError, Exception) as e:
-            logging.error(f"Exception encountered while initiating server: {e}.", exc_info=True)
+            logger.error(f"Exception encountered while initiating server: {e}.", exc_info=True)
             raise
         else:
-            logging.info('Initiation faced no exceptions.')
+            logger.info('Initiation faced no exceptions.')
 
-    # if start:
-    #     end = datetime.datetime.now(datetime.UTC).timestamp()
-    #     proc_time = end - start
-    #     logging.info(f"Processing time for rosa [init]: {proc_time}.")
+    logger.info('[init] complete.')
 
-    logging.info('[init] complete.')
+    if start:
+        end = datetime.datetime.now(datetime.UTC).timestamp()
+        proc_time = end - start
+        if proc_time > 60:
+            mins = proc_time / 60
+            logger.info(f"Total processing time [in minutes] for rosa [init]: {mins:.3f}.")
+        else:
+            logger.info(f"Total processing time [in seconds] for rosa [init]: {proc_time:.3f}.")
+
     print('All set.')
 
 
@@ -190,10 +185,9 @@ def init_logger():
     f_handler.setLevel(logging.DEBUG)
 
     cons_handler = logging.StreamHandler()
-    # cons_handler.setLevel(logging.INFO)
     cons_handler.setLevel(LOGGING_LEVEL.upper())
 
-    logging.basicConfig(
+    logger.basicConfig(
         level=logging.DEBUG,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[f_handler, cons_handler]
@@ -202,19 +196,19 @@ def init_logger():
 
 if __name__=="__main__":
     init_logger()
-    logging.info('Rosa [init] executed.')
+    # logging.info('Rosa [init] executed.')
 
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    if start:
-        logging.info('[init] timer started.')
+    # start = datetime.datetime.now(datetime.UTC).timestamp()
+    # if start:
+    #     logging.info('[init] timer started.')
 
     main()
 
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start
-        if proc_time > 60:
-            mins = proc_time / 60
-            logging.info(f"Total processing time [in minutes] for rosa [init]: {mins:.3f}.")
-        else:
-            logging.info(f"Total processing time [in seconds] for rosa [init]: {proc_time:.3f}.")
+    # if start:
+    #     end = datetime.datetime.now(datetime.UTC).timestamp()
+    #     proc_time = end - start
+    #     if proc_time > 60:
+    #         mins = proc_time / 60
+    #         logging.info(f"Total processing time [in minutes] for rosa [init]: {mins:.3f}.")
+    #     else:
+    #         logging.info(f"Total processing time [in seconds] for rosa [init]: {proc_time:.3f}.")

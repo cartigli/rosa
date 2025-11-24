@@ -1,0 +1,24 @@
+Metadata-Version: 2.4
+Name: rosa
+Version: 0.1.0
+Summary: versioning system with history tracking & hash verification
+Requires-Python: >=3.14.0
+Description-Content-Type: text/markdown
+Requires-Dist: xxhash
+Requires-Dist: mysql-connector-python
+Requires-Dist: zstandard
+
+This is the child of snql3 [check my profile] built for more robust uploading, downloading, and versioning. Some significant changes between the two are batched uploads / downloads (snql3 is fundamentally limited by the size of the maximum network packet), atomic writes when downloading (all nothing), and aggressive rollback on error when uploading. The hash generation was also delegated to xxhash instead of hashlib for speed/computational efficiency, and checkpoints like timing of uploads/downloads and the size before/after compression were included (compression is also present before uploading, and decompression during downloading).
+
+The improvements made around speed allow the modern pc hosting the MySQL server to download and write 3 GB worth of files in under 10 seconds and upload the same in under a minute. An older generation laptop running Arch Linux ran the same download of the remote server in under 2 minutes and uploaded the same in 2.1 minutes.
+
+Other improvements/adjustments are the MAX_ALLOWED_PACKET variable in the config file; this determines or helps provide a base for the ideal packet size for uploading and downloading. The batch_sizes are calculated based off this variable and averages of the server's table. Determining the files' size based off of their counted content was replaced with os.path.getsize() which is multitudes faster than reading the file [duh] and the server's average record size was changed from AVG_ROW_LENGTH to AVG(OCTET_LENGTH()) which is faster and more accurate. Also, compression with zstandard was added before uploading and the connection obj's config included use_pure: False to attempt to use the C backend for faster connection operations. If this fails, the fallback to use_pure: True is immediate and silent.
+
+The next big change needed is autonomous or asynchronous refactoring of the deltas table to only track differences generated with diff_match_patch, for an extreme efficiency upgrade compared to tracking the entire file's previous content. It needs to be asynchronous/autonomous because the atomic-y of the current config would face trouble attempting to compute the diff while doing an all-or-nothing upload.
+
+Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
+
+Required packages:
+  - xxhash (unless using hashlib; xxhash is mad fast but less secure. Just swap the code with xxhash for the commented out hashlib functions)
+  - mysql-connector-python (connection)
+  - Zstandard (compression)

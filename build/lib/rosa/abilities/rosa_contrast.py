@@ -1,4 +1,4 @@
-import sys
+#!/usr/bin/env python3
 import logging
 import datetime
 
@@ -77,14 +77,18 @@ def udcheck(gates, caves):
     logging.info('Showing user directory discrepancies completed.')
 
 
-# if __name__ == "__main__":
 def main():
-    # logging.info('Rosa [contrast] executed.')
-    # start = datetime.datetime.now(datetime.UTC).timestamp()
-    # if start:
-    #     logging.info('Timer started.')
-
+    being = datetime.datetime.now(datetime.UTC).timestamp()
     raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
+    end = datetime.datetime.now(datetime.UTC).timestamp()
+
+    if begin and end:
+        hash_time = end - begin
+        if hash_time < 60:
+            logging.info(f"Hash generation took {hash_time:.4f} seconds.")
+        else:
+            hash_min = hash_time / 60
+            logging.info(f"Hash generation took {hash_min:.4f} minutes.")
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
         try:
@@ -109,11 +113,6 @@ def main():
             logging.error(f"Exception occured while contrasting directories:{e}.", exc_info=True)
             raise
 
-    # if start:
-    #     end = datetime.datetime.now(datetime.UTC).timestamp()
-    #     proc_time = end - start
-    #     logging.info(f"Processing time for rosa [contrast]: {proc_time}.")
-
     logging.info('[contrast] completed.')
     print('All set.')
 
@@ -133,7 +132,7 @@ def init_logger():
 
 
 if __name__=="__main__":
-    init_logger()
+    # init_logger()
     logging.info('Rosa [contrast] executed.')
 
     start = datetime.datetime.now(datetime.UTC).timestamp()

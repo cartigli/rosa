@@ -13,8 +13,8 @@ import xxhash # this one is optional and can be replaced with hashlib which is m
 import mysql.connector # to connect with the mysql server - helps prevent injection while building queries as well
 import zstandard as zstd # compressor for files before uploading and decompressing after download
 
-from queries import ASSESS
-from config import MAX_ALLOWED_PACKET # why am I not importing variables from the config directly into here? No point in having a middle-man - or is it better for tracing errors? Ig not seeing what is being passed could be sketch, but for the conn it does not change.
+from rosa.abilities.queries import ASSESS
+from rosa.abilities.config import MAX_ALLOWED_PACKET # why am I not importing variables from the config directly into here? No point in having a middle-man - or is it better for tracing errors? Ig not seeing what is being passed could be sketch, but for the conn it does not change.
 
 
 """
@@ -376,19 +376,19 @@ def save_people(people, backup, tmp_):
 			os.link(curr, tmpd)
 
 		except FileNotFoundError as fne:
-			logging.error('File Not Found error encountered while attempting to hard link unchanged files', exc_info=True)
+			logger.error('File Not Found error encountered while attempting to hard link unchanged files', exc_info=True)
 			try:
 				(tmpd.parent).mkdir(parents=True, exist_ok=True)
 				os.link(curr, tmpd)
 
 			except FileNotFoundError | Exception as e:
-				logging.critical(f"Exception encountered while attempting handling of primary error: {e},", exc_info=True)
+				logger.critical(f"Exception encountered while attempting handling of primary error: {e},", exc_info=True)
 				raise
 			else:
-				logging.info('Error handled and parent directory created in tmp_ direcotry.')
+				logger.info('Error handled and parent directory created in tmp_ direcotry.')
 
 		except PermissionError | Exception as te:
-			logging.critical(f"Exception occured outside of handle-able scope: {te}.", exc_info=True)
+			logger.critical(f"Exception occured outside of handle-able scope: {te}.", exc_info=True)
 			raise
 		else:
 			logger.info('Linked unchanged file without exception.')

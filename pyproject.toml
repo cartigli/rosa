@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rosa"
+version = "0.1.0"
+description = "versioning system with history tracking & hash verification"
+readme = "README.md"
+requires-python = ">=3.14.0"
+dependencies = [
+    "xxhash",
+    "mysql-connector-python",
+    "zstandard"
+]
+
+[project.scripts]
+rosa = "rosa.router:main"
