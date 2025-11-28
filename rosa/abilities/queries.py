@@ -169,3 +169,12 @@ ASSESS = os.getenv("""ASSESS""","""
 SELECT AVG(OCTET_LENGTH(content)) FROM notation.notes;
 """
 )
+
+# 10+ seconds faster than ASSESS, and faster download/write speeds because of (I assume) the optimzied packet_size
+ASSESS2 = os.getenv("""ASSESS2""","""
+SELECT AVG_ROW_LENGTH
+FROM information_schema.tables
+WHERE table_schema = 'notation'
+AND table_name = 'notes';
+"""
+)

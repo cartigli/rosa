@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import time
-import shutil
 import logging
 import datetime
 from pathlib import Path
@@ -23,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
+    # logger = logging.getLogger(__name__)
     logger.info('Rosa [get] executed.')
 
     start = datetime.datetime.now(datetime.UTC).timestamp()
@@ -31,61 +30,37 @@ def main():
     
     abs_path = Path( LOCAL_DIR ).resolve()
 
-    if abs_path.exists():
-        if abs_path.is_dir():
-            dwarn = input(f"A folder already exists @{abs_path}. Unless specified now with 'n', it will be written over. Return to continue. Decision: ")
-            if dwarn in ('n', 'N', 'no', 'NO', 'No'):
-                logger.warn('Abandoning rosa [get] [all].')
-                sys.exit(0)
-            else:
-                shutil.rmtree(abs_path)
-                logging.warning(f"{abs_path} was deleted from your disk.")
-        else:
-            fwarn = input(f"A folder already exists @{abs_path}. Unless specified now with 'n', it will be written over. Return to continue. Decision: ")
-            if fwarn in ('n', 'N', 'no', 'NO', 'No'):
-                logger.warn('Abandoning rosa [get] [all].')
-                sys.exit(0)
-            else:
-                abs_path.unlink()
-                logging.warning(f"{abs_path} was deleted from your disk.")
-    else:
-        pass
+    # raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
+    # files, directories, folder full path
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
-    # with init_conn(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn: # context manager for peace of mind
         raw_heaven = scope_rem(conn) # raw remote files & hash_id's
         souls = [s[0] for s in raw_heaven]
-
         heaven_dirs = ping_cass(conn) # raw remote dirs' rpath's
         soul_dirs = [h[0] for h in heaven_dirs]
 
         heaven_data = [raw_heaven, heaven_dirs]
-        if heaven_data[0]: # remote hashes & relative paths
+        if heaven_data: # remote hashes & relative paths
             logger.info('Data returned from heaven.')
-            # with fat_boy(abs_path) as (tmp_, backup): # context manager [atomic]
-            tmp_ = abs_path.resolve()
-            batch_size, row_size = calc_batch(conn)
-            # try:
-            if soul_dirs:
-                # logger.debug(f"{len(soul_dirs)} remote-only directories found.")
-                mk_rdir(soul_dirs, tmp_) # write directory heirarchy to tmp_ directory
-                logger.info('New directories written to disk.')
+            with fat_boy(abs_path) as (tmp_, backup): # context manager [atomic]
+                batch_size = calc_batch(conn)
+                # try:
+                if soul_dirs:
+                    logger.debug(f"{len(soul_dirs)} remote-only directories found.")
+                    mk_rdir(soul_dirs, tmp_) # write directory heirarchy to tmp_ directory
+                    logger.info('New directories written to disk.')
 
-            if souls:
-                # logger.debug(f"{len(souls)} files with hash discrepancies found.")
-                # st = time.perf_counter()
-                # soulss = sorted(souls, reverse=True, key=str.lower)
-                soulss = sorted(souls, key=str.lower)
-                # soulss = sorted(souls, reverse=True)
-                # last = time.perf_counter()
-                # logging.info(f"TEST TIMER = {last - st} seconds to sort the 99k souls.")
-                download_batches5(soulss, conn, batch_size, row_size, tmp_)
+                if souls:
+                    logger.debug(f"{len(souls)} files with hash discrepancies found.")
+                    download_batches5(souls, conn, batch_size, tmp_, backup)
 
-            # except Exception as p:
-            #     logger.critical(f"Exception encountered while attempting atomic download & write: {p}.", exc_info=True)
-            #     raise
-            # else:
-            #     logger.info('Atomic downlaod & write completed without exception.')
+                # except Exception as p:
+                #     logger.critical(f"Exception encountered while attempting atomic download & write: {p}.", exc_info=True)
+                #     raise
+                # else:
+                #     logger.info('Atomic downlaod & write completed without exception.')
+            
+            logger.info('Fat boy closed.')
         
         else:
             logger.info('Server is devoid of data.')
@@ -98,12 +73,10 @@ def main():
         if proc_time > 60:
             min_time = proc_time / 60
             logger.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
-            # print(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
         else:
             logger.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
-            # print(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
 
-    # print('All set.')
+    print('All set.')
 
 
 def init_logger():

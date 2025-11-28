@@ -7,8 +7,9 @@ name = "rosa"
 version = "0.1.0"
 description = "versioning system with history tracking & hash verification"
 readme = "README.md"
-requires-python = ">=3.14.0"
+requires-python = ">=3.13.0"
 dependencies = [
+    "tqdm",
     "xxhash",
     "mysql-connector-python",
     "zstandard"

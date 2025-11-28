@@ -22,6 +22,10 @@ def contrastor():
     from rosa.abilities import contrast
     contrast.main()
 
+def get_all():
+    from rosa.abilities import get_all
+    get_all.main()
+
 def init_logger():
     f_handler = logging.FileHandler('rosa.log', mode='a')
     f_handler.setLevel(logging.DEBUG)
@@ -52,6 +56,9 @@ def main():
 
     parser_contrast = subparsers.add_parser('contrast') # rosa contrast
     parser_contrast.set_defaults(func=contrastor)
+
+    parser_get_all = subparsers.add_parser('get_all') # rosa get all
+    parser_get_all.set_defaults(func=get_all)
 
     args = parser.parse_args()
 

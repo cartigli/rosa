@@ -5,7 +5,7 @@ import datetime
 from rosa.abilities.config import *
 from rosa.abilities.lib import (scope_loc, scope_rem,
     ping_cass, contrast, compare,
-    calc_batch, download_batches5,
+    calc_batch, download_batches,
     fat_boy, save_people,
     mk_dir, phone_duty
 )
@@ -84,13 +84,13 @@ def main():
 
                                     if cherubs:
                                         logger.info(f"{len(cherubs)} Remote-only files found; downloading.")
-                                        download_batches5(cherubs, conn, batch_size, tmp_)
+                                        download_batches(cherubs, conn, batch_size, tmp_)
                                         # handles pulling new file data, giving it batch by batch
                                         # to the wr batches function, and continuing until list is empty
 
                                     if souls:
                                         logger.debug(f"{len(souls)} files with hash discrepancies found.")
-                                        download_batches5(souls, conn, batch_size, tmp_)
+                                        download_batches(souls, conn, batch_size, tmp_)
                                         # same here as w.cherubs but for altered file[s] (hash discrepancies)
 
                             except (PermissionError, KeyboardInterrupt) as p:

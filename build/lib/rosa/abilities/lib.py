@@ -11,6 +11,8 @@ from pathlib import Path
 from itertools import batched
 
 # these three are the only external packages required
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 import xxhash # this one is optional and can be replaced with hashlib which is more secure & in the native python library
 import mysql.connector # to connect with the mysql server - helps prevent injection while building queries as well
 import zstandard as zstd # compressor for files before uploading and decompressing after download
@@ -39,12 +41,18 @@ def phone_duty(db_user, db_pswd, db_name, db_addr):
 		conn = init_conn(db_user, db_pswd, db_name, db_addr)
 		yield conn
 
-	except (ConnectionError, mysql.connector.Error, Exception) as e:
+	except (ConnectionError, ConnectionRefusedError, TimeoutError) as e:
 		logger.critical(f"Error encountered while connecting to the server: {e}.", exc_info=True)
 		try:
-			_safety(conn)
-		finally:
-			raise
+			conn.ping(reconnect=True, attempts=3, delay=0.5)
+		except Exception as e:
+			logger.warning(f"Connection obj could not be re-established after error:{e}.", exc_info=True)
+		else:
+			yield conn
+		# try:
+		# 	_safety(conn)
+		# finally:
+		# 	raise
 
 	finally:
 		try:
@@ -52,12 +60,12 @@ def phone_duty(db_user, db_pswd, db_name, db_addr):
 				conn.close()
 				logger.info('Connection closed.')
 
-		except (mysql.connector.Error, ConnectionError, Exception) as mce:
-			logger.critical(f"Error encountered while closing connection: {mce}.", exc_info=True)
-			try:
-				_safety(conn)
-			finally:
-				raise
+		except Exception as mce:
+			logger.warning(f"Error encountered while closing connection: {mce}.", exc_info=True)
+			# try:
+			# 	_safety(conn)
+			# finally:
+			# 	raise
 
 
 def _safety(conn):
@@ -98,13 +106,13 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 		try:
 			conn = mysql.connector.connect(**config)
 
-		except (ImportError) as ie:
+		except ImportError as ie:
 			logger.error(f"Error establishing C Extension-connection: {ie}.", exc_info=True)
 			try:
 				config['use_pure']=True # switch back to pure_python
 				conn = mysql.connector.connect(**config)
 	
-			except (ConnectionRefusedError, ConnectionError, mysql.connector.Error) as ce:
+			except (ConnectionRefusedError, ConnectionError) as ce:
 				logger.critical(f"Error establishing pure python connection: {ce}.", exc_info=True)
 				raise
 			else:
@@ -115,11 +123,11 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 			return conn
 
 	except (ConnectionRefusedError, TimeoutError) as e:
-		logger.critical(f"Error encountered while attempting to establish connection: {e}", exc_info=True)
-		raise
+		logger.error(f"Error encountered while attempting to establish connection: {e}", exc_info=True)
+		# raise
 	except (ConnectionError, mysql.connector.Error) as c:
-		logger.critical(f"Connection Error encountered while trying to establish connection: {c}.", exc_info=True)
-		raise
+		logger.error(f"Connection Error encountered while trying to establish connection: {c}.", exc_info=True)
+		# raise
 
 # collecting local info for comparison
 
@@ -238,7 +246,7 @@ def contrast(raw_heaven, raw_hell): # unfiform for all scripts
 			stags.append(key)
 
 	logger.info('Contrasted collections and id\'d discrepancies.')
-	return cherubs, serpents, stags, souls # files in server but not present, files present not in server, files, in both, in both but with hash discrepancies
+	return cherubs, serpents, stags, souls # files in server but not present, files present not in server, files in both, files in both but with hash discrepancies
 
 
 def compare(heaven_dirs, hell_dirs): # all
@@ -264,7 +272,8 @@ def fat_boy(abs_path):
 		tmp_, backup = configure(abs_path)
 		yield tmp_, backup # return these & freeze in place
 
-	except (Exception, KeyboardInterrupt, ConnectionError) as e:
+	# except ConnectionError | TimeoutError | mysql.connector.Error as e:
+	except (ConnectionError, TimeoutError) as e:
 		logger.critical(f"Error encountered while attempting atomic wr: {e}.", exc_info=True)
 		try:
 			_lil_guy(abs_path, backup, tmp_)
@@ -275,8 +284,9 @@ def fat_boy(abs_path):
 			apply_atomicy(tmp_, abs_path, backup)
 			logger.info('Atomic write complete.')
 
-		except:
-			logger.critical('Error encountered while attempting to apply atomicy.', exc_info=True)
+		# except mysql.connector.Error | ConnectionError as c:
+		except (mysql.connector.Error, ConnectionError) as c:
+			logger.critical(f"Error encountered while attempting to apply atomicy: {c}.", exc_info=True)
 			try:
 				_lil_guy(abs_path, backup, tmp_)
 			finally:
@@ -288,7 +298,7 @@ def _lil_guy(abs_path, backup, tmp_):
 	try:
 		if backup and backup.exists():
 			if abs_path.exists():
-				shutil.rmtree(abs_path)
+				shutil.rmtree(tmp_)
 				logger.info('Removed damaged attempt.')
 			backup.rename(abs_path)
 			logger.info('Moved backup back to original location.')
@@ -544,63 +554,84 @@ def download_batches4(flist, conn, batch_size, tmp_): # get
 
 
 
-def download_batches5(flist, conn, batch_size, tmp_): # get
+def download_batches5(souls, conn, batch_size, tmp_, backup): # get_all ( aggressive )
 	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
 	dictionaries from contrast and makes them into queries for the given file[s]. *Executemany() cannot be used with SELECT; it is for DML quries only.
 	This function passes the found data to the wr_data function, which writes the new data structure to the disk.
 	"""
-	paths = []
-	[paths.append(item['frp']) for item in flist]
-	# params = ', '.join(['%s']*len(paths))
+	batch_count = int(len(souls) / batch_size)
+	if len(souls) % batch_size:
+		batch_count += 1
 
-	# batch_size = batch_size
-	# offset = 0
+	kbb = False
+	curr_count = 0
+	batched_list = list(batched(souls, batch_size))
 
-	batched_list = list(batched(paths, batch_size))
+	with logging_redirect_tqdm(loggers=[logger]):
+		with tqdm(batched_list, desc=f"Pulling {batch_count} batches", unit="batch", colour="white") as pbar:
+			for bunch in pbar:
+				query = "SELECT frp, content FROM notes WHERE frp = %s;"
+				batch = []
+				curr_count += 1
 
-	with conn.cursor() as cursor:
+				with conn.cursor() as cursor:
+					try:
+						for item in bunch:
+							cursor.execute(query, (item,))
+							note = cursor.fetchone()
+							batch.append(note)
+						
+						if batch:
+							# end = time.perf_counter()
+							# logger.info(f"Downloaded batch in {(end - beg):.4f} seconds.")
+							wr_batches(batch, tmp_)
+							# beg = time.perf_counter()
+							# logger.info(f"Wrote batch {curr_count}/{batch_count} in {(beg - end):.4f} seconds.")
+
+					except KeyboardInterrupt as c:
+						tqdm.write("Boss killed it.")
+						pbar.leave = False
+						pbar.clear()
+						# pbar.close()
+						# tqdm.write(f"Boss killed it.")
+						kbb = True
+						break
+						# try:
+						# 	shutil.rmtree(tmp_)
+						# 	shutil.rmtree(backup) # for get all, this was a place holder
+						# except Exception as e:
+						# 	logger.warning(f"Error encountered while removing directories from failed d/w: {e}.", exc_info=True)
+						# else:
+						# 	logger.warning('Backup and temporary directories removed.')
+						# finally:
+						# 	# conn.close()
+						# 	# # pbar.colour = "red"
+						# 	sys.exit(0)
+
+					except (mysql.connector.Error, ConnectionError, TimeoutError) as c:
+						logger.critical(f"Error while trying to downwrite data: {c}.", exc_info=True)
+						try:
+							shutil.rmtree(tmp_)
+							shutil.rmtree(backup) # for get all, this was a place holder
+						except Exception as e:
+							logger.warning(f"Error encountered while removing directories from failed d/w: {e}.", exc_info=True)
+						else:
+							logger.warning('Backup and temporary directories removed.')
+					except:
+						logger.critical('Unknown exception encountered while attempting batched download.')
+						raise
+	if kbb:
 		try:
-			# while True:
-			# query = f"SELECT frp, content FROM notes WHERE frp IN ({params});"
-
-			try:
-				for b_tch in batched_list:
-					params = ', '.join(['%s']*len(b_tch))
-					query = f"SELECT frp, content FROM notes WHERE frp IN ({params});"
-
-					beg = time.perf_counter()
-					cursor.execute(query, b_tch)
-					batch = cursor.fetchall()
-
-					if batch:
-						end = time.perf_counter()
-
-						dur = end - beg
-						logging.info(f"Collected batch in {dur:.4f} seconds.")
-				# logger.info('Got one batch of data.')
-
-			except (mysql.connector.Error, ConnectionError, KeyboardInterrupt) as c:
-				logger.critical(f"Error while trying to download data: {c}.", exc_info=True)
-				raise
-			else:
-				if batch:
-					stt = time.perf_counter()
-					wr_batches(batch, tmp_)
-					stp = time.perf_counter()
-
-					timez = stp - stt
-					logger.info(f"Wrote batch in {timez:.4f} seconds.")
-
-				# if len(batch) < batch_size:
-				# 	# break
-
-				# offset += batch_size
-
-		except: # tout de monde
-			logger.critical('Error while attempting batched atomic write.', exc_info=True)
-			raise
+			# tqdm.write("Boss killed it.")
+			shutil.rmtree(tmp_)
+			shutil.rmtree(backup)
+		except Exception:
+			logger.warning(f"Err while removing dirs on err-handling: {e}.")
 		else:
-			logger.info('Atomic wr w batched download complete.')
+			logger.warning('Removed tmp_ directory.')
+		# finally:
+			# conn.close()
+			sys.exit(1)
 
 
 def wr_batches(data, tmp_):
@@ -627,30 +658,20 @@ def wr_batches(data, tmp_):
 				# unflushed.add(t_path.parent)
 
 				# if os.name == 'posix': # MOVED OUTSIDE OF LOOP
-				# 	try: # test 1 time: 10.563706874847412 seconds - compared to outside-of-loop flush: 10.129662036895752.
-				# 		idp = os.open(t_path.parent, os.O_RDONLY)
-				# 		os.fsync(idp)
-				# 	except:
-				# 		logger.critical('Exception while writing batches to disk.', exc_info=True)
-				# 		raise
-				# 	else:
-				# 		logger.info(f"Wrote & flushed {t_path}'s file & parent without exception.")
-				# 	finally:
-				# 		os.close(idp)
+			# 		idp = os.open(t_path.parent, os.O_RDONLY)
+			# 		os.fsync(idp)
 
-		except (PermissionError, FileNotFoundError, Exception) as e:
+		except (PermissionError, FileNotFoundError) as e:
 			logger.critical(f"Exception encountered while attempting atomic wr: {e}.", exc_info=True)
 			raise
-		except:
-			logger.critical('Exception encountered while attempting atomic wr.', exc_info=True)
-			raise
+		# except:
+		# 	logger.critical('Exception encountered while attempting atomic wr.', exc_info=True)
+		# 	raise
 		# else:
 		# 	stop = time.perf_counter()
 		# 	score = stop - start
 		# 	logger.info(f"Wrote batch to disk in {score:.4f} seconds.")
 
-	# moving this outside of the file loop sped up writing during downloading a lot
-	# not a great test bc this pc also hosts the server, but it wrote 3 gb in under 10s
 	# for parent in unflushed: # for every [not repeated] p_dir in unflushed: flush it
 	# 	if os.name == 'posix':
 	# 		try:
@@ -692,6 +713,21 @@ def mk_dir(gates, abs_path):
 		for gate in gates:
 			path = gate['drp']
 			fdpath = (abs_path / path ).resolve()
+			fdpath.mkdir(parents=True, exist_ok=True)
+
+	except (PermissionError, FileNotFoundError, Exception) as e:
+		logger.error(F"Permission Error when tried to make directories: {e}.", exc_info=True)
+		raise
+	else:
+		logger.info('Created directory structure on disk without exception.')
+
+
+def mk_rdir(gates, abs_path):
+	"""Takes the list of remote-only directories as dicts from contrast & writes them on the disk."""
+	try:
+		for gate in gates:
+			# path = gate['drp']
+			fdpath = (abs_path / gate ).resolve()
 			fdpath.mkdir(parents=True, exist_ok=True)
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
