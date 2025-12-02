@@ -15,11 +15,14 @@ rosa/abilities/contrast.py
 rosa/abilities/file_diff.py
 rosa/abilities/get.py
 rosa/abilities/get_all.py
+rosa/abilities/get_surg.py
 rosa/abilities/give.py
 rosa/abilities/give_all.py
 rosa/abilities/init.py
 rosa/abilities/lib.py
 rosa/abilities/queries.py
+rosa/abilities/rm3.py
 rosa/abilities/rosa_get_moment.py
+rosa/abilities/testf.py
 rosa/abilities/textr.py
 rosa/abilities/textx.py

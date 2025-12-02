@@ -1,171 +1,145 @@
 #!/usr/bin/env python3
-import logging
-import datetime
+import sys
+import time
 
-from rosa.abilities.config import *
-from rosa.abilities.lib import(
-    scope_loc, scope_rem, ping_cass,
-    contrast, compare,
-    phone_duty #, init_conn
-)
+if __name__!="__main__":
+    from rosa.abilities.config import *
+    from rosa.abilities.lib import(mini_ps,
+        scope_loc, hash_loc, scope_rem, ping_cass,
+        contrast, compare, phone_duty, init_logger
+    )
 
 """
 Compare local data to server, report back.
 """
 
-logger = logging.getLogger(__name__)
+def check(fdiff):
+    for tupl3 in fdiff:
+        title = tupl3[0]
+        count = len(tupl3[1])
+        descr = tupl3[2]
+        dict_key = tupl3[3]
 
+        if count == 0:
+            break
 
-def ucheck(cherubs, serpents, stags, souls): # only contrast
-    # logger = logging.getLogger(__name__)
-
-    if cherubs:
-        decis0 = input(f"Found {len(cherubs)} cherubs. Do you want details? y/n: ")
-        if decis0 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
+        decis0 = input(f"found {count} {title} ({descr}). do you want details? y/n: ")
+        formatted = []
+        if decis0.lower() in ('yes', 'y', 'ye', 'yeah','sure', ' y', 'y '):
             c = []
-            [c.append(cherub['frp']) for cherub in cherubs]
-            print(f"Cherubs ( In the server but not found locally ):\n{list(c)}")
+            if dict_key == 'frp':
+                [c.append(item['frp']) for item in tupl3[1]]
+            else:
+                [c.append(item['drp']) for item in tupl3[1]]
+            [formatted.append(f"\n{item}") for item in c]
+            print(f"{title} ({descr}):\n{''.join(formatted)}")
 
-        elif decis0 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
-            print('Heard.')
-        else:
-            logger.info('Unkown response, no details; proceding.')
-
-    if serpents:
-        decis1 = input(f"Found {len(serpents)} serpents. Do you want details? y/n: ")
-        if decis1 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
-            s = []
-            [s.append(serpent['frp']) for serpent in serpents]
-            print(f"Serpents ( On the local disk but not in the server ):\n{list(s)}")
-
-        elif decis1 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
-            print('Heard.')
-        else:
-            logger.info('Unkown response, no details; proceding.')
-    
-    if souls:
-        decis2 = input(f"Found {len(souls)} souls. Do you want details? y/n: ")
-        if decis2 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
-            ss = []
-            [ss.append(soul['frp']) for soul in souls]
-            print(f"Souls ( Files whose contents were altered. Human soul\'s natural state is transient, like water, buddy. ):\n{list(ss)}")            
-        elif decis2 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
-            print('Heard.')
-        else:
-            logger.info('Unkown response, no details; proceding.')
-    
-    logger.info('Showing user file discrepancies completed.')
-    
-
-def udcheck(gates, caves):
-    # logger = logging.getLogger(__name__)
-
-    if caves:
-        decis3 = input(f"Found {len(caves)} local-only directories. Do you want details? y/n: ")
-        if decis3 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
-            print(f"Caves (directories on the disk but not seen in server): {caves}.")
-        elif decis3 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
-            print('Bet.')
+        elif decis0.lower() in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
             pass
-        else:
-            print('Couldn\'nt catch that.')
-
-    if gates:
-        decis4 = input(f"Found {len(gates)} local-only directories. Do you want to see details? y/n: ")
-        if decis4 in ('yes', 'Yes', 'YES', 'y', 'Y', 'ye', 'Ye', 'yeah', 'Yeah', 'sure', 'Sure'):
-            print(f"Gates (directories on the disk but not seen in server): {gates}.")
-        elif decis4 in ('n', 'N', 'no', 'No', 'NO', 'naw', 'Naw', 'NAW', 'hell naw', 'Hell naw', 'HELL NAW'):
-            print('Bet.')
-            pass
-        else:
-            print('Couldn\'nt catch that.')
-
-    logger.info('Showing user directory discrepancies completed.')
 
 
-def main():
-    # logger = logging.getLogger(__name___)
-    logger.info('Rosa [contrast] executed.')
+def main(args):
+    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
 
-    start = datetime.datetime.now(datetime.UTC).timestamp()
+    logger.info('rosa [contrast] executed')
+    start = time.perf_counter()
     if start:
-        logger.info('[contrast] timer started.')
-
-    begin = datetime.datetime.now(datetime.UTC).timestamp()
-    raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
-    end = datetime.datetime.now(datetime.UTC).timestamp()
-
-    if begin and end:
-        hash_time = end - begin
-        if hash_time < 60:
-            logger.info(f"Hash generation took {hash_time:.4f} seconds.")
-        else:
-            hash_min = hash_time / 60
-            logger.info(f"Hash generation took {hash_min:.4f} minutes.")
+        logger.info('rosa [contrast] timer started')
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
         try:
+            logger.info('...pinging heaven...')
             raw_heaven = scope_rem(conn)
+            logger.info('...pinging cass...')
             heaven_dirs = ping_cass(conn)
 
-            relics = contrast(raw_heaven, raw_hell)
-            hallowed = compare(heaven_dirs, hell_dirs)
+            if any(raw_heaven) or any(heaven_dirs):
+                logger.info('data returned from heaven; processing...')
+                tot = 0
+                altered = 0
+                unchanged = 0
+                fdiff = []
+                ddiff = []
 
-            if any(relics) or any(hallowed):
-                logger.info('Discrepancies found; showing to user.')
+                begin = time.perf_counter()
+                logger.info('...scanning local directory...')
+                raw_paths, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
+                logger.info('...hashing local files...')
+                raw_hell = hash_loc(raw_paths, abs_path)
+                end = time.perf_counter()
+                logger.info(f"scoped local directory in {end - begin:.4f} seconds")
 
-                if any(relics):
-                    ucheck(*relics)
+                if begin and end:
+                    hash_time = end - begin
+                    if hash_time < 60:
+                        logger.info(f"hash & path generation took {hash_time:.4f} seconds")
+                    else:
+                        hash_min = hash_time / 60
+                        logger.info(f"hash & path generation took {hash_min:.4f} minutes")
 
-                if any(hallowed):
-                    udcheck(*hallowed)
+                cherubs, souls, stags, serpents = contrast(raw_heaven, raw_hell)
+                fdiff.append(("cherubs", cherubs, "files not found locally [only exist in server]", 'frp'),)
+                fdiff.append(("souls", souls, "files whose contents have been altered [hash discrepancies]", 'frp'),)
+                fdiff.append(("serpents", serpents, "files not found in the server [local only]", 'frp'),)
+
+                gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
+                ddiff.append(("gates", gates, "directories not found locally [only exist in the server]", "drp"),)
+                ddiff.append(("caves", caves, "directories not found in the server [local only]", "drp"),)
+
+                if any(fdiff) or any(ddiff):
+                    if not prints and not force:
+                        logger.info('discrepancies found; showing to user')
+
+                        if any(fdiff):
+                            check(fdiff)
+
+                        if any(ddiff):
+                            check(ddiff)
+
+                    elif prints or force:
+                        logger.info('skipping ask-to-show')
+                    
+                    altered += len(cherubs) + len(serpents) + len(souls)
+                    unchanged += len(stags)
+                    tot += unchanged + altered
+
+                    if unchanged > 1:
+                        fratio = (((tot - altered) / tot)*100)
+                        if fratio < 50:
+                            logger.info(f"{100 - fratio:.4f}% of files were altered")
+                        else:
+                            logger.info(f"{fratio:.4f}% of files were unchanged")
+                    else:
+                        logger.info("less than 1% of files were altered")
+                else:
+                    logger.info('no dif')
             else:
-                print('No dif; All set.')
+                logger.info('no heaven data; have you uploaded?')
 
-        except (ConnectionError, Exception) as e:
-            logger.error(f"Exception occured while contrasting directories:{e}.", exc_info=True)
-            raise
-
-    logger.info('[contrast] completed.')
+        except (ConnectionError, KeyboardInterrupt, Exception) as e:
+            logger.error(f"err occured while contrasting directories:{e}.", exc_info=True)
+            sys.exit(1)
 
     if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
+        end = time.perf_counter()
         proc_time = end - start
         if proc_time > 60:
             mins = proc_time / 60
-            logger.info(f"Total processing time [in minutes] for rosa [contrast]: {mins:.3f}.")
+            logger.info(f"total processing time [in minutes] for rosa [contrast]: {mins:.3f}")
         else:
-            logger.info(f"Total processing time [in seconds] for rosa [contrast]: {proc_time:.3f}.")
+            logger.info(f"total processing time [in seconds] for rosa [contrast]: {proc_time:.3f}")
 
-    print('All set.')
+    logger.info('[contrast] completed')
 
-
-def init_logger():
-    f_handler = logging.FileHandler('rosa.log', mode='a')
-    f_handler.setLevel(logging.DEBUG)
-
-    cons_handler = logging.StreamHandler()
-    cons_handler.setLevel(LOGGING_LEVEL.upper())
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[f_handler, cons_handler]
-    )
+    if prints:
+        print('All set.')
 
 
 if __name__=="__main__":
-    init_logger()
-    # logging.info('Rosa [contrast] executed.')
-    # start = datetime.datetime.now(datetime.UTC).timestamp()
-    # if start:
-    #     logging.info('[contrast] timer started.')
-    main()
-    # if start:
-    #     end = datetime.datetime.now(datetime.UTC).timestamp()
-    #     proc_time = end - start
-    #     if proc_time > 60:
-    #         mins = proc_time / 60
-    #         logging.info(f"Total processing time [in minutes] for rosa [contrast]: {mins:.3f}.")
-    #     else:
-    #         logging.info(f"Total processing time [in seconds] for rosa [contrast]: {proc_time:.3f}.")
+    from config import *
+    from lib import(mini_ps,
+        scope_loc, hash_loc, scope_rem, ping_cass,
+        contrast, compare, phone_duty, init_logger
+    )
+
+    main(args=None)

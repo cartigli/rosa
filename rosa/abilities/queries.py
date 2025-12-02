@@ -136,6 +136,48 @@ WHERE d.tfinal > %s;
 """
 )
 
+SNAP2 = os.getenv("""SNAP""","""
+SELECT n.id,
+FROM notes n 
+LEFT OUTER JOIN deltas de
+	ON de.id = n.id 
+		AND de.tstart < %s
+		AND de.tfinal > %s
+WHERE n.torigin < %s
+UNION ALL
+SELECT d.id
+FROM deleted d 
+LEFT OUTER JOIN dead_deltas dd 
+	ON dd.rmid = d.rmid
+		AND dd.tstart < %s
+		AND dd.tfinal > %s
+WHERE d.tfinal > %s;
+"""
+)
+
+# SNAP3 = os.getenv("""SNAP""","""
+# SELECT n.frp, 
+# 	COALESCE(de.content, n.content)
+# FROM notes n 
+# LEFT OUTER JOIN deltas de
+# 	ON de.id = n.id 
+# 		AND de.tstart < %s
+# 		AND de.tfinal > %s
+# WHERE n.torigin < %s
+# AND n.id in ({params})
+# UNION ALL
+# SELECT d.id,
+# 	COALESCE(dd.content, d.content)
+# FROM deleted d 
+# LEFT OUTER JOIN dead_deltas dd 
+# 	ON dd.rmid = d.rmid
+# 		AND dd.tstart < %s
+# 		AND dd.tfinal > %s
+# WHERE d.tfinal > %s
+# AND d.id IN ({params});
+# """
+# )
+
 # SNAP = os.getenv("""SNAP""","""
 # SELECT n.frp,
 # 	COALESCE(de.content, n.content)
@@ -157,21 +199,13 @@ WHERE d.tfinal > %s;
 # """
 # )
 
-# ASSESS = os.getenv("""ASSESS""","""
-# SELECT AVG_ROW_LENGTH
-# FROM INFORMATION_SCHEMA.TABLES
-# WHERE TABLE_SCHEMA = 'notation'
-# AND TABLE_NAME = 'notes';
-# """
-# )
-
 ASSESS = os.getenv("""ASSESS""","""
 SELECT AVG(OCTET_LENGTH(content)) FROM notation.notes;
 """
 )
 
-# 10+ seconds faster than ASSESS, and faster download/write speeds because of (I assume) the optimzied packet_size
-ASSESS2 = os.getenv("""ASSESS2""","""
+# 1/100th the time, less accurate
+ASSESS2 = os.getenv("""ASSESS2""",""" 
 SELECT AVG_ROW_LENGTH
 FROM information_schema.tables
 WHERE table_schema = 'notation'
