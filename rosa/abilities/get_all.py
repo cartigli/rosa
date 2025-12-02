@@ -99,7 +99,7 @@ def main(args):
                         time.sleep(5)
                         shutil.rmtree(abs_path)
                         if abs_path.exists():
-                            logger.error(f"could not delete {abs_path}.")
+                            logger.error(f"{RED}could not delete {abs_path}.{RESET}")
                             sys.exit(1)
                     else:
                         logger.info(f"deleted {abs_path} silenetly.")

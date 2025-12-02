@@ -108,7 +108,7 @@ def main(args):
                                 logger.warning('boss killed it; wrap it up')
                                 raise
                             except (PermissionError, Exception) as e:
-                                logger.error('err encountered while attempting atomic write', exc_info=True)
+                                logger.error(f"{RED}error encountered while attempting atomic write:{RESET} {e}", exc_info=True)
                                 raise
                             else:
                                 logger.info('atomic downlaod & write completed without exception')
@@ -139,7 +139,7 @@ def main(args):
         logger.warning('boss killed it; wrap it up')
         sys.exit(0)
     except (SystemError, Exception) as e:
-        logger.error(f"err encountered with [get] [main]: {e}", exc_info=True)
+        logger.error(f"{RED}error encountered with [get] [main]:{RESET} {e}", exc_info=True)
         sys.exit(1)
     else:
         if prints:

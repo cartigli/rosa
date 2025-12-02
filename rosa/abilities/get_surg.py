@@ -87,7 +87,7 @@ def main(args):
                             logger.warning('boss killed it; wrap it up')
                             raise
                         except (PermissionError, Exception) as e:
-                            logger.error('exception encountered while attempting atomic write', exc_info=True)
+                            logger.error(f"{RED}exception encountered while attempting atomic write{RESET}", exc_info=True)
                             raise
 
                     else:

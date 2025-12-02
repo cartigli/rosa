@@ -151,7 +151,7 @@ def main(args):
                         try:
                             conn.commit()
                         except Exception as e:
-                            logger.critical(f"error on --forced commit: {e}", exc_info=True)
+                            logger.critical(f"{RED}error on --forced commit:{RESET} {e}", exc_info=True)
                             sys.exit(3) # auto_commit: False, so error handling to rollback is not necessary
                         else:
                             logger.info('forced commit w.o exception')

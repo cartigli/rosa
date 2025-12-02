@@ -103,7 +103,7 @@ def main(args):
                         logger.info(f"upload time [in seconds] for rosa [give] [all]: {proc_time:.3f}.")
 
             except (ConnectionError, TimeoutError) as c:
-                logger.critical(f"exception encountered while uploading data{c}", exc_info=True)
+                logger.critical(f"{RED}exception encountered while uploading data:{RESET} {c}", exc_info=True)
                 sys.exit(1)
             except KeyboardInterrupt as k:
                 logger.warning('boss killed it; aborting')
@@ -113,7 +113,7 @@ def main(args):
                     try:
                         conn.commit()
                     except Exception as e:
-                        logger.critical(f"error on --forced commit: {e}", exc_info=True)
+                        logger.critical(f"{RED}error on --forced commit:{RESET} {e}", exc_info=True)
                         sys.exit(3) # auto_commit: False, so error handling to rollback is not necessary
                     else:
                         logger.info('forced commit w.o exception')

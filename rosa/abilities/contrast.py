@@ -48,6 +48,7 @@ def main(args):
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
         try:
+            1/0
             logger.info('...pinging heaven...')
             raw_heaven = scope_rem(conn)
             logger.info('...pinging cass...')
@@ -117,7 +118,7 @@ def main(args):
                 logger.info('no heaven data; have you uploaded?')
 
         except (ConnectionError, KeyboardInterrupt, Exception) as e:
-            logger.error(f"err occured while contrasting directories:{e}.", exc_info=True)
+            logger.error(f"{RED}err occured while contrasting directories:{RESET} {e}.", exc_info=True)
             sys.exit(1)
 
     if start:

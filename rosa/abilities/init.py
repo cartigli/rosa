@@ -39,7 +39,7 @@ def table_helper(conn, logger):
                         pass
 
                 except ConnectionError as c:
-                    logger.error(f"conn err encountered while attempting to truncate tables: {c}. rolling back", exc_info=True)
+                    logger.error(f"{RED}conn err encountered while attempting to truncate tables:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
                     raise
                 else:
                     logger.info('tables truncated')
@@ -53,7 +53,7 @@ def table_helper(conn, logger):
                         pass
 
                 except ConnectionError as c:
-                    logger.error(f"conn err encountered while attempting to drop tables: {c}. rolling back", exc_info=True)
+                    logger.error(f"{RED}conn err encountered while attempting to drop tables:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
                     raise
                 else:
                     logger.info('tables dropped')
@@ -72,7 +72,7 @@ def table_helper(conn, logger):
                         pass
 
                 except ConnectionError as c:
-                    logger.error(f"conn err encountered while attempting to initiate database: {c}. rolling back", exc_info=True)
+                    logger.error(f"{RED}conn err encountered while attempting to initiate database:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
                     raise
                 else:
                     logger.info('created tables')
@@ -94,7 +94,7 @@ def trigger_helper(conn, logger):
                         cursor.execute(f)
 
                 except ConnectionError as c:
-                    logger.error(f"conn err encountered while attempting to replace triggers: {c}. rolling back", exc_info=True)
+                    logger.error(f"{RED}conn err encountered while attempting to replace triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
                     raise
                 else:
                     cursor.execute(EDIT_TRIGGER)
@@ -108,7 +108,7 @@ def trigger_helper(conn, logger):
                         cursor.execute(f)
 
                 except ConnectionError as c:
-                    logger.error(f"conn err encountered while attempting to erase triggers: {c}. rolling back", exc_info=True)
+                    logger.error(f"{RED}conn err encountered while attempting to erase triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
                     raise
                 else:
                     logger.info('dropped triggers')
@@ -124,7 +124,7 @@ def trigger_helper(conn, logger):
                     cursor.execute(DELETE_TRIGGER)
 
                 except ConnectionError as c:
-                    logger.error(f"conn err encountered while attempting to create triggers: {c}. rolling back", exc_info=True)
+                    logger.error(f"{RED}conn err encountered while attempting to create triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
                     raise
                 else:
                     logger.info('triggers created')
@@ -178,7 +178,7 @@ def main(args):
                 logger.info('decision made, and relayed to the server')
 
             except (ConnectionError, Exception) as e:
-                logger.error(f"exception encountered while initiating server: {e}", exc_info=True)
+                logger.error(f"{RED}exception encountered while initiating server:{RESET} {e}", exc_info=True)
                 raise
             else:
                 logger.info('initiation faced no exceptions')

@@ -22,7 +22,7 @@ def get_snap(conn, SNAP, logger):
             cursor.execute(SNAP, moments)
 
         except (ConnectionError, Exception) as c:
-            logger.error(f"Exception encountered while attempting to get moment: {c}.")
+            logger.error(f"{RED}exception encountered while attempting to get moment:{RESET} {c}.")
             raise
         else:
             logger.info('Executed query to get moment.')
@@ -83,7 +83,7 @@ def main(args):
                         # download_batches6(snapshot, conn, batch_size, row_size, tmp_)
 
                     except (PermissionError, FileNotFoundError, Exception) as e:
-                        logger.error(f"Exception encountered while attempting atomic wr for [get] [moment]: {e}.", exc_info=True)
+                        logger.error(f"{RED}exception encountered while attempting atomic wr for [get] [moment]:{RESET} {e}.", exc_info=True)
                         raise
                     else:
                         logger.info('No exceptions caught during atomic wr for [get] [moment].')
@@ -94,7 +94,7 @@ def main(args):
                 logger.warning('No data returned from moment; do records exist at this time?')
         
         except (ConnectionError, Exception) as e:
-            logger.error(f"Error encountered while obtaining moment: {e}.", exc_info=True)
+            logger.error(f"{RED}error encountered while obtaining moment:{RESET} {e}.", exc_info=True)
             raise
         else:
             logger.info('[moment] main function complete without exception.')

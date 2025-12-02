@@ -17,7 +17,7 @@ import mysql.connector # to connect with the mysql server - helps prevent inject
 # import zstandard as zstd # compressor for files before uploading and decompressing after download
 
 from rosa.abilities.queries import ASSESS2
-from rosa.abilities.config import MAX_ALLOWED_PACKET
+from rosa.abilities.config import MAX_ALLOWED_PACKET, RED, RESET
 
 
 """
@@ -28,8 +28,6 @@ maintainability. There is also queries for longer MySQL queries. Some scripts, l
 # logging
 
 logger = logging.getLogger(__name__)
-RED = "\x1b[31;1m"
-RESET = "\x1b[0m"
 
 def init_logger(logging_level):
     if logging_level:
@@ -55,13 +53,15 @@ def init_logger(logging_level):
 
         console_format = logging.Formatter(cons_)
         file_format = logging.Formatter(file_)
-        err_format = logging.Formatter(errs_)
+        error_format = logging.Formatter(errs_)
 
         file_handler.setFormatter(file_format)
         console_handler.setFormatter(console_format)
+        error_handler.setFormatter(error_format)
 
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)
+        logger.addHandler(error_handler)
 
         return logger
     else:
@@ -69,29 +69,29 @@ def init_logger(logging_level):
         sys.exit(1)
 
 def mini_ps(args, logging_level):
-    f = False # no checks - force
-    p = True # no prints - prints
+    force = False # no checks - force
+    prints = True # no prints - prints
 
     if args:
         if args.silent:
             logging_level="critical".upper()
             logger = init_logger(logging_level)
-            p = False
+            prints = False
         elif args.verbose: # can't do verbose & silent
             logging_level = "debug".upper()
             logger = init_logger(logging_level)
-            p = True
+            prints = True
         else: # but can do verbose & force (or silent & force)
             logging_level = logging_level
             logger = init_logger(logging_level.upper())
 
         if args.force:
-            f = True
+            force = True
     else:
         logger = init_logger(logging_level.upper())
 
     logger.debug('mini parser completed')
-    return p, f, logger
+    return prints, force, logger
 
 # connection & management thereof
 
@@ -114,7 +114,7 @@ def phone_duty(db_user, db_pswd, db_name, db_addr):
             _safety(conn)
         sys.exit(1)
     except (ConnectionRefusedError, TimeoutError, RuntimeError, Exception) as e:
-        logger.error(f"err encountered while connecting to the server: {e}.", exc_info=True)
+        logger.error(f"err encountered while connecting to the server:{RESET} {e}.", exc_info=True)
         if conn:
             _safety(conn)
         sys.exit(1)
@@ -134,7 +134,7 @@ def _safety(conn):
         conn.rollback()
 
     except (mysql.connector.Error, ConnectionRefusedError, ConnectionError, TimeoutError, Exception) as e:
-        logger.error(f"_safety caught an error while trying to rollback on err: {e}", exc_info=True)
+        logger.error(f"_safety caught an error while trying to rollback on err:{RESET} {e}", exc_info=True)
         raise
     else:
         logger.warning("_safety rolled server back w.o exception")
@@ -200,7 +200,7 @@ def scope_loc(local_dir): # all
             sys.exit(1)
 
     except Exception as e:
-        logger.error(f"encountered: {e} while hashing; aborting.", exc_info=True)
+        logger.error(f"encountered:{RESET} {e} {RED}while hashing; aborting{RESET}", exc_info=True)
         raise
     except KeyboardInterrupt as ko:
         logger.warning("boss killed it; wrap it up")
@@ -266,7 +266,7 @@ def scope_rem(conn): # all
                 logger.warning("server returned raw_heaven as an empty set")
 
         except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
-            logger.error(f"err while getting data from server: {c}.", exc_info=True)
+            logger.error(f"err while getting data from server:{RESET} {c}.", exc_info=True)
             raise
         else:
             logger.debug('remote file scoping completed w.o exception')
@@ -295,7 +295,7 @@ def ping_cass(conn): # all
                 logger.warning("server returned heaven dirs as an empty set")
 
         except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
-            logger.error(f"err encountered while attempting to collect directory data from server: {c}.", exc_info=True)
+            logger.error(f"err encountered while attempting to collect directory data from server:{RESET} {c}.", exc_info=True)
             raise
         else:
             logger.debug('remote file scoping completed w.o exception')
@@ -384,7 +384,7 @@ def fat_boy(abs_path):
                 sys.exit(1)
 
         except (mysql.connector.Error, ConnectionError, Exception) as e:
-            logger.error(f"{RED}err encountered while attempting atomic wr: {e}.", exc_info=True)
+            logger.error(f"{RED}err encountered while attempting atomic wr:{RESET} {e}.", exc_info=True)
             try:
                 _lil_guy(abs_path, backup, tmp_)
             except:
@@ -421,7 +421,7 @@ def fat_boy(abs_path):
                 logger.debug("applied 'atomicy' w.o exception")
 
     except (KeyboardInterrupt, Exception) as e:
-        logger.critical(f"{RED}uncaught exception slipped through: {e}{RESET}", exc_info=True)
+        logger.critical(f"{RED}uncaught exception slipped through:{RESET} {e}", exc_info=True)
         logger.warning(f"{abs_path} is likely remains @{backup}, and {tmp_} was probably not deleted")
         sys.exit(1)
     else:
@@ -768,7 +768,7 @@ def apply_atomicy(tmp_, abs_path, backup):
         tmp_.rename(abs_path)
 
     except (PermissionError, FileNotFoundError, Exception) as e:
-        logger.critical(f"{RED}exception encountered while attempting atomic write: {e}.", exc_info=True)
+        logger.critical(f"{RED}exception encountered while attempting atomic write:{RESET} {e}.", exc_info=True)
         raise
     else:
         logger.debug('temporary directory renamed w.o exception')
@@ -798,7 +798,7 @@ def mk_dir(gates, abs_path):
             fdpath.mkdir(parents=True, exist_ok=True)
 
     except (PermissionError, FileNotFoundError, Exception) as e:
-        logger.error(f"err when tried to make directories: {e}.", exc_info=True)
+        logger.error(f"{RED}err when tried to make directories:{RESET} {e}.", exc_info=True)
         raise
     else:
         logger.debug('created directory tree on disk w.o exception')
@@ -817,7 +817,7 @@ def mk_rdir(gates, abs_path):
     except (PermissionError, FileNotFoundError, Exception) as e:
         pbar.leave = False
         pbar.close()
-        logger.error(f"err when tried to make directories: {e}.", exc_info=True)
+        logger.error(f"{RED}err when tried to make directories:{RESET} {e}.", exc_info=True)
         raise
         # raise
     else:
@@ -837,7 +837,7 @@ def mk_rrdir(gates, abs_path):
     except (PermissionError, FileNotFoundError, Exception) as e:
         pbar.leave = False
         pbar.close()
-        logger.error(f"error when tried to make directories: {e}.", exc_info=True)
+        logger.error(f"{RED}error when tried to make directories:{RESET} {e}.", exc_info=True)
         sys.exit(1)
         # raise
     else:
@@ -860,7 +860,7 @@ def rm_remdir(conn, gates): # only give 3.0
             cursor.executemany(g, gates)
 
         except (mysql.connector.Error, ConnectionError, Exception) as c:
-            logger.error(f"err encountered when trying to delete directory[s] from server: {c}.", exc_info=True)
+            logger.error(f"{RED}error encountered when trying to delete directory[s] from server:{RESET} {c}.", exc_info=True)
             raise
         else:
             logger.debug('removed remote-only directory[s] from server w.o exception')
@@ -876,7 +876,7 @@ def rm_remfile(conn, cherubs): # only give 3.0
             cursor.executemany(f, cherubs)
 
         except (mysql.connector.Error, ConnectionError, Exception) as c:
-            logger.error(f"err encountered when trying to delete file[s] from server: {c}", exc_info=True)
+            logger.error(f"{RED}err encountered when trying to delete file[s] from server:{RESET} {c}", exc_info=True)
             raise
         else:
             logger.debug('removed remote-only file[s] from server w.o exception')
@@ -905,7 +905,7 @@ def collect_info(dicts_, abs_path): # give - a
         size = os.path.getsize(item) 
 
         if size > MAX_ALLOWED_PACKET:
-            logger.error(f"a single file is larger than the maximum packet size allowed: {item}")
+            logger.error(f"{RED}a single file is larger than the maximum packet size allowed:{RESET} {item}")
             raise
 
         elif (curr_batch + size) > MAX_ALLOWED_PACKET:
@@ -949,7 +949,7 @@ def collect_info2(dicts_, abs_path):
         size = os.path.getsize(item)
 
         if size > MAX_ALLOWED_PACKET:
-            logger.error(f"a single file is larger than the maximum packet size allowed: {item}")
+            logger.error(f"{RED}a single file is larger than the maximum packet size allowed:{RESET} {item}")
             raise
 
         elif (curr_batch + size) > MAX_ALLOWED_PACKET:
@@ -1034,7 +1034,7 @@ def upload_created(conn, serpent_data): # give
             cursor.executemany(i, serpent_data)
 
     except (mysql.connector.Error, ConnectionError, Exception) as c:
-        logger.error(f"err encountered while attempting to upload [new] file[s] to server: {c}", exc_info=True)
+        logger.error(f"{RED}err encountered while attempting to upload [new] file[s] to server:{RESET} {c}", exc_info=True)
         raise
     else:
         logger.debug('wrote new file[s] to server w.o exception')
@@ -1051,7 +1051,7 @@ def upload_created2(conn, serpent_data): # give
                 cursor.executemany(i, serpent_data)
 
     except (mysql.connector.Error, ConnectionError, Exception) as c:
-        logger.error(f"err encountered while attempting to upload [new] file[s] to server: {c}", exc_info=True)
+        logger.error(f"err encountered while attempting to upload [new] file[s] to server:{RESET} {c}", exc_info=True)
         raise
     else:
         logger.debug('wrote new file[s] to server w.o exception')
@@ -1069,7 +1069,7 @@ def upload_edited(conn, soul_data): # only give 3.0
             cursor.executemany(j, soul_data)
 
     except (mysql.connector.Error, ConnectionError, Exception) as c:
-        logger.error(f"err encountered while attempting to upload altered file to server: {c}", exc_info=True)
+        logger.error(f"err encountered while attempting to upload altered file to server:{RESET} {c}", exc_info=True)
         raise
     else:
         logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
@@ -1088,7 +1088,7 @@ def upload_edited2(conn, soul_data): # only give 3.0
                 cursor.executemany(j, soul_data)
 
             except (mysql.connector.Error, ConnectionError, Exception) as c:
-                logger.error(f"err encountered while attempting to upload altered file to server: {c}", exc_info=True)
+                logger.error(f"err encountered while attempting to upload altered file to server:{RESET} {c}", exc_info=True)
                 raise
             else:
                 logger.debug('uploaded altered file[s]\'s content & new hash')
@@ -1106,7 +1106,7 @@ def confirm(conn): # give
             conn.commit()
 
         except (mysql.connector.Error, ConnectionError, Exception) as c:
-            logger.error(f"err encountered while attempting to commit changes to server: {c}", exc_info=True)
+            logger.error(f"{RED}err encountered while attempting to commit changes to server:{RESET} {c}", exc_info=True)
             raise
         else:
             logger.info('commited changes to server')
@@ -1116,7 +1116,7 @@ def confirm(conn): # give
             conn.rollback()
 
         except (mysql.connector.Error, ConnectionError, Exception) as c:
-            logger.error(f"err encountered while attempting to rollback changes to server: {c}", exc_info=True)
+            logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
             raise
         else:
             logger.info('changes rolled back')
