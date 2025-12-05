@@ -2,6 +2,7 @@
 import sys
 import time
 import shutil
+import logging
 from pathlib import Path
 
 if __name__!="__main__":
@@ -10,7 +11,7 @@ if __name__!="__main__":
         ping_cass, contrast, compare, init_logger,
         calc_batch, download_batches5, mini_ps,
         fat_boy, save_people,
-        mk_rdir, phone_duty
+        mk_rdir, phones
     )
 
 """
@@ -18,8 +19,50 @@ Scan local directory, collect data from server, and compare all contents. Downlo
 server, download/write all hash discrepancies, and delete all files not found in the server. Make parent directories if needed & 
 delete old ones.
 """
+def log():
+    logger = logging.getLogger()
+    return logger
 
-def tmper(tmp_, force, logger):
+def rm_origin(abs_path, force):
+    logger = log()
+    if not force:
+        if abs_path.is_dir():
+            dwarn = input(f"A folder already exists @{abs_path}. Unless specified now with 'n', it will be written over. Return to continue. decision: ").lower()
+            if dwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+                logger.warning('abandoning rosa [get] [all]')
+                sys.exit(0)
+            else:
+                shutil.rmtree(abs_path)
+                logger.warning(f"{abs_path} was deleted from your disk.")
+        else:
+            fwarn = input(f"a file already exists @{abs_path}; unless specified now with 'n', it will be written over. Return to continue. Decision: ").lower()
+            if fwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+                logger.warning('abandoning rosa [get] [all]')
+                sys.exit(0)
+            else:
+                abs_path.unlink()
+                logger.warning(f"{abs_path} was deleted from your disk.")
+    elif force:
+        logger.info(f"staying silent & deleting {abs_path}.")
+        if abs_path.is_dir():
+            shutil.rm_tree(abs_path)
+            if abs_path.exists():
+                logger.info('shutil failed; retrying in 5 seconds')
+                time.sleep(5)
+                shutil.rmtree(abs_path)
+                if abs_path.exists():
+                    logger.error(f"{RED}could not delete {abs_path}.{RESET}")
+                    sys.exit(1)
+            else:
+                logger.info(f"deleted {abs_path} silenetly.")
+        if abs_path.is_file():
+            abs_path.unlink()
+            if abs_path.exists():
+                logger.info(f"couldn't delete {abs_path}.")
+                sys.exit(1)
+
+def tmper(tmp_, force):
+    logger = log()
     if force:
         try:
             shutil.rmtree(tmp_)
@@ -62,54 +105,22 @@ def tmper(tmp_, force, logger):
             pass
 
 def main(args):
-    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
-    force
-    logger.info('rosa [get] executed')
-
-    start = time.perf_counter()
-    if start:
-        logger.info('[get] [all] timer started')
     try:
+        logger, force, prints = mini_ps(args)
+        force
+        logger.info('rosa [get] executed')
+
+        start = time.perf_counter()
+        if start:
+            logger.info('[get] [all] timer started')
+        # try:
         abs_path = Path( LOCAL_DIR ).resolve()
 
         if abs_path.exists():
-            if not force:
-                if abs_path.is_dir():
-                    dwarn = input(f"A folder already exists @{abs_path}. Unless specified now with 'n', it will be written over. Return to continue. decision: ").lower()
-                    if dwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
-                        logger.warning('abandoning rosa [get] [all]')
-                        sys.exit(0)
-                    else:
-                        shutil.rmtree(abs_path)
-                        logger.warning(f"{abs_path} was deleted from your disk.")
-                else:
-                    fwarn = input(f"a file already exists @{abs_path}; unless specified now with 'n', it will be written over. Return to continue. Decision: ").lower()
-                    if fwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
-                        logger.warning('abandoning rosa [get] [all]')
-                        sys.exit(0)
-                    else:
-                        abs_path.unlink()
-                        logger.warning(f"{abs_path} was deleted from your disk.")
-            elif force:
-                logger.info(f"staying silent & deleting {abs_path}.")
-                if abs_path.is_dir():
-                    shutil.rm_tree(abs_path)
-                    if abs_path.exists():
-                        logger.info('shutil failed; retrying in 5 seconds')
-                        time.sleep(5)
-                        shutil.rmtree(abs_path)
-                        if abs_path.exists():
-                            logger.error(f"{RED}could not delete {abs_path}.{RESET}")
-                            sys.exit(1)
-                    else:
-                        logger.info(f"deleted {abs_path} silenetly.")
-                if abs_path.is_file():
-                    abs_path.unlink()
-                    if abs_path.exists():
-                        logger.info(f"couldn't delete {abs_path}.")
-                        sys.exit(1)
+            rm_origin(abs_path, force)
 
-        with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+        # with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+        with phones() as conn:
             logger.info('conn is connected')
             raw_heaven = scope_rem(conn) # raw remote files & hash_id's
             logger.info('raw heaven returned')
@@ -169,7 +180,7 @@ if __name__=="__main__":
     from lib import (scope_loc, scope_rem, mini_ps,
         ping_cass, contrast, compare, init_logger,
         calc_batch, download_batches5, fat_boy, 
-        save_people, mk_rdir, phone_duty
+        save_people, mk_rdir, phones
     )
 
     main(args=None)

@@ -11,7 +11,7 @@ if __name__!="__main__":
     from rosa.abilities.lib import(scope_rem, ping_cass, 
         contrast, compare, rm_remdir, init_logger, rm_remfile, 
         collect_info, collect_data, upload_dirs, upload_created, 
-        confirm, phone_duty, mini_ps
+        confirm, phones, mini_ps
     )
 
 """
@@ -52,7 +52,7 @@ def scraper():
 
 
 def main(args):
-    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
+    logger, force, prints = mini_ps(args)
 
     logger.info('rosa [give] executed')
 
@@ -60,7 +60,8 @@ def main(args):
     if start:
         logger.info('[give] [all] timer started')
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+    # with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+    with phones() as conn:
         logger.info('conn is connected')
         raw_heaven = scope_rem(conn) # raw remote files & hash_id's
         heaven_dirs = ping_cass(conn) # raw remote dirs' rpats
@@ -68,7 +69,7 @@ def main(args):
         if not raw_heaven or heaven_dirs:
             logger.info('heaven\'s empty; processing local data...')
 
-            if LOCAL_DIR.exists():
+            if Path(LOCAL_DIR).exists():
                 serpents, caves, abs_path = scraper()
                 logger.info('collected local paths; uploading...')
             else:
@@ -109,7 +110,7 @@ def main(args):
                 logger.warning('boss killed it; aborting')
                 sys.exit(1)
             else:
-                if force:
+                if force == True:
                     try:
                         conn.commit()
                     except Exception as e:

@@ -1,125 +1,146 @@
 #!/usr/bin/env python3
 import sys
 import time
+import logging
 
 if __name__!="__main__":
     from rosa.abilities.config import *
-    from rosa.abilities.lib import(mini_ps,
+    from rosa.abilities.lib import(mini_ps, diffr,
         scope_loc, hash_loc, scope_rem, ping_cass,
-        contrast, compare, phone_duty, init_logger
+        contrast, compare, init_logger, doit_urself
     )
 
 """
 Compare local data to server, report back.
 """
 
-def check(fdiff):
-    for tupl3 in fdiff:
-        title = tupl3[0]
-        count = len(tupl3[1])
-        descr = tupl3[2]
-        dict_key = tupl3[3]
+NOMIC = "[diff]"
 
-        if count == 0:
-            break
+def check(diff):
+    logger = logging.getLogger()
 
-        decis0 = input(f"found {count} {title} ({descr}). do you want details? y/n: ")
+    title = diff["type"]
+    count = len(diff["details"])
+    descr = diff["message"]
+    dict_key = diff["key"]
+
+    if count > 0:
+        decis0 = input(f"found {count} {title} ({descr}). do you want details? y/n: ").lower()
         formatted = []
-        if decis0.lower() in ('yes', 'y', 'ye', 'yeah','sure', ' y', 'y '):
+        if decis0 in ('yes', 'y', 'ye', 'yeah','sure', ' y', 'y '):
             c = []
-            if dict_key == 'frp':
-                [c.append(item['frp']) for item in tupl3[1]]
+            if dict_key == "frp":
+                [c.append(item["frp"]) for item in diff["details"]]
             else:
-                [c.append(item['drp']) for item in tupl3[1]]
+                [c.append(item["drp"]) for item in diff["details"]]
             [formatted.append(f"\n{item}") for item in c]
-            print(f"{title} ({descr}):\n{''.join(formatted)}")
+            print(f".../{title} ({descr}):\n{''.join(formatted)}")
 
-        elif decis0.lower() in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+        elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
             pass
+        else:
+            print('ok freak')
 
 
 def main(args):
-    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
+    x = False
+    data, diff, start, mini, x = diffr(args, NOMIC, x)
 
-    logger.info('rosa [contrast] executed')
-    start = time.perf_counter()
-    if start:
-        logger.info('rosa [contrast] timer started')
+    cherubs = data[0][0]
+    souls = data[0][1]
+    stags = data[0][2]
+    serpents = data[0][3]
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+    gates = data[1][0]
+    caves = data[1][1]
+    ledeux = data[1][2]
+
+    logger = mini[0]
+    force = mini[1]
+    prints = mini[2]
+
+    if diff == True:
         try:
-            1/0
-            logger.info('...pinging heaven...')
-            raw_heaven = scope_rem(conn)
-            logger.info('...pinging cass...')
-            heaven_dirs = ping_cass(conn)
-
-            if any(raw_heaven) or any(heaven_dirs):
-                logger.info('data returned from heaven; processing...')
-                tot = 0
-                altered = 0
-                unchanged = 0
-                fdiff = []
-                ddiff = []
-
-                begin = time.perf_counter()
-                logger.info('...scanning local directory...')
-                raw_paths, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
-                logger.info('...hashing local files...')
-                raw_hell = hash_loc(raw_paths, abs_path)
-                end = time.perf_counter()
-                logger.info(f"scoped local directory in {end - begin:.4f} seconds")
-
-                if begin and end:
-                    hash_time = end - begin
-                    if hash_time < 60:
-                        logger.info(f"hash & path generation took {hash_time:.4f} seconds")
-                    else:
-                        hash_min = hash_time / 60
-                        logger.info(f"hash & path generation took {hash_min:.4f} minutes")
-
-                cherubs, souls, stags, serpents = contrast(raw_heaven, raw_hell)
-                fdiff.append(("cherubs", cherubs, "files not found locally [only exist in server]", 'frp'),)
-                fdiff.append(("souls", souls, "files whose contents have been altered [hash discrepancies]", 'frp'),)
-                fdiff.append(("serpents", serpents, "files not found in the server [local only]", 'frp'),)
-
-                gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
-                ddiff.append(("gates", gates, "directories not found locally [only exist in the server]", "drp"),)
-                ddiff.append(("caves", caves, "directories not found in the server [local only]", "drp"),)
-
-                if any(fdiff) or any(ddiff):
-                    if not prints and not force:
-                        logger.info('discrepancies found; showing to user')
-
-                        if any(fdiff):
-                            check(fdiff)
-
-                        if any(ddiff):
-                            check(ddiff)
-
-                    elif prints or force:
-                        logger.info('skipping ask-to-show')
-                    
-                    altered += len(cherubs) + len(serpents) + len(souls)
-                    unchanged += len(stags)
-                    tot += unchanged + altered
-
-                    if unchanged > 1:
-                        fratio = (((tot - altered) / tot)*100)
-                        if fratio < 50:
-                            logger.info(f"{100 - fratio:.4f}% of files were altered")
-                        else:
-                            logger.info(f"{fratio:.4f}% of files were unchanged")
-                    else:
-                        logger.info("less than 1% of files were altered")
-                else:
-                    logger.info('no dif')
+            if force == True:
+                logger.info('-force skipped ask-to-show')
+                pass
             else:
-                logger.info('no heaven data; have you uploaded?')
+                if prints == False:
+                    logger.info('-silent skipped ask-to-show')
+                    # pass
+                else:
+                    fdiff = []
+                    ddiff = []
 
-        except (ConnectionError, KeyboardInterrupt, Exception) as e:
-            logger.error(f"{RED}err occured while contrasting directories:{RESET} {e}.", exc_info=True)
+                    fdiff.append( {
+                        "type": "cherubs",
+                        "details": cherubs,
+                        "message": "files not found locally [only exist in server]",
+                        "key": "frp"
+                        }
+                    )
+                    fdiff.append( {
+                        "type": "souls",
+                        "details": souls,
+                        "message": "files whose contents have been altered [hash discrepancies]",
+                        "key": "frp"
+                        }
+                    )
+                    fdiff.append( {
+                        "type": "serpents",
+                        "details": serpents,
+                        "message": "files not found in the server [local only]", 
+                        "key": "frp"
+                        }
+                    )
+
+                    ddiff.append( {
+                        "type": "gates",
+                        "details": gates,
+                        "message": "directories not found locally [only exist in the server]", 
+                        "key": "drp"
+                        }
+                    )
+                    ddiff.append( {
+                        "type": "caves",
+                        "details": caves, 
+                        "message": "directories not found in the server [local only]", 
+                        "key": "drp"
+                        }
+                    )
+
+                    for item in ddiff:
+                        check(item)
+
+                    for item in fdiff:
+                        check(item)
+
+            tot = 0
+            altered = 0
+            unchanged = 0
+            
+            altered += len(cherubs) + len(serpents) + len(souls)
+            unchanged += len(stags)
+            tot += unchanged + altered
+
+            fratio = (((tot - altered) / tot)*100)
+            # print(fratio)
+            if fratio > 1:
+                # if fratio >= 50:
+                logger.info(f"{(100 - fratio):.4f}% failed verification (did not match your last upload)")
+                # else:
+                #     logger.info(f"{fratio:.4f}% of files were unchanged")
+            else:
+                logger.info(f"less than 1% of files were altered: {fratio:.3f}")
+
+        except KeyboardInterrupt as ko:
+            logger.error(f"boss killed it; wrap it up")
             sys.exit(1)
+
+    else:
+        logger.info('no dif')
+    
+    doit_urself()
 
     if start:
         end = time.perf_counter()
@@ -130,7 +151,7 @@ def main(args):
         else:
             logger.info(f"total processing time [in seconds] for rosa [contrast]: {proc_time:.3f}")
 
-    logger.info('[contrast] completed')
+    logger.info('[diff] completed')
 
     if prints:
         print('All set.')

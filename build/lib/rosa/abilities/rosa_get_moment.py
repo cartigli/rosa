@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
+import time
 import logging
-import datetime
+from pathlib import Path
 
-from rosa.abilities.config import *
-from rosa.abilities.queries import SNAP
-from rosa.abilities.lib import fat_boy, calc_batch, download_batches2, phone_duty #, init_conn #, wr_data4
+if __name__!="__main__":
+    from rosa.abilities.config import *
+    from rosa.abilities.queries import SNAP
+    from rosa.abilities.lib import fat_boy, calc_batch, download_batches2, phone_duty, init_logger, mini_ps
 
 """
 Downloads the servers contents from a given moment using recorded UTC timestamps.
 """
 
-logger = logging.getLogger(__name__)
-
 def get_snap(conn, SNAP):
-    """
-    Collect the data from the given moment of the server's data.
-    """
-    # logger = logging.getLogger(__name__)
+    """Collect the data from the given moment of the server's data."""
+    logger = logging.getLogger()
 
     with conn.cursor() as cursor:
         logger.info('Getting a date to grab a snapshot from.')
@@ -27,7 +25,7 @@ def get_snap(conn, SNAP):
             cursor.execute(SNAP, moments)
 
         except (ConnectionError, Exception) as c:
-            logger.error(f"Exception encountered while attempting to get moment: {c}.")
+            logger.error(f"{RED}exception encountered while attempting to get moment:{RESET} {c}.")
             raise
         else:
             logger.info('Executed query to get moment.')
@@ -42,35 +40,44 @@ def get_snap(conn, SNAP):
 
 def get_dest(LOCAL_DIR):
     """Ask the user for a path to write the moment's contents to. Default is LOCAL_DIR from config."""
-    # logger = logging.getLogger(__name__)
+    logger = logging.getLogger()
 
-    snap_dest = Path(LOCAL_DIR).resolve()
+    snap_dest = Path( LOCAL_DIR / 'moment' )
     upath = input(f"Where do you want this written to? The default is: {snap_dest} and will overwrite your files. If you want another location, enter here: ")
     if upath:
         logger.info('User provided a new path.')
         return Path(upath).resolve()
     else:
         logger.info(f"User did not provide a path; {snap_dest} is the chosen destination.")
-        return snap_dest
+        try:
+            snap_dest.mkdir(parents=True, exist_ok=True)
+        except:
+            raise
+        else:
+            return snap_dest
 
 
-# if __name__ == "__main__":
-def main():
-    # logger = logger.getLogger(__name__)
+def main(args):
+    logger, force, prints = mini_ps(args)
 
     logger.info('Rosa [get] [moment] executed.')
 
-    start = datetime.datetime.now(datetime.UTC).timestamp()
+    start = time.perf_counter()
     if start:
         logger.info('[get] [moment] timer started.')
 
     abs_path = Path(LOCAL_DIR).resolve()
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+        logger.info('conn is connected; pinging heaven...')
         try:
             snapshot = get_snap(conn, SNAP)
             if snapshot:
-                upath = get_dest(LOCAL_DIR)
+                if not force:
+                    upath = get_dest(LOCAL_DIR)
+                if force:
+                    upath = Path(abs_path / 'moment').resolve()
+
                 with fat_boy(upath) as (tmp_, backup):
                     batch_size = calc_batch(conn)
 
@@ -80,7 +87,7 @@ def main():
                         download_batches2(snapshot, conn, batch_size, tmp_)
 
                     except (PermissionError, FileNotFoundError, Exception) as e:
-                        logger.error(f"Exception encountered while attempting atomic wr for [get] [moment]: {e}.", exc_info=True)
+                        logger.error(f"{RED}exception encountered while attempting atomic wr for [get] [moment]:{RESET} {e}.", exc_info=True)
                         raise
                     else:
                         logger.info('No exceptions caught during atomic wr for [get] [moment].')
@@ -90,17 +97,14 @@ def main():
             else:
                 logger.warning('No data returned from moment; do records exist at this time?')
         
-        # except (mysql.connector.Error, ConnectionError, Exception) as e:
         except (ConnectionError, Exception) as e:
-            logger.error(f"Error encountered while obtaining moment: {e}.", exc_info=True)
+            logger.error(f"{RED}error encountered while obtaining moment:{RESET} {e}.", exc_info=True)
             raise
         else:
             logger.info('[moment] main function complete without exception.')
-    
-    logger.info('[get] [moment] complete.')
 
     if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
+        end = time.perf_counter()
         proc_time = end - start 
         if proc_time > 60:
             min_time = proc_time / 60
@@ -108,35 +112,15 @@ def main():
         else:
             logger.info(f"Processing time [in seconds] for rosa [get] [moment]: {proc_time:.4f}.")
 
-    print('All set.')
+    logger.info('[get] [moment] complete.')
 
-
-def init_logger():
-    f_handler = logging.FileHandler('rosa.log', mode='a')
-    f_handler.setLevel(logging.DEBUG)
-
-    cons_handler = logging.StreamHandler()
-    cons_handler.setLevel(LOGGING_LEVEL.upper())
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[f_handler, cons_handler]
-    )
+    if prints:
+        print('All set.')
 
 
 if __name__=="__main__":
-    init_logger()
-    # logging.info('Rosa [get] [moment] executed.')
-    # start = datetime.datetime.now(datetime.UTC).timestamp()
-    # if start:
-    #     logging.info('[get] [moment] timer started.')
-    main()
-    # if start:
-    #     end = datetime.datetime.now(datetime.UTC).timestamp()
-    #     proc_time = end - start 
-    #     if proc_time > 60:
-    #         min_time = proc_time / 60
-    #         logging.info(f"Processing time [in minutes] for rosa [get] [moment]: {min_time:.4f}.")
-    #     else:
-    #         logging.info(f"Processing time [in seconds] for rosa [get] [moment]: {proc_time:.4f}.")
+    from config import *
+    from queries import SNAP
+    from lib import fat_boy, calc_batch, download_batches2, phone_duty, init_logger, mini_ps
+
+    main(args=None)

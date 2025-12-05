@@ -33,7 +33,9 @@ def give_all(args):
 	give_all.main(args)
 
 def test(args):
-	print('Hello, world.')
+	# print('Hello, world.')
+	from rosa.abilities.add_extra import contrast_two
+	contrast_two.main(args)
 
 rosa = {
 	'get': {
@@ -95,19 +97,19 @@ arguments = {
 		'flag': '--silent',
 		'shorthand': '-s',
 		'action': "store_true",
-		'help': "runs with logging_level set to critical"
+		'help': "runs with logging_level set to critical; disables print statements"
 	},
 	'force': {
 		'flag': '--force',
 		'shorthand': '-f',
 		'action': "store_true",
-		'help': "bypasses all user checks & confirmations; can be damaging if not careful"
+		'help': "bypasses all user checks & confirmations [commit, show, confirm]; can be damaging if not careful"
 	},
 	'verbose': {
 		'flag': '--verbose',
 		'shorthand': '-v',
 		'action': "store_true",
-		'help': "runs with logging_level set to debug"
+		'help': "runs with logging_level set to debug; prints enabled"
 	}
 }
 

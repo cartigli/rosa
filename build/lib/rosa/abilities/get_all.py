@@ -1,115 +1,186 @@
 #!/usr/bin/env python3
+import sys
+import time
+import shutil
 import logging
-import datetime
 from pathlib import Path
 
-from rosa.abilities.config import *
-from rosa.abilities.lib import (scope_loc, scope_rem,
-    ping_cass, contrast, compare,
-    calc_batch, download_batches5,
-    fat_boy, save_people,
-    mk_rdir, phone_duty
-)
+if __name__!="__main__":
+    from rosa.abilities.config import *
+    from rosa.abilities.lib import (scope_loc, scope_rem,
+        ping_cass, contrast, compare, init_logger,
+        calc_batch, download_batches5, mini_ps,
+        fat_boy, save_people,
+        mk_rdir, phones
+    )
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
 server, download/write all hash discrepancies, and delete all files not found in the server. Make parent directories if needed & 
 delete old ones.
 """
+def log():
+    logger = logging.getLogger()
+    return logger
 
-logger = logging.getLogger(__name__)
+def rm_origin(abs_path, force):
+    logger = log()
+    if not force:
+        if abs_path.is_dir():
+            dwarn = input(f"A folder already exists @{abs_path}. Unless specified now with 'n', it will be written over. Return to continue. decision: ").lower()
+            if dwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+                logger.warning('abandoning rosa [get] [all]')
+                sys.exit(0)
+            else:
+                shutil.rmtree(abs_path)
+                logger.warning(f"{abs_path} was deleted from your disk.")
+        else:
+            fwarn = input(f"a file already exists @{abs_path}; unless specified now with 'n', it will be written over. Return to continue. Decision: ").lower()
+            if fwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+                logger.warning('abandoning rosa [get] [all]')
+                sys.exit(0)
+            else:
+                abs_path.unlink()
+                logger.warning(f"{abs_path} was deleted from your disk.")
+    elif force:
+        logger.info(f"staying silent & deleting {abs_path}.")
+        if abs_path.is_dir():
+            shutil.rm_tree(abs_path)
+            if abs_path.exists():
+                logger.info('shutil failed; retrying in 5 seconds')
+                time.sleep(5)
+                shutil.rmtree(abs_path)
+                if abs_path.exists():
+                    logger.error(f"{RED}could not delete {abs_path}.{RESET}")
+                    sys.exit(1)
+            else:
+                logger.info(f"deleted {abs_path} silenetly.")
+        if abs_path.is_file():
+            abs_path.unlink()
+            if abs_path.exists():
+                logger.info(f"couldn't delete {abs_path}.")
+                sys.exit(1)
 
+def tmper(tmp_, force):
+    logger = log()
+    if force:
+        try:
+            shutil.rmtree(tmp_)
+        except e:
+            try:
+                logger.info('5 sec pause before retry recursive delete; standby')
+            except:
+                logger.warning('Retry unsucessful')
+                sys.exit(1)
+            else:
+                logger.info('Retry sucessful')
+        else:
+            if tmp_.exists():
+                logger.debug('Gah fucking lee; tmp_ is still there, I quit')
+                raise
+            else:
+                logger.info(f"{tmp_} deleted")
+    if tmp_.exists():
+        decis = input(f"{tmp_} was started, but not finished. Keep the half-baked directory? y/n: ").lower()
+        if decis0 in ('yes', 'y', ' y', 'y ', 'ye', 'yeah', 'sure'):
+            try:
+                shutil.rmtree(tmp_)
+            except e:
+                try:
+                    logger.info('5 sec pause before retry recursive delete; standby')
+                except:
+                    logger.warning('retry unsucessful')
+                    sys.exit(1)
+                else:
+                    logger.info('retry sucessful')
+            else:
+                if tmp_.exists():
+                    logger.debug('gah fucking lee; tmp_ is still there, I quit')
+                    raise
+                else:
+                    logger.info(f"{tmp_} deleted")
 
-def main():
-    # logger = logging.getLogger(__name__)
-    logger.info('Rosa [get] executed.')
+        elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+            logger.info('heard; won\'t touch it')
+            pass
 
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    if start:
-        logger.info('[get] timer started.')
-    
-    abs_path = Path( LOCAL_DIR ).resolve()
+def main(args):
+    try:
+        logger, force, prints = mini_ps(args)
+        force
+        logger.info('rosa [get] executed')
 
-    # raw_hell, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
-    # files, directories, folder full path
+        start = time.perf_counter()
+        if start:
+            logger.info('[get] [all] timer started')
+        # try:
+        abs_path = Path( LOCAL_DIR ).resolve()
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn: # context manager for peace of mind
-        raw_heaven = scope_rem(conn) # raw remote files & hash_id's
-        souls = [s[0] for s in raw_heaven]
-        heaven_dirs = ping_cass(conn) # raw remote dirs' rpath's
-        soul_dirs = [h[0] for h in heaven_dirs]
+        if abs_path.exists():
+            rm_origin(abs_path, force)
 
-        heaven_data = [raw_heaven, heaven_dirs]
-        if heaven_data: # remote hashes & relative paths
-            logger.info('Data returned from heaven.')
-            with fat_boy(abs_path) as (tmp_, backup): # context manager [atomic]
-                batch_size = calc_batch(conn)
+        # with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+        with phones() as conn:
+            logger.info('conn is connected')
+            raw_heaven = scope_rem(conn) # raw remote files & hash_id's
+            logger.info('raw heaven returned')
+            souls = [s[0] for s in raw_heaven]
+
+            heaven_dirs = ping_cass(conn) # raw remote dirs' rpath's
+            logger.info('heavenly dirs returned')
+            soul_dirs = [h[0] for h in heaven_dirs]
+
+            if soul_dirs or heaven_dirs: # remote hashes & relative paths
+                logger.info(f"data was returned from heaven; going directly to processing...")
+
+                tmp_ = abs_path.resolve()
+                batch_size, row_size = calc_batch(conn)
+                logger.info('optimal batch size returned')
                 # try:
                 if soul_dirs:
-                    logger.debug(f"{len(soul_dirs)} remote-only directories found.")
+                    logger.info('...downloading directories...')
                     mk_rdir(soul_dirs, tmp_) # write directory heirarchy to tmp_ directory
-                    logger.info('New directories written to disk.')
+                    logger.info('new directories written to disk')
 
                 if souls:
-                    logger.debug(f"{len(souls)} files with hash discrepancies found.")
-                    download_batches5(souls, conn, batch_size, tmp_, backup)
-
-                # except Exception as p:
-                #     logger.critical(f"Exception encountered while attempting atomic download & write: {p}.", exc_info=True)
-                #     raise
-                # else:
-                #     logger.info('Atomic downlaod & write completed without exception.')
+                    logger.info('...downloading files...')
+                    download_batches5(souls, conn, batch_size, row_size, tmp_)
+                    logger.info('new files written to disk')
             
-            logger.info('Fat boy closed.')
-        
-        else:
-            logger.info('Server is devoid of data.')
+            else:
+                logger.info('server is devoid of data')
+                sys.exit(0)
 
-    logger.info('[get] completed.')
+        logger.info('[get] [all] completed')
 
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start 
-        if proc_time > 60:
-            min_time = proc_time / 60
-            logger.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
-        else:
-            logger.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
+        if start:
+            end = time.perf_counter()
+            proc_time = end - start 
+            if proc_time > 60:
+                min_time = proc_time / 60
+                logger.info(f"processing time [in minutes] for rosa [get] [all]: {min_time:.4f}.")
+            else:
+                logger.info(f"processing time [in seconds] for rosa [get] [all]: {proc_time:.4f}.")
 
-    print('All set.')
-
-
-def init_logger():
-    f_handler = logging.FileHandler('rosa.log', mode='a')
-    f_handler.setLevel(logging.DEBUG)
-
-    cons_handler = logging.StreamHandler()
-    # cons_handler.setLevel(logging.INFO)
-    cons_handler.setLevel(LOGGING_LEVEL.upper())
-
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[f_handler, cons_handler]
-    ) # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    except KeyboardInterrupt as ko:
+        logger.warning('boss killed it; wrap it up')
+        tmper(tmp_, force, logger)
+        sys.exit(0)
+    except Exception as e:
+        logger.warning(f"exception encountered during [get] [all] [main]: {e}.", exc_info=True)
+        tmper(tmp_, force, logger)
+        sys.exit(1)
+    else:
+        if prints:
+            print('All set.')
 
 
 if __name__=="__main__":
-    # init_logger()
-    logger = logging.getLogger(__name__)
-    logger.info('Rosa [get] executed.')
+    from config import *
+    from lib import (scope_loc, scope_rem, mini_ps,
+        ping_cass, contrast, compare, init_logger,
+        calc_batch, download_batches5, fat_boy, 
+        save_people, mk_rdir, phones
+    )
 
-    start = datetime.datetime.now(datetime.UTC).timestamp()
-    if start:
-        logger.info('[get] timer started.')
-
-    main()
-
-    if start:
-        end = datetime.datetime.now(datetime.UTC).timestamp()
-        proc_time = end - start 
-        if proc_time > 60:
-            min_time = proc_time / 60
-            logger.info(f"Processing time [in minutes] for rosa [get]: {min_time:.4f}.")
-        else:
-            logger.info(f"Processing time [in seconds] for rosa [get]: {proc_time:.4f}.")
+    main(args=None)

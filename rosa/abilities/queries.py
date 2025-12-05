@@ -1,35 +1,5 @@
 import os
 
-T_CHECK = os.getenv("""T_CHECK""","""
-SHOW TABLES;
-"""
-)
-
-TRIG_CHECK = os.getenv("""TRIG_CHECK""","""
-SHOW TRIGGERS;
-"""
-)
-
-TRUNC = os.getenv("""TRUNC""","""
-SET FOREIGN_KEY_CHECKS = 0;
-TRUNCATE TABLE directories;
-TRUNCATE TABLE deltas;
-TRUNCATE TABLE notes;
-TRUNCATE TABLE dead_deltas;
-TRUNCATE TABLE deleted;
-SET FOREIGN_KEY_CHECKS = 1;
-"""
-)
-
-DROP = os.getenv("""DROP""","""
-DROP TABLE directories;
-DROP TABLE deltas;
-DROP TABLE notes;
-DROP TABLE dead_deltas;
-DROP TABLE deleted;
-"""
-)
-
 INITIATION = os.getenv("""INITIATION""","""
 CREATE TABLE IF NOT EXISTS directories(
 	drp VARCHAR(512) NOT NULL
@@ -155,29 +125,6 @@ WHERE d.tfinal > %s;
 """
 )
 
-# SNAP3 = os.getenv("""SNAP""","""
-# SELECT n.frp, 
-# 	COALESCE(de.content, n.content)
-# FROM notes n 
-# LEFT OUTER JOIN deltas de
-# 	ON de.id = n.id 
-# 		AND de.tstart < %s
-# 		AND de.tfinal > %s
-# WHERE n.torigin < %s
-# AND n.id in ({params})
-# UNION ALL
-# SELECT d.id,
-# 	COALESCE(dd.content, d.content)
-# FROM deleted d 
-# LEFT OUTER JOIN dead_deltas dd 
-# 	ON dd.rmid = d.rmid
-# 		AND dd.tstart < %s
-# 		AND dd.tfinal > %s
-# WHERE d.tfinal > %s
-# AND d.id IN ({params});
-# """
-# )
-
 # SNAP = os.getenv("""SNAP""","""
 # SELECT n.frp,
 # 	COALESCE(de.content, n.content)
@@ -210,5 +157,35 @@ SELECT AVG_ROW_LENGTH
 FROM information_schema.tables
 WHERE table_schema = 'notation'
 AND table_name = 'notes';
+"""
+)
+
+T_CHECK = os.getenv("""T_CHECK""","""
+SHOW TABLES;
+"""
+)
+
+TRIG_CHECK = os.getenv("""TRIG_CHECK""","""
+SHOW TRIGGERS;
+"""
+)
+
+TRUNC = os.getenv("""TRUNC""","""
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE directories;
+TRUNCATE TABLE deltas;
+TRUNCATE TABLE notes;
+TRUNCATE TABLE dead_deltas;
+TRUNCATE TABLE deleted;
+SET FOREIGN_KEY_CHECKS = 1;
+"""
+)
+
+DROP = os.getenv("""DROP""","""
+DROP TABLE directories;
+DROP TABLE deltas;
+DROP TABLE notes;
+DROP TABLE dead_deltas;
+DROP TABLE deleted;
 """
 )

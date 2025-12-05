@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import time
+import logging
 from pathlib import Path
 
 if __name__!="__main__":
@@ -11,8 +12,10 @@ if __name__!="__main__":
 Downloads the servers contents from a given moment using recorded UTC timestamps.
 """
 
-def get_snap(conn, SNAP, logger):
+def get_snap(conn, SNAP):
     """Collect the data from the given moment of the server's data."""
+    logger = logging.getLogger()
+
     with conn.cursor() as cursor:
         logger.info('Getting a date to grab a snapshot from.')
         moment = input(f"Please provide a time to get the state of your server from that moment (ex: [1999-12-31 24:60:60]): ")
@@ -35,10 +38,11 @@ def get_snap(conn, SNAP, logger):
                 logger.warning('No data returned from query. Did your notes exist at that time?')
 
 
-def get_dest(LOCAL_DIR, logger):
+def get_dest(LOCAL_DIR):
     """Ask the user for a path to write the moment's contents to. Default is LOCAL_DIR from config."""
+    logger = logging.getLogger()
+
     snap_dest = Path( LOCAL_DIR / 'moment' )
-    logger = log()
     upath = input(f"Where do you want this written to? The default is: {snap_dest} and will overwrite your files. If you want another location, enter here: ")
     if upath:
         logger.info('User provided a new path.')
@@ -54,7 +58,7 @@ def get_dest(LOCAL_DIR, logger):
 
 
 def main(args):
-    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
+    logger, force, prints = mini_ps(args)
 
     logger.info('Rosa [get] [moment] executed.')
 
@@ -65,11 +69,12 @@ def main(args):
     abs_path = Path(LOCAL_DIR).resolve()
 
     with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+        logger.info('conn is connected; pinging heaven...')
         try:
-            snapshot = get_snap(conn, SNAP, logger)
+            snapshot = get_snap(conn, SNAP)
             if snapshot:
                 if not force:
-                    upath = get_dest(LOCAL_DIR, logger)
+                    upath = get_dest(LOCAL_DIR)
                 if force:
                     upath = Path(abs_path / 'moment').resolve()
 
@@ -80,7 +85,6 @@ def main(args):
                         logger.info(f"Found batch size: {batch_size}.")
                     try:
                         download_batches2(snapshot, conn, batch_size, tmp_)
-                        # download_batches6(snapshot, conn, batch_size, row_size, tmp_)
 
                     except (PermissionError, FileNotFoundError, Exception) as e:
                         logger.error(f"{RED}exception encountered while attempting atomic wr for [get] [moment]:{RESET} {e}.", exc_info=True)

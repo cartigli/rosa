@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import sys
 import time
+from pathlib import Path
 
 if __name__!="__main__":
+    from rosa.abilities.config import LOCAL_DIR
     from rosa.abilities.lib import (scope_loc, hash_loc, 
         scope_rem, ping_cass, contrast, compare, init_logger,
         calc_batch, download_batches5, fat_boy, mini_ps,
-        save_people, mk_rrdir, mk_dir, phone_duty
+        save_people, mk_rrdir, mk_dir, phones, diffr
     )
 
 """
@@ -15,85 +17,71 @@ server, download/write all hash discrepancies, and delete all files not found in
 delete old ones.
 """
 
+NOMIC = "[get][surgic]"
+
 def main(args):
-    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
+    x = False
+    data, diff, start, mini, x = diffr(args, NOMIC, x)
 
-    logger.info('rosa [get] executed')
+    cherubs = data[0][0]
+    souls = data[0][1]
+    stags = data[0][2]
+    serpents = data[0][3]
 
-    start = time.perf_counter()
-    if start:
-        logger.info('rosa [get] timer started')
+    gates = data[1][0]
+    caves = data[1][1]
+    ledeux = data[1][2]
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn: # context manager for peace of mind
-        try: # this will catch all exceptions and just dip; all other keyboard interrupts are caught and handled; this avoids extraneous server rollback
-            raw_heaven = scope_rem(conn) # raw remote files & hash_id's
-            heaven_dirs = ping_cass(conn) # raw remote dirs' rpath's
+    logger = mini[0]
+    force = mini[1]
+    prints = mini[2]
 
-            heaven_data = [raw_heaven, heaven_dirs]
-            if heaven_data[0] or heaven_data[0]: # remote hashes & relative paths
-                logger.info('Data returned from heaven; checking out local directory')
+    if diff == True:
+        try:
+            altered = len(cherubs) + len(serpents) + len(souls)
+            un_altered = len(stags) + len(ledeux)
+            total = altered + un_altered
+            ratio = (total - altered) / total * 100
 
-                raw_paths, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
-                raw_hell = hash_loc(raw_paths, abs_path)
+            logger.info(f"{ratio:.4f}% unaltered files in {LOCAL_DIR}")
+            if ratio >= 80:
+                with phones() as conn:
+                    # dumb fat boy replacement
+                    batch_size, row_size = calc_batch(conn)
+                    patient = Path(LOCAL_DIR).resolve()
 
-                logger.info('contrasting and comparing')
-                cherubs, serpents, stags, souls = contrast(raw_heaven, raw_hell) # new, old, unchanged, changed file[s]
-                f_delta = [cherubs, serpents, souls] # f_delta = altered file data
+                    try: # all the changes are made inside this try catch block
+                        if gates:
+                            # logger.debug(f"{len(gates)} remote-only directories found.")
+                            lgates = [gate['frp'] for gate in gates]
+                            mk_dir(lgates, patient) # write directory heirarchy to tmp_ directory
+                            logger.info('new directories [gates] written to disk')
 
-                gates, caves, ledeux = compare(heaven_dirs, hell_dirs) # new directory[s], old directory[s]
-                d_delta = [gates, caves] # altered directory data
+                        # if caves:
+                        #     logger.debug(f"Ignoring local-only directories [caves].")
 
-                if any(f_delta) or any(d_delta): # if file or folder data has been changed, continue to processing
-                    logger.info('discrepancies found; proceeding to processing')
+                        if cherubs:
+                            logger.info('pulling cherubs')
+                            cherubs_ = [cherub['frp'] for cherub in cherubs]
+                            download_batches5(cherubs_, conn, batch_size, row_size, patient)
+                            # handles pulling new file data, giving it batch by batch
+                            # to the wr batches function, and continuing until list is empty
 
-                    altered = len(cherubs) + len(serpents) + len(souls)
-                    un_altered = len(stags) + len(ledeux)
-                    total = altered + un_altered
-                    ratio = (total - altered) / total * 100
+                        if souls:
+                            logger.info('pulling souls')
+                            souls_ = [soul['frp'] for soul in souls]
+                            download_batches5(souls_, conn, batch_size, row_size, patient)
+                            # same here as w.cherubs but for altered file[s] (hash discrepancies)
 
-                    logger.info(f"{ratio:.4f}% unaltered files in {abs_path}.")
-                    if ratio >= 80:
-                        # dumb fat boy replacement
-                        batch_size, row_size = calc_batch(conn)
-                        patient = abs_path.resolve()
+                    except KeyboardInterrupt as ko:
+                        logger.warning('boss killed it; wrap it up')
+                        raise
+                    except (PermissionError, Exception) as e:
+                        logger.error(f"{RED}exception encountered while attempting atomic write{RESET}", exc_info=True)
+                        raise
 
-                        try: # all the changes are made inside this try catch block
-                            if any(d_delta):
-
-                                if gates:
-                                    # logger.debug(f"{len(gates)} remote-only directories found.")
-                                    lgates = [gate['frp'] for gate in gates]
-                                    mk_dir(lgates, patient) # write directory heirarchy to tmp_ directory
-                                    logger.info('new directories [gates] written to disk')
-
-                                # if caves:
-                                #     logger.debug(f"Ignoring local-only directories [caves].")
-
-                            if any(f_delta):
-                                if cherubs:
-                                    logger.info('pulling cherubs')
-                                    cherubs_ = [cherub['frp'] for cherub in cherubs]
-                                    download_batches5(cherubs_, conn, batch_size, row_size, patient)
-                                    # handles pulling new file data, giving it batch by batch
-                                    # to the wr batches function, and continuing until list is empty
-
-                                if souls:
-                                    logger.info('pulling souls')
-                                    souls_ = [soul['frp'] for soul in souls]
-                                    download_batches5(souls_, conn, batch_size, row_size, patient)
-                                    # same here as w.cherubs but for altered file[s] (hash discrepancies)
-
-                        except KeyboardInterrupt as ko:
-                            logger.warning('boss killed it; wrap it up')
-                            raise
-                        except (PermissionError, Exception) as e:
-                            logger.error(f"{RED}exception encountered while attempting atomic write{RESET}", exc_info=True)
-                            raise
-
-                    else:
-                        logger.info('ratio of altered files too great; run "rosa get"')
             else:
-                logger.info('server is devoid of data')
+                logger.info('ratio of altered files too great; run "rosa get"')
 
         except KeyboardInterrupt as ko:
             conn.close()

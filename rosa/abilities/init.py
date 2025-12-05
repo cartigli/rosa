@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import time
-import datetime
+import logging
 
 if __name__!="__main__":
     from rosa.abilities.config import *
     from rosa.abilities.queries import *
-    from rosa.abilities.lib import phone_duty, confirm, init_conn, init_logger, mini_ps
+    from rosa.abilities.lib import phones, confirm, init_conn, init_logger, mini_ps
 
 """
 Helper for executing the queries for:
@@ -19,9 +19,12 @@ Helper for executing the queries for:
         - Replacing tables
 Asks to user to confirm before committing to the server, just like rosa_give.
 """
+def log():
+    logger = logging.getLogger()
+    return logger
 
-def table_helper(conn, logger):
-    # logger = log()
+def table_helper(conn):
+    logger = log()
 
     with conn.cursor() as cursor:
         cursor.execute(T_CHECK)
@@ -80,7 +83,8 @@ def table_helper(conn, logger):
             logger.info('no selection made')
 
 
-def trigger_helper(conn, logger):
+def trigger_helper(conn):
+    logger = log()
     with conn.cursor() as cursor:
         cursor.execute(TRIG_CHECK)
         trigs = cursor.fetchall()
@@ -135,8 +139,8 @@ def trigger_helper(conn, logger):
                 logger.info('couldn\'t catch that')
 
 
-def force_initiation(conn, logger):
-    # logger = log()
+def force_initiation(conn):
+    logger = log()
     init_cmds = [INITIATION, EDIT_TRIGGER, DELETE_TRIGGER]
 
     with conn.cursor() as cursor:
@@ -155,7 +159,7 @@ def force_initiation(conn, logger):
 
 
 def main(args):
-    prints, force, logger = mini_ps(args, LOGGING_LEVEL)
+    logger, force, prints = mini_ps(args)
 
     logger.info('rosa [init] executed')
 
@@ -163,7 +167,7 @@ def main(args):
     if start:
         logger.info('[init] timer started')
 
-    with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
+    with phones() as conn:
         if force:
             try:
                 force_initiation(conn)
@@ -171,8 +175,8 @@ def main(args):
                 raise
         elif not force:
             try:
-                table_helper(conn, logger)
-                trigger_helper(conn, logger)
+                table_helper(conn)
+                trigger_helper(conn)
             
                 confirm(conn)
                 logger.info('decision made, and relayed to the server')
