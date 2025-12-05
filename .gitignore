@@ -4,3 +4,12 @@ rosa.log
 __pycache__/
 .vscode/
 .git/
+
+rosa.egg-info/
+abilities/rosa_records/
+abilities/add_extra/
+abilities/__pycache__/
+abilities/config.py
+abilities/__init__.py
+__init__.py
+build/
