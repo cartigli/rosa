@@ -8,10 +8,11 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 if __name__!="__main__":
     from rosa.abilities.config import *
-    from rosa.abilities.lib import(scope_rem, ping_cass, 
-        contrast, compare, rm_remdir, init_logger, rm_remfile, 
-        collect_info, collect_data, upload_dirs, upload_created, 
-        confirm, phones, mini_ps
+    from rosa.abilities.lib import(
+        phones, mini_ps, scope_rem, 
+        ping_cass, collect_info, 
+        collect_data, upload_dirs, 
+        upload_created, confirm
     )
 
 """
@@ -45,13 +46,11 @@ def scraper():
                 caves.append({
                     'drp':drp
                 }) # keep the empty list of dirs
-            else:
-                continue
     
     return serpents, caves, abs_path
 
 
-def main(args):
+def main(args=None):
     logger, force, prints = mini_ps(args)
 
     logger.info('rosa [give] executed')
@@ -60,86 +59,67 @@ def main(args):
     if start:
         logger.info('[give] [all] timer started')
 
-    # with phone_duty(DB_USER, DB_PSWD, DB_NAME, DB_ADDR) as conn:
     with phones() as conn:
         logger.info('conn is connected')
         raw_heaven = scope_rem(conn) # raw remote files & hash_id's
         heaven_dirs = ping_cass(conn) # raw remote dirs' rpats
 
-        if not raw_heaven or heaven_dirs:
+        if not any((raw_heaven, heaven_dirs)):
             logger.info('heaven\'s empty; processing local data...')
 
             if Path(LOCAL_DIR).exists():
                 serpents, caves, abs_path = scraper()
                 logger.info('collected local paths; uploading...')
-            else:
-                logger.warning('local directory doesn\'t exist; aborting')
-                sys.exit(1)
 
-            try:
-                if caves: 
-                    logger.info('uploading local-only directory[s]...')
-                    upload_dirs(conn, caves) # upload local-only[s] to server
-                    logger.info('directory[s] uploaded')
+                try:
+                    if caves: 
+                        logger.info('uploading local-only directory[s]...')
+                        upload_dirs(conn, caves) # upload local-only[s] to server
 
-                if serpents:
-                    logger.info('uploading local-only file[s]...')
-                    # serpents_ = sorted(serpents, key=str.lower)
-                    with logging_redirect_tqdm(loggers=[logger]): # tqdm method
-                        with tqdm(collect_info(serpents, abs_path), unit="batches", leave=False) as pbar:
-                            for batch in pbar:
-                                serpent_data = collect_data(batch, abs_path, conn)
+                    if serpents:
+                        logger.info('uploading local-only file[s]...')
+                        with logging_redirect_tqdm(loggers=[logger]): # tqdm method
+                            with tqdm(collect_info(serpents, abs_path), unit="batches", leave=False) as pbar:
 
-                                if serpent_data:
-                                    upload_created(conn, serpent_data)
-                    logger.info('file[s] uploaded')
+                                for batch in pbar:
+                                    serpent_data = collect_data(batch, abs_path, conn)
 
-                if start:
-                    end = time.perf_counter()
-                    proc_time = end - start
-                    if proc_time > 60:
-                        min_time = proc_time / 60
-                        logger.info(f"upload time [in minutes] for rosa [give] [all]: {min_time:.3f}.")
-                    else:
-                        logger.info(f"upload time [in seconds] for rosa [give] [all]: {proc_time:.3f}.")
+                                    if serpent_data:
+                                        upload_created(conn, serpent_data)
 
-            except (ConnectionError, TimeoutError) as c:
-                logger.critical(f"{RED}exception encountered while uploading data:{RESET} {c}", exc_info=True)
-                sys.exit(1)
-            except KeyboardInterrupt as k:
-                logger.warning('boss killed it; aborting')
-                sys.exit(1)
-            else:
-                if force == True:
-                    try:
-                        conn.commit()
-                    except Exception as e:
-                        logger.critical(f"{RED}error on --forced commit:{RESET} {e}", exc_info=True)
-                        sys.exit(3) # auto_commit: False, so error handling to rollback is not necessary
-                    else:
-                        logger.info('forced commit w.o exception')
+                    counter(start, NOMIC)
+
+                except (ConnectionError, TimeoutError) as c:
+                    logger.critical(f"{RED}exception encountered while uploading data:{RESET} {c}", exc_info=True)
+                    sys.exit(1)
+                except KeyboardInterrupt as k:
+                    logger.warning('boss killed it; aborting')
+                    sys.exit(1)
                 else:
-                    try:
-                        confirm(conn)
-                    except:
-                        raise
-                    else:
-                        logger.info('confirmed commitment w.o exception')
+                    confirm(conn, force)
 
-        else: # if server is empty, let us know
-            logger.info('server contains data; truncate tables before attempting again. Aborting [give] [all]')
+            else:
+                logger.warning(f"{RED}local directory doesn\'t exist{RESET}")
+                sys.exit(1)
+
+        else: # if server is empty, let em know
+            logger.info('server contains data; truncate tables before attempting again. aborting')
 
     logger.info('[give] [all] complete')
 
-    if prints:
+    counter(start, NOMIC) # two counters in case -f isn't used - commit question takes time
+
+    if prints is True:
         print('All set.')
 
 
 if __name__=="__main__":
     from config import *
-    from lib import(scope_rem, ping_cass, mini_ps,
-        contrast, compare, rm_remdir, init_logger, rm_remfile, 
-        collect_info, collect_data, upload_dirs, upload_created, 
-        confirm, phone_duty
+    from lib import(
+        phones, mini_ps, scope_rem, 
+        ping_cass, collect_info, 
+        collect_data, upload_dirs, 
+        upload_created, confirm
     )
-    main(args=None)
+
+    main(args)

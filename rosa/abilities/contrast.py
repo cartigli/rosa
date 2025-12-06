@@ -5,9 +5,8 @@ import logging
 
 if __name__!="__main__":
     from rosa.abilities.config import *
-    from rosa.abilities.lib import(mini_ps, diffr,
-        scope_loc, hash_loc, scope_rem, ping_cass,
-        contrast, compare, init_logger, doit_urself
+    from rosa.abilities.lib import(
+        diffr, doit_urself, counter
     )
 
 """
@@ -16,152 +15,162 @@ Compare local data to server, report back.
 
 NOMIC = "[diff]"
 
-def check(diff):
-    logger = logging.getLogger()
+def log():
+    logger = logging.getLogger('rosa.log')
+    return logger
 
-    title = diff["type"]
-    count = len(diff["details"])
-    descr = diff["message"]
-    dict_key = diff["key"]
+def ask_to_share(diff_data, force):
+    logger = log()
 
-    if count > 0:
-        decis0 = input(f"found {count} {title} ({descr}). do you want details? y/n: ").lower()
-        formatted = []
-        if decis0 in ('yes', 'y', 'ye', 'yeah','sure', ' y', 'y '):
-            c = []
-            if dict_key == "frp":
-                [c.append(item["frp"]) for item in diff["details"]]
+    logger.info('discrepancy[s] found between the server and local data:')
+
+    for i in diff_data:
+        title = i["type"]
+        count = len(i["details"])
+        descr = i["message"]
+        dict_key = i["key"]
+
+        if count > 0:
+            if force is True:
+                logger.info(f"found: {count} {descr}")
             else:
-                [c.append(item["drp"]) for item in diff["details"]]
-            [formatted.append(f"\n{item}") for item in c]
-            print(f".../{title} ({descr}):\n{''.join(formatted)}")
+                decis0 = input(f"found {count} {descr}. do you want details? y/n: ").lower()
+                formatted = []
 
-        elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
-            pass
-        else:
-            print('ok freak')
+                if decis0 in ('yes', 'y', ' y', 'y ', 'ye', 'yeah','sure'):
+                    c = []
+
+                    if dict_key == "frp":
+                        [c.append(item["frp"]) for item in i["details"]]
+                    else:
+                        [c.append(item["drp"]) for item in i["details"]]
+
+                    [formatted.append(f"\n{item}") for item in c]
+                    logger.info(f".../{title} ({descr}):\n{''.join(formatted)}")
+
+                elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
+                    logger.info('heard')
+                else:
+                    logger.info('ok, freak')
 
 
-def main(args):
-    x = False
-    data, diff, start, mini, x = diffr(args, NOMIC, x)
-
-    cherubs = data[0][0]
-    souls = data[0][1]
-    stags = data[0][2]
-    serpents = data[0][3]
-
-    gates = data[1][0]
-    caves = data[1][1]
-    ledeux = data[1][2]
+def main(args=None):
+    data, diff, start, mini = diffr(args, NOMIC)
 
     logger = mini[0]
     force = mini[1]
     prints = mini[2]
 
-    if diff == True:
-        try:
-            if force == True:
-                logger.info('-force skipped ask-to-show')
-                pass
+    if diff is True:
+        remote_only = data[0][0]
+        deltas = data[0][1]
+        nodiffs = data[0][2]
+        local_only = data[0][3]
+
+        remote_only_directories = data[1][0]
+        local_only_directories = data[1][1]
+        ledeux = data[1][2]
+
+        diff_data = []
+
+        diff_data.append(
+            {
+                "type": "remote_only", 
+                "details": remote_only, 
+                "message": "file[s] that only exist in server", 
+                "key": "frp"
+            }
+        )
+        diff_data.append(
+            {
+                "type": "local_only", 
+                "details": local_only, 
+                "message": "local-only file[s]", 
+                "key": "frp"
+            }
+        )
+        diff_data.append(
+            {
+                "type": "deltas", 
+                "details": deltas, 
+                "message": "file[s] with hash discrepancies", 
+                "key": "frp"
+            }
+        )
+
+        diff_data.append(
+            {
+                "type": "remote only directory[s]", 
+                "details": remote_only_directories, 
+                "message": "directory[s] that only exist in the server", 
+                "key": "drp"
+            }
+        )
+        diff_data.append(
+            {
+                "type": "local_only_directory", 
+                "details": local_only_directories, 
+                "message": "directory[s] that are local only", 
+                "key": "drp"
+            }
+        )
+
+        ask_to_share(diff_data, force)
+
+        # files altered:total
+        tot = 0
+        t_deltas = 0
+        unchanged = 0
+        
+        t_deltas += len(remote_only) + len(local_only) + len(deltas)
+        unchanged += len(nodiffs)
+        tot += unchanged + t_deltas
+
+        fratio = (t_deltas / tot)*100
+
+        # directories altered:total
+        d_tot = 0
+        d_deltas = 0
+        unchangedd = 0
+        
+        d_deltas += len(remote_only_directories) + len(local_only_directories)
+        unchangedd += len(ledeux)
+        d_tot += unchangedd + d_deltas
+
+        dratio = (d_deltas / d_tot)*100
+    
+        # ratio prints
+        if prints is True:
+            if fratio < 2:
+                logger.info(f"{RED}{(fratio):.4f} %{RESET} of files were altered [failed hash verification]")
+            elif fratio > 2:
+                logger.info(f"{(100 - fratio):.4f} % of files were altered [failed hash verification]")
             else:
-                if prints == False:
-                    logger.info('-silent skipped ask-to-show')
-                    # pass
-                else:
-                    fdiff = []
-                    ddiff = []
+                logger.info(f"{fratio:.4f} % of files are unaltered [verified by hash]")
 
-                    fdiff.append( {
-                        "type": "cherubs",
-                        "details": cherubs,
-                        "message": "files not found locally [only exist in server]",
-                        "key": "frp"
-                        }
-                    )
-                    fdiff.append( {
-                        "type": "souls",
-                        "details": souls,
-                        "message": "files whose contents have been altered [hash discrepancies]",
-                        "key": "frp"
-                        }
-                    )
-                    fdiff.append( {
-                        "type": "serpents",
-                        "details": serpents,
-                        "message": "files not found in the server [local only]", 
-                        "key": "frp"
-                        }
-                    )
-
-                    ddiff.append( {
-                        "type": "gates",
-                        "details": gates,
-                        "message": "directories not found locally [only exist in the server]", 
-                        "key": "drp"
-                        }
-                    )
-                    ddiff.append( {
-                        "type": "caves",
-                        "details": caves, 
-                        "message": "directories not found in the server [local only]", 
-                        "key": "drp"
-                        }
-                    )
-
-                    for item in ddiff:
-                        check(item)
-
-                    for item in fdiff:
-                        check(item)
-
-            tot = 0
-            altered = 0
-            unchanged = 0
-            
-            altered += len(cherubs) + len(serpents) + len(souls)
-            unchanged += len(stags)
-            tot += unchanged + altered
-
-            fratio = (((tot - altered) / tot)*100)
-            # print(fratio)
-            if fratio > 1:
-                # if fratio >= 50:
-                logger.info(f"{(100 - fratio):.4f}% failed verification (did not match your last upload)")
-                # else:
-                #     logger.info(f"{fratio:.4f}% of files were unchanged")
+            if dratio < 2:
+                logger.info(f"{RED}{(dratio):.4f} %{RESET} of directories were altered [failed hash verification]")
+            elif dratio > 2:
+                logger.info(f"{(100 - dratio):.4f} % of files were altered [failed hash verification]")
             else:
-                logger.info(f"less than 1% of files were altered: {fratio:.3f}")
-
-        except KeyboardInterrupt as ko:
-            logger.error(f"boss killed it; wrap it up")
-            sys.exit(1)
-
-    else:
-        logger.info('no dif')
+                logger.info(f"{dratio:.4f} % of files are unaltered [verified by hash]")
+    
+    # wrap_up() here would be nice for all files
     
     doit_urself()
 
-    if start:
-        end = time.perf_counter()
-        proc_time = end - start
-        if proc_time > 60:
-            mins = proc_time / 60
-            logger.info(f"total processing time [in minutes] for rosa [contrast]: {mins:.3f}")
-        else:
-            logger.info(f"total processing time [in seconds] for rosa [contrast]: {proc_time:.3f}")
+    counter(start, NOMIC)
 
     logger.info('[diff] completed')
 
-    if prints:
+    if prints is True:
         print('All set.')
 
 
 if __name__=="__main__":
     from config import *
-    from lib import(mini_ps,
-        scope_loc, hash_loc, scope_rem, ping_cass,
-        contrast, compare, phone_duty, init_logger
+    from lib import(
+        diffr, doit_urself, counter
     )
 
-    main(args=None)
+    main(args)

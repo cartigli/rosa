@@ -21,11 +21,11 @@ def get_all(args):
 	get_all.main(args)
 
 def few(args):
-	from rosa.abilities import get_surg
+	from rosa.add_xtra import get_surg
 	get_surg.main(args)
 
 def moment(args):
-	from rosa.abilities import rosa_get_moment
+	from rosa.add_extra import rosa_get_moment
 	rosa_get_moment.main(args)
 
 def give_all(args):
@@ -47,7 +47,7 @@ rosa = {
 				'name': 'all'
 			}, 
 			'few': {
-				'func': few, 
+				'func': few,
 				'name': 'few'
 			}, 
 			'diff': {

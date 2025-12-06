@@ -5,7 +5,7 @@ import logging
 if __name__!="__main__":
     from rosa.abilities.config import *
     from rosa.abilities.queries import *
-    from rosa.abilities.lib import phones, confirm, init_conn, init_logger, mini_ps
+    from rosa.abilities.lib import phones, confirm, init_conn, init_logger, mini_ps, counter, doit_urself
 
 """
 Helper for executing the queries for:
@@ -19,18 +19,26 @@ Helper for executing the queries for:
         - Replacing tables
 Asks to user to confirm before committing to the server, just like rosa_give.
 """
+NOMIC = "[init]"
+
 def log():
-    logger = logging.getLogger()
+    logger = logging.getLogger('rosa.log')
     return logger
 
-def table_helper(conn):
+def table_helper(conn, force=False):
     logger = log()
+
+    if force is True:
+        exit
 
     with conn.cursor() as cursor:
         cursor.execute(T_CHECK)
         qtables = cursor.fetchall()
 
-    if qtables:
+    # if force is True:
+    #     exit
+
+    elif qtables:
         logger.info('obtained table data from db.')
         decis = input(f"found these tables: {qtables} in the db; do you want to [t] truncate data, [d] drop tables, or [p] pass? ").lower()
         if decis in ('t', 'trunc', 'truncate'):
@@ -83,80 +91,87 @@ def table_helper(conn):
             logger.info('no selection made')
 
 
-def trigger_helper(conn):
+def trigger_helper(conn, force=False):
     logger = log()
-    with conn.cursor() as cursor:
-        cursor.execute(TRIG_CHECK)
-        trigs = cursor.fetchall()
-        
-        if trigs:
-            decis2 = input(f"found triggers: {trigs}. [r] replace, [e] erase, or [p] pass? ").lower()
-            if decis2 in ('r', 'replace'):
-                try:
-                    for x in trigs:
-                        f = f"DROP TRIGGER {x[0]}"
-                        cursor.execute(f)
 
-                except ConnectionError as c:
-                    logger.error(f"{RED}conn err encountered while attempting to replace triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
-                    raise
-                else:
-                    cursor.execute(EDIT_TRIGGER)
-                    cursor.execute(DELETE_TRIGGER)
-                    logger.info('dropped & replaced triggers')
+    if force is True:
+        exit
+    else:
+        with conn.cursor() as cursor:
+            cursor.execute(TRIG_CHECK)
+            trigs = cursor.fetchall()
             
-            elif decis2 in ('e', 'erase'):
-                try:
-                    for x in trigs:
-                        f = f"DROP TRIGGER {x[0]}"
-                        cursor.execute(f)
+            if trigs:
+                decis2 = input(f"found triggers: {trigs}. [r] replace, [e] erase, or [p] pass? ").lower()
+                if decis2 in ('r', 'replace'):
+                    try:
+                        for x in trigs:
+                            f = f"DROP TRIGGER {x[0]}"
+                            cursor.execute(f)
 
-                except ConnectionError as c:
-                    logger.error(f"{RED}conn err encountered while attempting to erase triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
-                    raise
+                    except ConnectionError as c:
+                        logger.error(f"{RED}conn err encountered while attempting to replace triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
+                        raise
+                    else:
+                        cursor.execute(EDIT_TRIGGER)
+                        cursor.execute(DELETE_TRIGGER)
+                        logger.info('dropped & replaced triggers')
+                
+                elif decis2 in ('e', 'erase'):
+                    try:
+                        for x in trigs:
+                            f = f"DROP TRIGGER {x[0]}"
+                            cursor.execute(f)
+
+                    except ConnectionError as c:
+                        logger.error(f"{RED}conn err encountered while attempting to erase triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
+                        raise
+                    else:
+                        logger.info('dropped triggers')
+
                 else:
-                    logger.info('dropped triggers')
+                    logger.info('no selection made')
 
             else:
-                logger.info('no selection made')
+                decis3 = input('found no triggers; would you like to create them? y/n: ').lower()
+                if decis3 in ('y', 'yes', 'yeah', 'i guess', 'i suppose'):
+                    try:
+                        cursor.execute(EDIT_TRIGGER)
+                        cursor.execute(DELETE_TRIGGER)
 
-        else:
-            decis3 = input('found no triggers; would you like to create them? y/n: ').lower()
-            if decis3 in ('y', 'yes', 'yeah', 'i guess', 'i suppose'):
-                try:
-                    cursor.execute(EDIT_TRIGGER)
-                    cursor.execute(DELETE_TRIGGER)
+                    except ConnectionError as c:
+                        logger.error(f"{RED}conn err encountered while attempting to create triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
+                        raise
+                    else:
+                        logger.info('triggers created')
 
-                except ConnectionError as c:
-                    logger.error(f"{RED}conn err encountered while attempting to create triggers:{RESET} {c}. {RED}rolling back{RESET}", exc_info=True)
-                    raise
+                elif decis3 in ('n', 'no', 'nope', 'hell no', 'naw'):
+                    logger.info('got it')
                 else:
-                    logger.info('triggers created')
-
-            elif decis3 in ('n', 'no', 'nope', 'hell no', 'naw'):
-                logger.info('got it')
-            else:
-                logger.info('couldn\'t catch that')
+                    logger.info('couldn\'t catch that')
 
 
-def force_initiation(conn):
+def force_initiation(conn, force=False):
     logger = log()
-    init_cmds = [INITIATION, EDIT_TRIGGER, DELETE_TRIGGER]
 
-    with conn.cursor() as cursor:
-        try:
-            for cmd in init_cmds:
-                cursor.execute(cmd)
-        except (ConnectionError, TimeoutError, Exception) as e:
-            raise
-        else:
+    if force is True:
+        force_init_cmds = [INITIATION, EDIT_TRIGGER, DELETE_TRIGGER]
+
+        with conn.cursor() as cursor:
             try:
-                conn.commit()
-            except:
+                for cmd in force_init_cmds:
+                    cursor.execute(cmd)
+            except (ConnectionError, TimeoutError, Exception) as e:
                 raise
             else:
-                logger.info('forced database initiation w.o exception')
-
+                try:
+                    conn.commit()
+                except:
+                    raise
+                else:
+                    logger.info('forced database initiation w.o exception')
+    else:
+        exit
 
 def main(args):
     logger, force, prints = mini_ps(args)
@@ -164,40 +179,31 @@ def main(args):
     logger.info('rosa [init] executed')
 
     start = time.perf_counter()
-    if start:
-        logger.info('[init] timer started')
+    logger.info('[init] timer started')
 
     with phones() as conn:
-        if force:
-            try:
-                force_initiation(conn)
-            except (ConnectionError, TimeoutError, Exception) as e:
-                raise
-        elif not force:
-            try:
-                table_helper(conn)
-                trigger_helper(conn)
-            
-                confirm(conn)
-                logger.info('decision made, and relayed to the server')
+        try:
+            table_helper(conn, force)
+            trigger_helper(conn, force)
 
-            except (ConnectionError, Exception) as e:
-                logger.error(f"{RED}exception encountered while initiating server:{RESET} {e}", exc_info=True)
-                raise
-            else:
-                logger.info('initiation faced no exceptions')
+            force_initiation(conn, force)
+        
+            confirm(conn, force)
+            logger.info('decision made and relayed to the server')
+
+        except (ConnectionError, Exception) as e:
+            logger.error(f"{RED}exception encountered while initiating server:{RESET} {e}", exc_info=True)
+            raise
+        else:
+            logger.info('initiation faced no exceptions')
 
     logger.info('[init] complete')
 
-    if start:
-        end = time.perf_counter()
-        proc_time = end - start
-        if proc_time > 60:
-            mins = proc_time / 60
-            logger.info(f"total processing time [in minutes] for rosa [init]: {mins:.3f}")
-        else:
-            logger.info(f"total processing time [in seconds] for rosa [init]: {proc_time:.3f}")
-    if prints:
+    counter(start, NOMIC)
+
+    doit_urself()
+
+    if prints is True:
         print('All set.')
 
 

@@ -5,11 +5,12 @@ from pathlib import Path
 
 if __name__!="__main__":
     from rosa.abilities.config import *
-    from rosa.abilities.lib import(scope_loc, hash_loc, scope_rem, 
-        ping_cass, contrast, compare, rm_remdir, init_logger,
-        rm_remfile, collect_info, collect_data, collect_data4, diffr, phones,
-        upload_dirs, upload_created, upload_created2, _safety, scope_sz, 
-        upload_edited, upload_edited2, confirm 
+    from rosa.abilities.lib import(diffr, 
+        phones, scope_sz, rm_remdir, 
+        rm_remfile, upload_dirs, 
+        collect_info, collect_data, 
+        upload_created, upload_edited, 
+        confirm, counter
         )
 
 """
@@ -20,45 +21,44 @@ of directories if not found locally, and add new ones.
 
 NOMIC = "[give]"
 
-def main(args):
-    x = True
-    data, diff, start, mini, batch_sz = diffr(args, NOMIC, x)
+def main(args=None):
+    data, diff, start, mini = diffr(args, NOMIC)
 
     logger = mini[0]
     force = mini[1]
     prints = mini[2]
 
-    cherubs = data[0][0]
-    souls = data[0][1]
-    stags = data[0][2]
-    serpents = data[0][3]
+    if diff is True:
 
-    gates = data[1][0]
-    caves = data[1][1]
-    ledeux = data[1][2]
+        cherubs = data[0][0]
+        souls = data[0][1]
+        stags = data[0][2]
+        serpents = data[0][3]
 
-    if diff == True:
+        gates = data[1][0]
+        caves = data[1][1]
+        ledeux = data[1][2]
+
+        batch_sz = scope_sz(LOCAL_DIR)
+
         try:
             with phones() as conn:
                 if gates:
                     logger.info('removing remote-only directory[s] from server...')
                     rm_remdir(conn, gates) # delete remote-only[s] from server
-                    logger.info('removed directory[s]')
+                    # logger.info('removed directory[s]')
 
                 if caves: 
                     # when uploading to server, order of when to upload new directory[s] is not as sensitive 
                     # as rosa_get is when writing to disk (writing a file require's its parent to exist)
                     logger.info('uploading local-only directory[s] to server...')
                     upload_dirs(conn, caves) # upload local-only[s] to server
-                    logger.info('directory[s] uploaded')
+                    # logger.info('directory[s] uploaded')
 
                 if cherubs:
-                    try:
-                        logger.info('removing remote-only file[s]...')
-                        rm_remfile(conn, cherubs) # delete remote-only file[s]
-                        logger.info('removed file[s]')
-                    except:
-                        raise
+                    logger.info('removing remote-only file[s]...')
+                    rm_remfile(conn, cherubs) # delete remote-only file[s]
+                    # logger.info('removed file[s]')
 
                 if souls:
                     # create lists of files to upload based on their size & the MAX_ALLOWED_PACKET
@@ -68,7 +68,6 @@ def main(args):
                     soul_batches = collect_info(souls_, LOCAL_DIR) # returns batches
                     logger.info('formatted batches; uploading iteratively...')
 
-                    logger.info('multi batches called for souls')
                     for batch in soul_batches:
                         soul_data = collect_data(batch, LOCAL_DIR, conn)
                         if soul_data:
@@ -78,14 +77,13 @@ def main(args):
                                 raise
 
                 if serpents:
-                    # identical to souls upload block
+                    # twin to souls upload block
                     logger.info('uploading serpents to the server...')
                     serpents_ = [item['frp'] for item in serpents]
 
                     serpent_batches = collect_info(serpents_, LOCAL_DIR)
                     logger.info('formatted batches; uploading iteratively...')
 
-                    logger.info('multi batches called for serpents')
                     for batch in serpent_batches:
                         serpent_data = collect_data(batch, LOCAL_DIR, conn)
                         if serpent_data:
@@ -94,40 +92,9 @@ def main(args):
                             except:
                                 raise
 
-                if start:
-                    end = time.perf_counter()
-                    proc_time = end - start
-                    if proc_time >= 60:
-                        min_time = proc_time / 60
-                        logger.info(f"upload time [in minutes] for rosa [give]: {min_time:.3f}")
-                    else:
-                        logger.info(f"upload time [in seconds] for rosa [give]: {proc_time:.3f}")
-                
-                if force == True:
-                    try:
-                        conn.commit()
-                        logger.info('commitment --forced')
-                        # logger.info(f"after conn.commit(): {conn.in_transaction}")
-                        # conn.close()
-                        # with phones() as conn:
-                        #     try:
-                        #         conn.ping(reconnect=False)
-                        #     except:
-                        #         pass
-                    except Exception as e:
-                        logger.critical(f"{RED}error on --forced commit:{RESET} {e}", exc_info=True)
-                        sys.exit(3) # auto_commit: False, so error handling to rollback is not necessary
-                    except:
-                        raise
-                    else:
-                        logger.info('forced commit w.o exception')
-                else:
-                    try:
-                        confirm(conn)
-                    except:
-                        raise
-                    else:
-                        logger.info('confirmation completed w.o exception')
+                counter(start, NOMIC)
+
+                confirm(conn, force)
 
         except KeyboardInterrupt as ko:
             logger.warning('going to try manual rollback for this one; standby')
@@ -138,31 +105,23 @@ def main(args):
             else:
                 logger.debug('rollback was clean')
                 sys.exit(0)
-    else:
-        logger.info('no diff')
-
-    if start:
-        end = time.perf_counter()
-        proc_time = end - start
-        if proc_time > 60:
-            min_time = proc_time / 60
-            logger.info(f"upload time [in minutes] for rosa [give]: {min_time:.3f}")
-        else:
-            logger.info(f"upload time [in seconds] for rosa [give]: {proc_time:.3f}")
 
     logger.info('[give] complete')
 
-    if prints:
+    counter(start, NOMIC)
+
+    if prints is True:
         print('All set.')
 
 
 if __name__=="__main__":
     from config import *
-    from lib import(scope_loc, hash_loc, scope_rem, 
-        ping_cass, contrast, compare, rm_remdir, init_logger,
-        rm_remfile, collect_info, collect_data, 
-        upload_dirs, upload_created, _safety, scope_sz,
-        upload_edited, confirm, phone_duty
-    )
+    from lib import(scope_sz,
+        diffr, phones, rm_remdir, 
+        rm_remfile, upload_dirs, 
+        collect_info, collect_data, 
+        upload_created, upload_edited, 
+        confirm, counter
+        )
 
-    main(args=None)
+    main(args)

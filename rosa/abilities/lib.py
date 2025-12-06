@@ -21,13 +21,12 @@ import mysql.connector # to connect with the mysql server - helps prevent inject
 from rosa.abilities.queries import ASSESS2
 from rosa.abilities.config import LOGGING_LEVEL, LOCAL_DIR, XCONFIG, MAX_ALLOWED_PACKET, RED, GREEN, YELLOW, RESET
 
-
 """
 Library of functions used in the management scripts. Many functions overlap and share uses, so moving them here is much easier for 
 maintainability. There are also queries for longer MySQL queries. Some scripts, like get_moment and contrast, hold their own unique functions.
 """
 
-# logging
+# logging / er
 
 logger = logging.getLogger('rosa.log')
 
@@ -93,23 +92,22 @@ def init_logger(logging_level):
 
 def mini_ps(args): # mini_parser for arguments/flags passed to the scripts
 	force = False # no checks - force
-	prints = True # no prints - prints
+	prints = False # no prints - prints
 
 	if args:
+		if args.force:
+			force = True
+
 		if args.silent:
 			logging_level= "critical".upper()
 			logger = init_logger(logging_level)
-			prints = False
 		elif args.verbose: # can't do verbose & silent
 			logging_level = "debug".upper()
 			logger = init_logger(logging_level)
 			prints = True
-		else: # but can do verbose & force (or silent & force)
+		else:
 			logger = init_logger(LOGGING_LEVEL.upper())
 
-		if args.force:
-			# logger = init_logger(LOGGING_LEVEL.upper())
-			force = True
 	else:
 		logger = init_logger(LOGGING_LEVEL.upper())
 
@@ -121,48 +119,45 @@ def doit_urself():
 	rosa = cd.parent
 	rosa_log = rosa / "rosa.log"
 	rosa_records = rosa / "rosa_records"
+
 	rosasz = os.path.getsize(rosa_log)
 	rosakb = rosasz / 1024
+
+	rosa_records_max = 5
+
 	if rosakb >= 64.0:
 		if rosa_records.exists():
 			if rosa_records.is_file():
 				logger.error(f"there is a file named rosa_records where a logging record should be; abandoning")
 			elif rosa_records.is_dir():
-				priors = []
+				npriors = 0
+				previous = []
 				for file_ in sorted(rosa_records.glob('*')):
 					if file_.is_file():
-						# if file.name() in ('rosa.log', 'rosa', 'rosa_record'):
-						priors.append((file_,))
-					else:
-						pass
-				
-				no_priors = 0
-				[(no_priors + 1) for prior in priors]
+						previous.append(file_)
+						npriors += 1
 
-				if no_priors > 4:
-					s_priors = sorted(priors)
-					end = len(s_priors)
-					begin = end - 4
-					remaining = s_priors[begin:end]
-					for prior in s_priors:
-						if prior not in remaining:
-							prior.unlink()
-						else:
-							continue
+				if npriors > rosa_records_max:
+					difference = npriors - rosa_records_max
+					wanted = previous[difference:(rosa_records_max + difference)]
+
+					for unwanted in previous:
+						if unwanted not in wanted:
+							unwanted.unlink()
+							logger.debug(f"rosa_records reached capacity; oldest record deleted (curr. max log files recorded: {rosa_records_max} | curr. max log file sz: {rosakb})")
 				else:
 					ctime = f"{time.time():.2f}"
 					subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
-					logger.debug('moved bloating rosa_log to rosa_records')
-			else:
-				pass
+
+					logger.debug('backed up & replaced rosa.log')
 		else:
 			rosa_records.mkdir(parents=True, exist_ok=True)
 			ctime = f"{time.time():.2f}"
-
 			subprocess.run(["mv", f"{rosa_log}", f"./rosa_records/rosa_records_{ctime}_"])
-			logger.debug('moved bloating rosa_log to rosa_records')
+
+			logger.debug('backed up & replaced rosa.log')
 	else:
-		logger.info('rosa.log: ok')
+		logger.info('rosa.log: [ok]')
 
 # connection & management thereof
 
@@ -175,8 +170,6 @@ def phones():
 		conn = init_conn(XCONFIG['user'], XCONFIG['pswd'], XCONFIG['name'], XCONFIG['addr'])
 
 		if conn.is_connected():
-			# stats = conn.cmd_statistics()
-			# logger.debug(f"cmd_statistics: {stats}\ (connection object yielded to main)")
 			yield conn
 		else:
 			logger.warning('connection object lost')
@@ -200,37 +193,16 @@ def phones():
 	except (ConnectionRefusedError, TimeoutError, Exception) as e:
 		logger.error(f"error encountered while connecting to the server:{RESET} {e}.", exc_info=True)
 		_safety(conn)
+	except:
+		logger.critical('uncaught exception found by phones; abandoning & rolling back')
+		_safety(conn)
 	else:
-		logger.debug('phone_duty() executed w.o exception')
+		logger.debug('phones executed w.o exception')
 	finally:
 		if conn:
 			if conn.is_connected():
 				conn.close()
-				logger.info('phone_duty() closed conn [finally]')
-
-
-def _safety(conn):
-	"""Handles rollback of the server on err from phone_duty."""
-	try:
-		if conn and conn.is_connected():
-			try:
-				logger.warning('_safety called to rollback server due to err')
-				conn.rollback()
-			except:
-				logger.error(f"{RED}_safety failed; abandoning{RESET}")
-				sys.exit(1)
-			else:
-				logger.warning('_safety recovered w.o exception')
-		else:
-			logger.warning('couldn\'t rollback due to faulty connection; abandoning')
-		sys.exit(1)
-	except:
-		#  (mysql.connector.Error, ConnectionRefusedError, ConnectionError, TimeoutError, Exception) as e:
-		logger.error("_safety caught an error while trying to rollback; abandoning", exc_info=True)
-		raise
-	else:
-		logger.warning("_safety rolled server back w.o exception")
-
+				logger.info('phones closed conn [finally]')
 
 def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 	"""Initiate the connection to the server. If an error occurs, [freak out] raise."""
@@ -252,8 +224,37 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 	except:
 		raise
 	else:
-		logger.info("connection object initialized w.o exception")
 		return conn
+
+def _safety(conn):
+	"""Handles rollback of the server on err from phone_duty."""
+	logger.warning('_safety called to rollback server due to err')
+
+	if conn and conn.is_connected():
+		try:
+			conn.rollback()
+		except ConnectionRefusedError as cre:
+			logger.error(f"{RED}_safety failed due to connection being refused:{RESET} {cre}")
+			sys.exit(3)
+		except:
+			logger.error(f"{RED}_safety failed; abandoning{RESET}")
+			if conn:
+				conn.ping(reconnect=True, attempts=3, delay=1)
+				if conn and conn.is_connected():
+					conn.rollback()
+					logger.warning('conn is connnected & server rolled back (after caught exception & reconnection)')
+
+				else:
+					logger.warning('could not ping server; abandoning')
+					sys.exit(1)
+			else:
+				logger.warning('conn object completely lost; abandoning')
+				sys.exit(1)
+		else:
+			logger.warning('_safety recovered w.o exception')
+	else:
+		logger.warning('couldn\'t rollback due to faulty connection; abandoning')
+		sys.exit(1)
 
 # COLLECTING LOCAL DATA
 
@@ -275,24 +276,20 @@ def scope_loc(local_dir): # all
 			for item in abs_path.rglob('*'):
 				path_str = item.resolve().as_posix()
 				if any(blocked in path_str for blocked in blk_list):
-					logger.debug(f"{item} was rejected due to blocked_list (config)")
+					# logger.debug(f"{item} was rejected due to blocked_list (config)")
 					continue # skip item if blkd item in its path
-				if item.is_file():
-					# logger.debug(f"file: {item} noted")
-					raw_paths.append(item) # only the full paths 
+				elif item.is_file():
+					raw_paths.append(item) # the full paths 
 
 				elif item.is_dir():
-					# logger.debug(f"directory: {item} is noted")
 					drp = item.relative_to(abs_path).as_posix()
-					hell_dirs.append((drp,)) # ditto for the dirs but in tuples
-				else:
-					continue
+					hell_dirs.append((drp,)) # ditto for the dirs but in tuples & rel_paths
 		else:
 			logger.warning('local directory does not exist')
 			sys.exit(1)
 
 	except Exception as e:
-		logger.error(f"encountered:{RESET} {e} {RED}while hashing; aborting{RESET}", exc_info=True)
+		logger.error(f"{RED}err:{RESET} {e} {RED}while scoping locally; aborting{RESET}", exc_info=True)
 		raise
 	except KeyboardInterrupt as ko:
 		logger.warning("boss killed it; wrap it up")
@@ -300,22 +297,6 @@ def scope_loc(local_dir): # all
 
 	logger.debug('finished collecting local paths')
 	return raw_paths, hell_dirs, abs_path
-
-
-def scope_sz(raw_paths):
-	blk_list = ['.DS_Store', '.git', '.obsidian'] 
-	tsz = 0
-
-	for path in raw_paths:
-		tsz += os.path.getsize(path)    
-	if tsz:
-		avg = tsz / len(raw_paths)
-
-	if avg:
-		logger.info(f"found avg_size of local file[s] : {avg}")
-
-	return int(avg)
-
 
 def hash_loc(raw_paths, abs_path):
 	hasher = xxhash.xxh64()
@@ -325,38 +306,15 @@ def hash_loc(raw_paths, abs_path):
 
 	with tqdm(raw_paths, unit="hashes", leave=True) as pbar:
 		for item in pbar:
-			if item.is_file():
-				hasher.reset()
+			hasher.reset()
+			hasher.update(item.read_bytes())
+			hash_id = hasher.digest()
 
-				hasher.update(item.read_bytes())
-				hash_id = hasher.digest()
+			frp = item.relative_to(abs_path).as_posix()
 
-				frp = item.relative_to(abs_path).as_posix()
-
-				raw_hell.append((frp, hash_id))
+			raw_hell.append((frp, hash_id))
 
 	return raw_hell
-
-def hash_loc2(raw_paths, abs_path):
-	hasher = xxhash.xxh64()
-	demon_id = {}
-
-	logger.debug('...hashing2...')
-
-	with tqdm(raw_paths, unit="hashes", leave=True) as pbar:
-		for item in pbar:
-			path = Path(abs_path / item).resolve()
-			if path.is_file():
-				hasher.reset()
-
-				hasher.update(path.read_bytes())
-				hash_id = hasher.digest()
-
-				frp = path.relative_to(abs_path).as_posix()
-
-				demon_id[frp] = hash_id
-
-	return demon_id
 
 # COLLECTING SERVER DATA
 
@@ -375,12 +333,30 @@ def scope_rem(conn): # all
 				logger.warning("server returned raw_heaven as an empty set")
 
 		except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
-			logger.error(f"err while getting data from server:{RESET} {c}.", exc_info=True)
+			logger.error(f"{RED}err while getting data from server:{RESET} {c}.", exc_info=True)
 			raise
 		else:
-			logger.debug('remote file scoping completed w.o exception')
+			return raw_heaven
 
-	return raw_heaven
+def ping_rem(conn): # all
+	"""Select and return every single relative path and hash from the notes table. Returned as a list of tuples (rel_path, hash_id)."""
+	q = "SELECT frp FROM notes;"
+
+	with conn.cursor() as cursor:
+		try:
+			logger.debug('...scoping remote files...')
+			cursor.execute(q)
+			raw_heaven = cursor.fetchall()
+			if raw_heaven:
+				logger.debug("server returned data from query")
+			else:
+				logger.warning("server returned raw_heaven as an empty set")
+
+		except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
+			logger.error(f"{RED}err while getting data from server:{RESET} {c}.", exc_info=True)
+			raise
+		else:
+			return raw_heaven
 
 def ping_cass(conn): # all
 	"""Ping the kid Cass because you just need a quick hand with the directories. If a directory is empty or contais only subdirectories and no files,
@@ -400,16 +376,14 @@ def ping_cass(conn): # all
 				logger.warning("server returned heaven dirs as an empty set")
 
 		except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
-			logger.error(f"err encountered while attempting to collect directory data from server:{RESET} {c}.", exc_info=True)
+			logger.error(f"{RED}err encountered while attempting to collect directory data from server:{RESET} {c}.", exc_info=True)
 			raise
 		else:
-			logger.debug('remote file scoping completed w.o exception')
-
-	return heaven_dirs
+			return heaven_dirs
 
 # COMPARING
 
-def contrast(raw_heaven, raw_hell): # unfiform for all scripts
+def contrast(remote_raw, local_raw): # unfiform for all scripts
 	"""Accepts two lists of tupled pairs which each hold a files relative path and hash. It makes a list of the first item for every item in each list; 
 	every file's relative path. It compares these lists to get the files that are remote-only and local-only and makes each one into a dictionary with 
 	the same key for every item: 'frp'. Then, for the files that are in both locations, they ar emade into a new dictionary containing each file's 
@@ -417,34 +391,32 @@ def contrast(raw_heaven, raw_hell): # unfiform for all scripts
 	discrepancy is found, it is added to the same dictionary key values as the first two result sets: 'frp'. 'frp' is the substitution key for the 
 	mysql queries these lists of dictionaries will be used for.
 	"""
-	# heaven_frps = {s[0] for s in raw_heaven}
-	heaven_souls = {s[0] for s in raw_heaven}
-	# hell_frps = {d[0] for d in raw_hell}
-	hell_souls = {d[0] for d in raw_hell}
-
-	cherubs = [{'frp':cherub} for cherub in heaven_souls - hell_souls] # get - cherubs as a dict: 'frp'
-	serpents = [{'frp':serpent} for serpent in hell_souls - heaven_souls]
-	logger.debug(f"found {len(cherubs)} cherubs [server only] and {len(serpents)} serpents [local only] file[s]")
-
-	people = heaven_souls & hell_souls # those in both - unaltered
-	logger.debug(f"found {len(people)} people [found in both] file[s]")
-	souls = []
-	stags = []
-
-	logger.info(f"found {len(cherubs)} cherubs, {len(serpents)} serpents, and {len(people)} people. comparing each persons' hash now")
-
-	heaven = {lo: id for lo, id in raw_heaven if lo in people}
-	hell = {lo: id for lo, id in raw_hell if lo in people}
-
-	for key in hell:
-		if hell[key] != heaven[key]:
-			souls.append({'frp': key}) # altered [transient, like water buddy]
-		else:
-			stags.append(key) # unchanged [hash verified]
+	remote = {file_path: hash_id for file_path, hash_id in remote_raw}
+	local = {file_path: hash_id for file_path, hash_id in local_raw}
 	
-	logger.info(f"found {len(souls)} souls [altered contents] and {len(stags)} stags [unchanged] file[s]")
+	remote_files = set(remote.keys())
+	local_files = set(local.keys())
 
-	return cherubs, souls, stags, serpents # files in server but not present, files present not in server, files in both, files in both but with hash discrepancies
+	remote_only = [{'frp':cherub} for cherub in remote_files - local_files] # get - cherubs as a dict: 'frp'
+	local_only = [{'frp':serpent} for serpent in local_files - remote_files]
+
+	both = remote_files & local_files # those in both - unaltered
+
+	logger.info(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
+
+	deltas = []
+	nodiffs = []
+
+	for file_path in both:
+		if local.get(file_path) == remote.get(file_path):
+			nodiffs.append(file_path)
+		else:
+			deltas.append({'frp': file_path})
+
+	logger.info(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
+
+	return remote_only, deltas, nodiffs, local_only # files in server but not present, files present not in server, files in both, files in both but with hash discrepancies
+
 
 def compare(heaven_dirs, hell_dirs): # all
 	"""Makes a set of each list of directories and formats them each into a dictionary. It compares the differences and returns a list of remote-only and local-only directories."""
@@ -461,9 +433,12 @@ def compare(heaven_dirs, hell_dirs): # all
 	logger.debug('compared directories & id\'d discrepancies')
 	return gates, caves, ledeux # dirs in heaven not found locally, dirs found locally not in heaven
 
-def diffr(args, nomic, need_sz):
+# COMPARISON -ER
+
+def diffr(args, nomic):
 	diff = False
-	batch_sz = 'x'
+	data = ([], [])
+
 	mini = mini_ps(args)
 	logger = mini[0]
 
@@ -481,7 +456,7 @@ def diffr(args, nomic, need_sz):
 			logger.info('...pinging cass...')
 			heaven_dirs = ping_cass(conn)
 
-			if any(raw_heaven) or any(heaven_dirs):
+			if any((raw_heaven, heaven_dirs)):
 				logger.info('confirmed data was returned from heaven; processing...')
 				raw_paths, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
 
@@ -489,32 +464,24 @@ def diffr(args, nomic, need_sz):
 					logger.info('...data returned from local directory; hashing file[s] found...')
 					raw_hell = hash_loc(raw_paths, abs_path)
 
-					logger.info("file[s] hashed; proceeding to compare & contrast...")
+					# logger.info("file[s] hashed; proceeding to compare & contrast...")
 
-					# cherubs, souls, stags, serpents = contrast(raw_heaven, raw_hell)
-					file_data = contrast(raw_heaven, raw_hell)
-					logger.info('file[s] contrasted')
-					f_delta = [file_data[0], file_data[1], file_data[3]]
+					logger.info('contrasting file[s]...')
+					remote_only, deltas, nodiffs, local_only = contrast(raw_heaven, raw_hell)
 
-					# gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
-					dir_data = compare(heaven_dirs, hell_dirs)
-					logger.info('directory[s] compared')
-					d_delta = [dir_data[0], dir_data[1]]
+					logger.info('comparing directory[s]...')
+					gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
 
-					data = [file_data, dir_data]
-					if any(f_delta) or any(d_delta):
+					if any((remote_only, local_only, deltas, gates, caves)):
 						diff = True
 						logger.info('discrepancies discovered')
 
-						if need_sz == True:
-							avg_size = scope_sz(raw_paths)
-							batch_sz = int(MAX_ALLOWED_PACKET / avg_size)
-							if batch_sz:
-								logger.info('batch size obtained')
-						else:
-							pass
+						file_data = [remote_only, deltas, nodiffs, local_only]
+						dir_data = [gates, caves, ledeux]
+						data = (file_data, dir_data)
+
 					else:
-						logger.info('no diff')
+						logger.info('no diff!')
 				else:
 					logger.error(f"no paths returned from scan of {abs_path}. does it have any files?")
 					sys.exit(1)
@@ -526,7 +493,7 @@ def diffr(args, nomic, need_sz):
 			logger.error(f"{RED}err caught while diff'ing directories:{RESET} {e}.", exc_info=True)
 			sys.exit(1)
 
-	return data, diff, start, mini, batch_sz
+	return data, diff, start, mini
 
 # EDIT LOCAL DIRECTORY
 
@@ -545,23 +512,23 @@ def fat_boy(_abs_path):
 
 	except KeyboardInterrupt as e:
 		logger.warning('boss killed it; wrap it up')
-		try:
-			_lil_guy(abs_path, backup, tmp_)
-		except:
-			raise
-		else:
-			logger.debug('_lil guy recovered on err w.o exception [on the big guy\'s orders]')
-			sys.exit(1)
+		# try:
+		_lil_guy(abs_path, backup, tmp_)
+		# except:
+		# 	raise
+		# else:
+		# 	logger.debug('_lil guy recovered on err w.o exception [on the big guy\'s orders]')
+		sys.exit(0)
 
 	except (mysql.connector.Error, ConnectionError, Exception) as e:
 		logger.error(f"{RED}err encountered while attempting atomic wr:{RESET} {e}.", exc_info=True)
-		try:
-			_lil_guy(abs_path, backup, tmp_)
-		except:
-			raise
-		else:
-			logger.debug('_lil guy recovered on err w.o exception')
-			sys.exit(1)
+		# try:
+		_lil_guy(abs_path, backup, tmp_)
+		# except:
+		# 	raise
+		# else:
+		# 	logger.debug('_lil guy recovered on err w.o exception')
+		sys.exit(1)
 
 	else:
 		try:
@@ -569,33 +536,25 @@ def fat_boy(_abs_path):
 
 		except KeyboardInterrupt as c:
 			logger.warning('boss killed it; wrap it up')
-			try:
-				_lil_guy(abs_path, backup, tmp_)
-			except:
-				raise
-			else:
-				logger.debug('_lil guy recovered on err w.o exception [on the big guy\'s orders]')
-				sys.exit(1)
+			# try:
+			_lil_guy(abs_path, backup, tmp_)
+			# except:
+				# raise
+			# else:
+				# logger.debug('_lil guy recovered on err w.o exception [on the big guy\'s orders]')
+			sys.exit(0)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}err encountered while attempting to apply atomicy: {c}.", exc_info=True)
-			try:
-				_lil_guy(abs_path, backup, tmp_)
-			except:
-				raise
-			else:
-				logger.debug('_lil guy recovered on err w.o exception')
-				sys.exit(1)
-
+			# try:
+			_lil_guy(abs_path, backup, tmp_)
+			# except:
+				# raise
+			# else:
+				# logger.debug('_lil guy recovered on err w.o exception')
+			sys.exit(1)
 		else:
 			logger.debug("fat boy finished w.o exception")
-	# except (KeyboardInterrupt, Exception) as e:
-	# 	logger.critical(f"{RED}uncaught exception slipped through:{RESET} {e}", exc_info=True)
-	# 	logger.warning(f"{abs_path} is likely remains @{backup}, and {tmp_} was probably not deleted")
-	# 	sys.exit(1)
-	# else:
-	# 	logger.info('fat boy completed w.o exception')
-
 
 def _lil_guy(abs_path, backup, tmp_):
 	"""Handles recovery on error for the context manager fat_boy."""
@@ -612,9 +571,9 @@ def _lil_guy(abs_path, backup, tmp_):
 						logger.error(f"directory failed to delete even on second round of brute force: {e}.", exc_info=True)
 						raise
 					else:
-						logger.warning('rm -rf flopped again, but we handled it')
-
-				logger.warning('removed damaged attempt')
+						logger.warning('shutil flopped again, but we handled it')
+				else:
+					logger.warning('removed damaged attempt')
 			try:
 				backup.rename(abs_path)
 			except:
@@ -643,7 +602,6 @@ def _lil_guy(abs_path, backup, tmp_):
 	else:
 		logger.info("_lil_guy's cleanup complete")
 
-
 def configure(abs_path): # raise err & say 'run get all or fix config's directory; there is no folder here'
 	"""Configure the temporary directory & move the original to a backup location. 
 	Returns the _tmp directory's path.
@@ -669,7 +627,6 @@ def configure(abs_path): # raise err & say 'run get all or fix config's director
 		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
 		sys.exit(1)
 
-
 def calc_batch(conn):
 	"""Get the average row size of the notes table to estimate optimal batch size for downloading. ASSESS2 is 1/100 the speed of ASSESS"""
 	batch_size = 5 # default
@@ -677,23 +634,19 @@ def calc_batch(conn):
 
 	with conn.cursor() as cursor:
 		try:
-			beg = time.perf_counter()
-
+			# beg = time.perf_counter()
 			cursor.execute(ASSESS2)
 			row_size = cursor.fetchone()
-
-			if row_size:
-				end = time.perf_counter()
-				logger.info(f"ASSESS2 took {(end - beg):.4f} seconds")
-
+			# if row_size:
+			# 	end = time.perf_counter()
+			# 	logger.info(f"ASSESS2 took {(end - beg):.4f} seconds")
 		except (ConnectionError, TimeoutError, Exception) as c:
 			logger.error(f"err encountered while attempting to find avg_row_size: {c}", exc_info=True)
 			raise
 		else:
 			if row_size:
 				if row_size[0] and row_size[0] != 0:
-					batch = int((0.94*MAX_ALLOWED_PACKET) / row_size[0])
-					batch_size = max(1, batch)
+					batch_size = max(1, int((0.94*MAX_ALLOWED_PACKET) / row_size[0]))
 					logger.debug(f"batch size: {batch_size}")
 					return batch_size, row_size
 				else:
@@ -703,70 +656,38 @@ def calc_batch(conn):
 				logger.warning(f"ASSESS2 returned nothing; defaulting to batch size = {batch_size}")
 				return batch_size, row_size
 
+def scope_sz(local_dir):
+	blk_list = ['.DS_Store', '.git', '.obsidian']
+	abs_path = Path(local_dir)
+
+	files = 0
+	tsz = 0
+
+	for path in abs_path.rglob('*'):
+		tsz += os.path.getsize(path)
+		files += 1
+
+	avg = tsz / files
+	logger.info(f"found avg_size of local file[s] : {avg}")
+
+	return int(avg)
+
+# WRITING TO DISK
 
 def save_people(people, backup, tmp_):
 	"""Hard-links unchanged files present in the server and locally from the backup directory (original) 
 	to the _tmp directory. Huge advantage over copying because the file doesn't need to move."""
-	try:
-		with tqdm(people, unit="hard-links", leave=True) as pbar:
-			for person in pbar:
+	# try:
+	with tqdm(people, unit="hard-links", leave=True) as pbar:
+		for person in pbar:
+			try:
 				curr = Path( backup / person )
 				tmpd = Path( tmp_ / person )
 
 				os.link(curr, tmpd)
 
-	except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
-		raise
-
-
-def download_batches(flist, conn, batch_size, tmp_): # get
-	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
-	dictionaries from contrast and makes them into queries for the given file[s]. *Executemany() cannot be used with SELECT; it is for DML quries only.
-	This function passes the found data to the wr_data function, which writes the new data structure to the disk.
-	"""
-	paths = [item['frp'] for item in flist]
-	params = ', '.join(['%s']*len(paths))
-
-	batch_size = batch_size
-	offset = 0
-
-	with conn.cursor() as cursor:
-		try:
-			while True:
-				query = f"SELECT frp, content FROM notes WHERE frp IN ({params}) LIMIT {batch_size} OFFSET {offset};"
-
-				try:
-					# beg = time.perf_counter()
-					cursor.execute(query, paths)
-					batch = cursor.fetchall()
-					# end = time.perf_counter()
-
-					# dur = end - beg
-					# logger.info(f"collected batch in {dur:.4f} seconds")
-
-				except (mysql.connector.Error, ConnectionError, KeyboardInterrupt) as c:
-					logger.warning(f"err while trying to download data: {c}.", exc_info=True)
-					raise
-				else:
-					if batch:
-						# stt = time.perf_counter()
-						wr_batches(batch, tmp_)
-						# stp = time.perf_counter()
-
-						# timez = stp - stt
-						# logger.debug(f"wrote batch in {timez:.4f} seconds")
-
-					if len(batch) < batch_size:
-						break
-
-					offset += batch_size
-
-		except: # tout de monde
-			logger.critical(f"{RED}err while attempting batched atomic write{RESET}", exc_info=True)
-			raise
-		else:
-			logger.debug('atomic wr w.batched download completed w.o exception')
-
+			except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
+				raise
 
 def download_batches2(flist, conn, batch_size, tmp_): # get
 	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
@@ -776,9 +697,6 @@ def download_batches2(flist, conn, batch_size, tmp_): # get
 	paths = [item[0] for item in flist]
 	params = ', '.join(['%s']* len(paths))
 
-	# logger.debug('downloading batches w.offset & limit')
-
-	batch_size = batch_size
 	offset = 0
 
 	with conn.cursor() as cursor:
@@ -805,9 +723,6 @@ def download_batches2(flist, conn, batch_size, tmp_): # get
 		except: # tout de monde
 			logger.critical(f"{RED}err while attempting batched atomic write{RESET}", exc_info=True)
 			raise
-		# else:
-		# 	logger.debug('atomic wr w.batched download completed w.o exception')
-
 
 def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggressive )
 	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
@@ -900,15 +815,13 @@ def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggr
 def wr_batches(data, tmp_):
 	"""Writes each batch to the _tmp directory as they are pulled. Each file has it and its parent directory flushed from memory for assurance of atomicy."""
 	# logger.debug('...writing batch to disk...')
-	# dcmpr = zstd.ZstdDecompressor() # initiate outside of loop; duh
-
+	# dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh
 	try:
 		for frp, content in data:
 			t_path = Path ( tmp_ / frp ) #.resolve()
 			(t_path.parent).mkdir(parents=True, exist_ok=True)
 
 			# d_content = dcmpr.decompress(content)
-
 			with open(t_path, 'wb') as t:
 				t.write(content)
 
@@ -935,11 +848,11 @@ def apply_atomicy(tmp_, abs_path, backup):
 		if backup.exists():
 			try:
 				shutil.rmtree(backup)
-			except Exception as e:
+			except:
 				logger.warning('5 sec pause before retry recursive delete; standby')
 				time.sleep(5)
 				try:
-					shutil.rmtree(backup)
+					shutil.rmtree(backup) # these are all over the place, it should be its own fx
 				except:
 					raise
 				else:
@@ -947,64 +860,27 @@ def apply_atomicy(tmp_, abs_path, backup):
 			else:
 				logger.debug('removed backup after execution w.o exception')
 
-
-def mk_dir(gates, abs_path):
+def mk_rrdir(raw_directories, abs_path):
 	"""Takes the list of remote-only directories as dicts from contrast & writes them on the disk."""
 	logger.debug('...writing directory tree to disk...')
-	try:
-		for gate in gates:
-			path = gate['drp']
-			fdpath = (abs_path / path ).resolve()
-			fdpath.mkdir(parents=True, exist_ok=True)
-
-	except (PermissionError, FileNotFoundError, Exception) as e:
-		logger.error(f"{RED}err when tried to make directories:{RESET} {e}.", exc_info=True)
-		raise
-	else:
-		logger.debug('created directory tree on disk w.o exception')
-
-
-def mk_rdir(gates, abs_path):
-	"""Takes the list of remote-only directories as dicts from contrast & writes them on the disk."""
-	logger.debug('...writing directory tree to disk...')
-	try:
-		with logging_redirect_tqdm(loggers=[logger]):
-			with tqdm(gates, unit="dirs") as pbar:
-				for gate in pbar:
-					fdpath = (abs_path / gate ).resolve()
+	directories = {dir_[0] for dir_ in raw_directories}
+	# try:
+	with logging_redirect_tqdm(loggers=[logger]):
+		with tqdm(directories, desc=f"Writing {len(directories)} directories", unit="dirs") as pbar:
+			try:
+				for directory in pbar:
+					fdpath = Path(abs_path / directory ).resolve()
 					fdpath.mkdir(parents=True, exist_ok=True)
 
-	except (PermissionError, FileNotFoundError, Exception) as e:
-		pbar.leave = False
-		pbar.close()
-		logger.error(f"{RED}err when tried to make directories:{RESET} {e}.", exc_info=True)
-		raise
-	else:
-		logger.debug('created directory tree on disk w.o exception')
-
-
-def mk_rrdir(gates, abs_path):
-	"""Takes the list of remote-only directories as dicts from contrast & writes them on the disk."""
-	logger.debug('...writing directory tree to disk...')
-	try:
-		with logging_redirect_tqdm(loggers=[logger]):
-			with tqdm(gates, desc=f"Writing {len(gates)} directories", unit="dirs") as pbar:
-				for gate in pbar:
-					fdpath = Path(abs_path / gate[0] ).resolve()
-					fdpath.mkdir(parents=True, exist_ok=True)
-
-	except (PermissionError, FileNotFoundError, Exception) as e:
-		pbar.leave = False
-		pbar.close()
-		logger.error(f"{RED}error when tried to make directories:{RESET} {e}.", exc_info=True)
-		sys.exit(1)
-		# raise
-	else:
-		logger.debug('created directory tree on disk w.o exception')
+			except (PermissionError, FileNotFoundError, Exception) as e:
+				pbar.leave = False
+				pbar.close()
+				logger.error(f"{RED}error when tried to make directories:{RESET} {e}.", exc_info=True)
+				raise
+			else:
+				logger.debug('created directory tree on disk w.o exception')
 
 # EDIT SERVER - rosaGIVE
-
-# deletes
 
 def rm_remdir(conn, gates): # only give 3.0
 	"""Remove remote-only directories from the server. Paths [gates] passed as list of dictionaries for executemany(). This, and every other call to 
@@ -1024,7 +900,6 @@ def rm_remdir(conn, gates): # only give 3.0
 		else:
 			logger.debug('removed remote-only directory[s] from server w.o exception')
 
-
 def rm_remfile(conn, cherubs): # only give 3.0
 	"""Remove remote-only files from the server. Paths [cherubs] passed as a list of dictionaries for executemany()."""
 	logger.debug('...deleting remote-only file[s] from server...')
@@ -1039,8 +914,6 @@ def rm_remfile(conn, cherubs): # only give 3.0
 			raise
 		else:
 			logger.debug('removed remote-only file[s] from server w.o exception')
-
-# uploads
 
 def collect_info(dicts_, _abs_path): # give - a
 	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
@@ -1058,19 +931,8 @@ def collect_info(dicts_, _abs_path): # give - a
 
 	batch_items = []
 	all_batches = []
-	# logger.info(f"collect_info recieved: {dicts_}")
-	# logger.info(f"it is a: {type(dicts_)}")
-	# logger.info(f"dict_[0] = {dicts_[0]}")
-
 	
 	for i in dicts_:
-		# print(i)
-		# print(i[0])
-		# print(i[1])
-		# print(i[2])
-		# print(i[2][0])
-		# logger.info(f"going to try to build a path to a file with: {i}")
-		# logger.info(f"it is a: {type(i)}")
 		size = 0
 		item = ( abs_path / i )
 
@@ -1094,62 +956,7 @@ def collect_info(dicts_, _abs_path): # give - a
 		all_batches.append((batch_items,))
 	
 	logger.debug('all batches collected')
-	# print(all_batches)
 	return all_batches
-
-
-def collect_info2(dicts_, abs_path):
-	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is pased to the upload functions as required. Both functions use the same three variables for every file, so they can all
-	be built with this function. Order is irrelevant for the dictionaries & %(variable)s method with executemany().
-	For batched uploads, the script reads the files to get their size so it can optimize queries-per-execution within the 
-	limitation for packet sizes. Pretty inneficient because reading every file just for its size when we already have the content 
-	in memory is a waste.
-	"""
-	# logger.debug('...collecting info on file[s] sizes for batching...')
-	# cmpr = zstd.ZstdCompressor(level=3)
-	# hasher = hashlib.sha256()
-	hasher = xxhash.xxh64()
-
-	curr_batch = 0
-	item_data = []
-	
-	for i in dicts_:
-		hasher.reset()
-		size = 0
-		item = ( abs_path / i ).resolve()
-
-		size = os.path.getsize(item)
-
-		if size > MAX_ALLOWED_PACKET:
-			logger.error(f"{RED}a single file is larger than the maximum packet size allowed:{RESET} {item}")
-			raise
-
-		elif (curr_batch + size) > MAX_ALLOWED_PACKET:
-			# logger.debug('...yielding one batch of data...')
-			yield item_data
-
-			item_data = []
-			curr_batch = 0
-
-		content = item.read_bytes()
-
-		hasher.update(content)
-		hash_id = hasher.digest()
-
-		# ccontent = cmpr.compress(content)
-
-		item_data.append({
-			'content': content,
-			'hash_id': hash_id,
-			'frp': i
-		},)
-		curr_batch += size
-
-	if item_data:
-		# logger.debug('...yielding last batch of data')
-		yield item_data
-
 
 def collect_data(dicts_, _abs_path, conn): # give - redundant
 	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
@@ -1158,7 +965,6 @@ def collect_data(dicts_, _abs_path, conn): # give - redundant
 	output of the collect_info function in terms of data type & format.
 	"""
 	# logger.debug('...collecting data on file[s] to upload...')
-	# print(dicts_)
 	abs_path = Path(_abs_path)
 	item_data = []
 
@@ -1166,31 +972,8 @@ def collect_data(dicts_, _abs_path, conn): # give - redundant
 	# hasher = hashlib.sha256()
 	hasher = xxhash.xxh64()
 
-	# print(dicts_[1])
-	# print(dicts_[2])
-
-	# for x in dicts_[0]: # x = ([file2, file3, file4]) - a tuple
-		# for i in x: # i = [file2, file3, file4] - a list
-		#     for p in i: # file2, file3, file4
-		# print(i)
-	
-	# logger.info(f"COLLECT_DATA recieved dicts_ as a: {type(dicts_)}")
-
 	for tupled_batch in dicts_:
-		# logger.info(f"COLLECT_DATA recieved tupled_batch as a: {type(tupled_batch)}") # list
-		# logger.info(f"COLLECT_DATA recieved tupled_batch[0] as a: {type(tupled_batch[0])}") # str
-		# logger.info(f"COLLECT_DATA recieved in tupled_batch: {tupled_batch}")
-		# paths = tupled_batch[0]
 		for paths in tupled_batch:
-			# if isinstance(paths, list):
-			# 	for path in paths:
-			# 		item = (abs_path / path ).resolve()
-			# 		hasher.reset()
-			# 		content = item.read_bytes()
-			# 		hasher.update(content)
-			# 		hash_id = hasher.digest()
-			# 		item_data.append((content, hash_id, path))
-			# else:
 			item = ( abs_path / paths ).resolve()
 			hasher.reset()
 
@@ -1198,102 +981,11 @@ def collect_data(dicts_, _abs_path, conn): # give - redundant
 			# c_content = cmpr.compress(content)
 
 			hasher.update(content)
-			hash_id = hasher.digest() # why would I ever want to digest this hash into a hexidecimal str of 2x the original length?
+			hash_id = hasher.digest()
 
-			# frp = item.relative_to(abs_path).as_posix()
-			# item_data.append((content, hash_id, frp))
 			item_data.append((content, hash_id, paths))
-		# item_data.append((content, hash_id, i))
 
-	# logger.debug("collected one batch of data's information")
-	# print(item_data)
 	return item_data
-
-
-
-def collect_data3(dicts_, _abs_path, conn): # give - redundant
-	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is pased to the upload functions as required. Both functions use the same three variables for every file, so they can all
-	be built with this function. Order is irrelevant for the dictionaries & %(variable)s method with executemany(). Works with the 
-	output of the collect_info function in terms of data type & format.
-	"""
-	# logger.debug('...collecting data on file[s] to upload...')
-	abs_path = Path(_abs_path)
-	item_data = []
-
-	# cmpr = zstd.ZstdCompressor(level=3)
-	# hasher = hashlib.sha256()
-	hasher = xxhash.xxh64()
-
-	# for x in dicts_: # for tuple in list of tuples generated by collect_info
-	for i in dicts_: # for relative path in the list of relative paths from the tuple
-		# print(i)
-		item = ( abs_path / i[0][0] ).resolve()
-		hasher.reset()
-
-		content = item.read_bytes()
-
-		# c_content = cmpr.compress(content)
-
-		hasher.update(content)
-		hash_id = hasher.digest() # why would I ever want to digest this hash into a hexidecimal str of 2x the original length?
-
-		item_data.append((content, hash_id, i),)
-		# item_data.append((content, hash_id, i))
-
-	# logger.debug("collected one batch of data's information")
-	# print(item_data)
-	return item_data
-
-
-
-def collect_data4(dicts_, _abs_path, conn): # give - redundant
-	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is pased to the upload functions as required. Both functions use the same three variables for every file, so they can all
-	be built with this function. Order is irrelevant for the dictionaries & %(variable)s method with executemany(). Works with the 
-	output of the collect_info function in terms of data type & format.
-	"""
-	# logger.debug('...collecting data on file[s] to upload...')
-	abs_path = Path(_abs_path)
-	item_data = []
-
-	# cmpr = zstd.ZstdCompressor(level=3)
-	# hasher = hashlib.sha256()
-	hasher = xxhash.xxh64()
-
-	# logger.info('AHAHHHHHHHH')
-	# logger.info(dicts_)
-	# logger.info(dicts_[0])
-	# logger.info(len(dicts_))
-	# logger.info(len(dicts_[0]))
-	# logger.info('AHHHHHHHHHHHHHH')
-	# # print(dicts_[1])
-	# # print(dicts_[2])
-
-	for i in dicts_:
-		item = ( abs_path / i ).resolve()
-		logger.info('xxxxxxxxxx')
-		logger.info(item)
-		logger.info('xxxxxxxxxx')
-		if item.is_file():
-			hasher.reset()
-
-			content = item.read_bytes()
-
-			# c_content = cmpr.compress(content)
-
-			hasher.update(content)
-			hash_id = hasher.digest() # why would I ever want to digest this hash into a hexidecimal str of 2x the original length?
-
-			frp = item.relative_to(abs_path).as_posix()
-
-			item_data.append((content, hash_id, frp))
-			# item_data.append((content, hash_id, i))
-
-	# logger.debug("collected one batch of data's information")
-	return item_data
-
-
 
 def upload_dirs(conn, caves): # give
 	"""Insert into the directories table any local-only directories found."""
@@ -1309,15 +1001,10 @@ def upload_dirs(conn, caves): # give
 		# else:
 		#     logger.debug('local-only directory[s] written to server w.o exception')
 
-
 def upload_created(conn, serpent_data): # give
 	"""Insert into the notes table the new record for local-only files that do not exist in the server. *This function triggers no actions in the database*."""
 	# logger.debug('...writing new file[s] to server...')
 	i = "INSERT INTO notes (content, hash_id, frp) VALUES (%s, %s, %s);"
-	# logger.info(f"{(len(serpent_data))} = serpent_data len()")
-	# logger.info(f"{(type(serpent_data))} = serpent_data type")
-	# logger.info(f"{(type(serpent_data[0]))} = serpent_data[0] type")
-	# logger.info(f"{serpent_data} = serpent_data")
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
@@ -1329,39 +1016,12 @@ def upload_created(conn, serpent_data): # give
 	# else:
 	#     logger.debug('wrote new file[s] to server w.o exception')
 
-
-def upload_created2(conn, serpent_data): # give
-	"""Insert into the notes table the new record for local-only files that do not exist in the server. *This function triggers no actions in the database*."""
-	# logger.debug('...writing new file[s] to server...UPLOAD_CREATED2...')
-	i = "INSERT INTO notes (content, hash_id, frp) VALUES (%s, %s, %s);"
-
-	# logging.info(f"{serpent_data[0]}; failing upload")
-	# logging.info(f"{type(serpent_data[0])}; failing upload")
-	try:
-		# print('HELLO')
-		# print(serpent_data)
-		# print(serpent_data[0])
-		# print('GOODBYE')
-		with conn.cursor() as cursor:
-			cursor.executemany(i, serpent_data)
-
-	except (mysql.connector.Error, ConnectionError, Exception) as c:
-		logger.error(f"{RED}err encountered while attempting to upload [new] file[s] to server:{RESET} {c}", exc_info=True)
-		raise
-	# else:
-	#     logger.debug('wrote new file[s] to server w.o exception')
-
-
 def upload_edited(conn, soul_data): # only give 3.0
 	"""Update the notes table to show the current content for a note that was altered, or whose hash did not show identical contents. *This function 
 	triggers the on_update_notes trigger which will record the previous version of the file's contents and the time of changing.
 	"""
 	# logger.debug('...writing altered file[s] to server...')
 	j = "UPDATE notes SET content = %s, hash_id = %s WHERE frp = %s;"
-	# logger.info(f"{(len(soul_data))} = serpent_data len()")
-	# logger.info(f"{(type(soul_data))} = serpent_data type")
-	# logger.info(f"{(type(soul_data[0]))} = serpent_data[0] type")
-	# logger.info(f"{soul_data} = soul_data")
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
@@ -1373,35 +1033,20 @@ def upload_edited(conn, soul_data): # only give 3.0
 	# else:
 	# 	logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
 
-
-def upload_edited2(conn, soul_data): # only give 3.0
-	"""Update the notes table to show the current content for a note that was altered, or whose hash did not show identical contents. *This function 
-	triggers the on_update_notes trigger which will record the previous version of the file's contents and the time of changing.
-	"""
-	# logger.debug('...writing altered file[s] to server...UPLOAD_EDITED2...')
-	j = "UPDATE notes SET content = %s, hash_id = %s WHERE frp = %s;"
-
-	try:
-		# print('HELLO')
-		xc = len(soul_data)
-		# logging.info(f"len(soul_data) = {xc}")
-		# logging.info(f"{type(soul_data)}; {type(soul_data[0])}")
-		# for x in range(xc):
-		# print(soul_data)
-		# print('GOODBYE')
-		with conn.cursor() as cursor:
-			# for soul in soul_data:
-			cursor.execute(j, soul_data[0])
-
-	except (mysql.connector.Error, ConnectionError, Exception) as c:
-		logger.error(f"err encountered while attempting to upload altered file to server:{RESET} {c}", exc_info=True)
-		raise
-	# else:
-	# 	logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
-
 # USER INPUT & HANDLING
 
-def confirm(conn): # give
+def counter(start, nomic):
+    if start:
+        end = time.perf_counter()
+        duration = end - start
+        if duration > 60:
+            duration_minutes = duration / 60
+            logger.info(f"upload time [in minutes] for rosa {nomic}: {duration_minutes:.3f}")
+        else:
+            logger.info(f"upload time [in seconds] for rosa {nomic}: {duration:.3f}")
+
+
+def confirm_(conn): # give
 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
 	confirm = input("commit changes to server? y/n: ").lower()
 	if confirm in ('y', ' y', 'y ', ' y ', 'yes', 'yeah', 'i guess', 'i suppose'):
@@ -1426,3 +1071,41 @@ def confirm(conn): # give
 	else:
 		logger.error('unknown response; rolling server back')
 		raise
+
+
+def confirm(conn, force=False): # give
+	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
+	if force is True:
+		try:
+			logger.debug('forcing commit...')
+			conn.commit()
+		except (mysql.connector.Error, ConnectionError, Exception) as c:
+			logger.error(f"{RED}err encountered while attempting to --force commit to server:{RESET} {c}", exc_info=True)
+			raise
+		else:
+			logger.info('--forced commit to server')
+	else:
+
+		confirm = input("commit changes to server? y/n: ").lower()
+		if confirm in ('y', ' y', 'y ', ' y ', 'yes', 'yeah', 'i guess', 'i suppose'):
+			try:
+				conn.commit()
+
+			except (mysql.connector.Error, ConnectionError, Exception) as c:
+				logger.error(f"{RED}err encountered while attempting to commit changes to server:{RESET} {c}", exc_info=True)
+				raise
+			else:
+				logger.info('commited changes to server')
+
+		elif confirm in ('n', ' n', 'n ', ' n ', 'no', 'nope', 'hell no', 'naw'):
+			try:
+				conn.rollback()
+
+			except (mysql.connector.Error, ConnectionError, Exception) as c:
+				logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
+				raise
+			else:
+				logger.info('changes rolled back')
+		else:
+			logger.error('unknown response; rolling server back')
+			raise
