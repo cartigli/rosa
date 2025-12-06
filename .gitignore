@@ -7,9 +7,11 @@ __pycache__/
 
 rosa.egg-info/
 abilities/rosa_records/
-abilities/add_extra/
+abilities/
 abilities/__pycache__/
 abilities/config.py
 abilities/__init__.py
+add_extra/config.py
+add_extra/__pycache__/
 __init__.py
 build/
