@@ -393,7 +393,7 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 	"""
 	remote = {file_path: hash_id for file_path, hash_id in remote_raw}
 	local = {file_path: hash_id for file_path, hash_id in local_raw}
-	
+
 	remote_files = set(remote.keys())
 	local_files = set(local.keys())
 
@@ -416,7 +416,6 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 	logger.info(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
 
 	return remote_only, deltas, nodiffs, local_only # files in server but not present, files present not in server, files in both, files in both but with hash discrepancies
-
 
 def compare(heaven_dirs, hell_dirs): # all
 	"""Makes a set of each list of directories and formats them each into a dictionary. It compares the differences and returns a list of remote-only and local-only directories."""
@@ -512,22 +511,12 @@ def fat_boy(_abs_path):
 
 	except KeyboardInterrupt as e:
 		logger.warning('boss killed it; wrap it up')
-		# try:
 		_lil_guy(abs_path, backup, tmp_)
-		# except:
-		# 	raise
-		# else:
-		# 	logger.debug('_lil guy recovered on err w.o exception [on the big guy\'s orders]')
 		sys.exit(0)
 
 	except (mysql.connector.Error, ConnectionError, Exception) as e:
 		logger.error(f"{RED}err encountered while attempting atomic wr:{RESET} {e}.", exc_info=True)
-		# try:
 		_lil_guy(abs_path, backup, tmp_)
-		# except:
-		# 	raise
-		# else:
-		# 	logger.debug('_lil guy recovered on err w.o exception')
 		sys.exit(1)
 
 	else:
@@ -536,22 +525,12 @@ def fat_boy(_abs_path):
 
 		except KeyboardInterrupt as c:
 			logger.warning('boss killed it; wrap it up')
-			# try:
 			_lil_guy(abs_path, backup, tmp_)
-			# except:
-				# raise
-			# else:
-				# logger.debug('_lil guy recovered on err w.o exception [on the big guy\'s orders]')
 			sys.exit(0)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}err encountered while attempting to apply atomicy: {c}.", exc_info=True)
-			# try:
 			_lil_guy(abs_path, backup, tmp_)
-			# except:
-				# raise
-			# else:
-				# logger.debug('_lil guy recovered on err w.o exception')
 			sys.exit(1)
 		else:
 			logger.debug("fat boy finished w.o exception")
@@ -1045,7 +1024,6 @@ def counter(start, nomic):
         else:
             logger.info(f"upload time [in seconds] for rosa {nomic}: {duration:.3f}")
 
-
 def confirm_(conn): # give
 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
 	confirm = input("commit changes to server? y/n: ").lower()
@@ -1071,7 +1049,6 @@ def confirm_(conn): # give
 	else:
 		logger.error('unknown response; rolling server back')
 		raise
-
 
 def confirm(conn, force=False): # give
 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
