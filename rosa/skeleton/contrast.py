@@ -2,12 +2,18 @@
 import sys
 import time
 import logging
+from pathlib import Path
 
-if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.lib import(
-        diffr, doit_urself, counter
-    )
+if __name__=="__main__":
+    cd = Path(__file__).resolve().parent.parent
+    if str(cd) not in sys.path:
+        sys.path.insert(0, str(cd))
+
+from rosa.configurables.config import *
+
+from rosa.guts.technician import counter
+from rosa.guts.dispatch import doit_urself
+from rosa.guts.analyst import diffr
 
 """
 Compare local data to server, report back.
@@ -55,11 +61,12 @@ def ask_to_share(diff_data, force):
 
 
 def main(args=None):
-    data, diff, start, mini = diffr(args, NOMIC)
+    data, diff, mini = diffr(args, NOMIC)
 
     logger = mini[0]
     force = mini[1]
     prints = mini[2]
+    start = mini[3]
 
     if diff is True:
         remote_only = data[0][0]
@@ -161,16 +168,11 @@ def main(args=None):
 
     counter(start, NOMIC)
 
-    logger.info('[diff] completed')
+    logger.info('[diff] completed') # these three
 
     if prints is True:
         print('All set.')
 
 
 if __name__=="__main__":
-    from config import *
-    from lib import(
-        diffr, doit_urself, counter
-    )
-
-    main(args)
+    main()

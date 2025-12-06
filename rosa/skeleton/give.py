@@ -3,15 +3,17 @@ import sys
 import time
 from pathlib import Path
 
-if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.lib import(diffr, 
-        phones, scope_sz, rm_remdir, 
-        rm_remfile, upload_dirs, 
-        collect_info, collect_data, 
-        upload_created, upload_edited, 
-        confirm, counter
-        )
+if __name__=="__main__":
+    cd = Path(__file__).resolve().parent.parent
+    if str(cd) not in sys.path:
+        sys.path.insert(0, str(cd))
+
+from rosa.configurables.config import *
+
+from rosa.guts.analyst import diffr
+from rosa.guts.dispatch import phones, _safety
+from rosa.guts.contractor import scope_sz
+from rosa.guts.technician import collect_info, collect_data, upload_created, upload_edited, upload_dirs, confirm, counter, rm_remfile, rm_remdir
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -19,14 +21,15 @@ upload/update all files with hash discrepancies, and delete files not found loca
 of directories if not found locally, and add new ones.
 """
 
-NOMIC = "[give]"
+NOMIX = "[give]"
 
 def main(args=None):
-    data, diff, start, mini = diffr(args, NOMIC)
+    data, diff, mini = diffr(args, NOMIX)
 
     logger = mini[0]
     force = mini[1]
     prints = mini[2]
+    start = mini[3]
 
     if diff is True:
 
@@ -41,8 +44,8 @@ def main(args=None):
 
         batch_sz = scope_sz(LOCAL_DIR)
 
-        try:
-            with phones() as conn:
+        with phones() as conn:
+            try:
                 if gates:
                     logger.info('removing remote-only directory[s] from server...')
                     rm_remdir(conn, gates) # delete remote-only[s] from server
@@ -92,36 +95,22 @@ def main(args=None):
                             except:
                                 raise
 
-                counter(start, NOMIC)
+            except KeyboardInterrupt as ko:
+                logger.warning('going to try manual rollback for this one; standby')
+                _safety(conn)
+                sys.exit(0)
+            else:
+                counter(start, NOMIX)
 
                 confirm(conn, force)
 
-        except KeyboardInterrupt as ko:
-            logger.warning('going to try manual rollback for this one; standby')
-            try:
-                _safety(conn)
-            except:
-                raise
-            else:
-                logger.debug('rollback was clean')
-                sys.exit(0)
-
     logger.info('[give] complete')
 
-    counter(start, NOMIC)
+    counter(start, NOMIX)
 
     if prints is True:
         print('All set.')
 
 
 if __name__=="__main__":
-    from config import *
-    from lib import(scope_sz,
-        diffr, phones, rm_remdir, 
-        rm_remfile, upload_dirs, 
-        collect_info, collect_data, 
-        upload_created, upload_edited, 
-        confirm, counter
-        )
-
-    main(args)
+    main()

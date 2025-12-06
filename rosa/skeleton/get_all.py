@@ -5,14 +5,17 @@ import shutil
 import logging
 from pathlib import Path
 
-if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.lib import (
-        ping_rem, ping_cass, calc_batch, 
-        download_batches5, mini_ps, 
-        fat_boy, save_people,
-        mk_rrdir, phones, counter
-    )
+if __name__=="__main__":
+    cd = Path(__file__).resolve().parent.parent
+    if str(cd) not in sys.path:
+        sys.path.insert(0, str(cd))
+
+from rosa.configurables.config import *
+
+from rosa.guts.technician import counter
+from rosa.guts.analyst import ping_rem, ping_cass
+from rosa.guts.dispatch import mini_ps, phones
+from rosa.guts.contractor import calc_batch, download_batches5, fat_boy, save_people, mk_rrdir
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
@@ -66,12 +69,7 @@ def rm_origin(abs_path, force=False):
                 logger.warning(f"{abs_path} was deleted from your disk.")
 
 def main(args=None):
-    # try:
-    logger, force, prints = mini_ps(args)
-    logger.info('rosa [get] executed')
-
-    start = time.perf_counter()
-    logger.info('[get] [all] timer started')
+    logger, force, prints, start = mini_ps(args, NOMIC)
 
     abs_path = Path( LOCAL_DIR ).resolve()
 
@@ -115,12 +113,4 @@ def main(args=None):
         print('All set.')
 
 if __name__=="__main__":
-    from config import *
-    from lib import(
-        ping_rem, ping_cass, calc_batch, 
-        download_batches5, mini_ps, 
-        fat_boy, save_people,
-        mk_rrdir, phones, counter
-    )
-
-    main(args)
+    main()

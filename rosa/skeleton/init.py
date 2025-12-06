@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
+import sys
 import time
 import logging
+from pathlib import Path
 
-if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.queries import *
-    from rosa.abilities.lib import phones, confirm, init_conn, init_logger, mini_ps, counter, doit_urself
+if __name__=="__main__":
+    cd = Path(__file__).resolve().parent.parent
+    if str(cd) not in sys.path:
+        sys.path.insert(0, str(cd))
+
+from rosa.configurables.config import *
+from rosa.configurables.queries import *
+from rosa.guts.lib import phones, confirm, init_conn, init_logger, mini_ps, counter, doit_urself
 
 """
 Helper for executing the queries for:
@@ -19,6 +25,7 @@ Helper for executing the queries for:
         - Replacing tables
 Asks to user to confirm before committing to the server, just like rosa_give.
 """
+
 NOMIC = "[init]"
 
 def log():
@@ -29,16 +36,13 @@ def table_helper(conn, force=False):
     logger = log()
 
     if force is True:
-        exit
+        return
 
     with conn.cursor() as cursor:
         cursor.execute(T_CHECK)
         qtables = cursor.fetchall()
 
-    # if force is True:
-    #     exit
-
-    elif qtables:
+    if qtables:
         logger.info('obtained table data from db.')
         decis = input(f"found these tables: {qtables} in the db; do you want to [t] truncate data, [d] drop tables, or [p] pass? ").lower()
         if decis in ('t', 'trunc', 'truncate'):
@@ -95,7 +99,7 @@ def trigger_helper(conn, force=False):
     logger = log()
 
     if force is True:
-        exit
+        return
     else:
         with conn.cursor() as cursor:
             cursor.execute(TRIG_CHECK)
@@ -171,15 +175,10 @@ def force_initiation(conn, force=False):
                 else:
                     logger.info('forced database initiation w.o exception')
     else:
-        exit
+        return
 
-def main(args):
-    logger, force, prints = mini_ps(args)
-
-    logger.info('rosa [init] executed')
-
-    start = time.perf_counter()
-    logger.info('[init] timer started')
+def main(args=None):
+    logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
         try:
@@ -208,8 +207,4 @@ def main(args):
 
 
 if __name__=="__main__":
-    from config import *
-    from queries import *
-    from lib import phone_duty, confirm, init_conn, init_logger
-
-    main(args=None)
+    main()

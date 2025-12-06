@@ -1,23 +1,23 @@
 import argparse
 
 def get(args):
-	from rosa.abilities import get
+	from rosa.skeleton import get
 	get.main(args)
 
 def give(args):
-	from rosa.abilities import give
+	from rosa.skeleton import give
 	give.main(args)
 
 def init(args):
-	from rosa.abilities import init
+	from rosa.skeleton import init
 	init.main(args)
 
 def diff(args):
-	from rosa.abilities import contrast
+	from rosa.skeleton import contrast
 	contrast.main(args)
 
 def get_all(args):
-	from rosa.abilities import get_all
+	from rosa.skeleton import get_all
 	get_all.main(args)
 
 def few(args):
@@ -29,12 +29,12 @@ def moment(args):
 	rosa_get_moment.main(args)
 
 def give_all(args):
-	from rosa.abilities import give_all
+	from rosa.skeleton import give_all
 	give_all.main(args)
 
 def test(args):
 	# print('Hello, world.')
-	from rosa.abilities.add_extra import contrast_two
+	from rosa.add_extra import contrast_two
 	contrast_two.main(args)
 
 rosa = {

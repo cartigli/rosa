@@ -18,8 +18,8 @@ import mysql.connector # to connect with the mysql server - helps prevent inject
 # from mysql.connector impor
 # import zstandard as zstd # compressor for files before uploading and decompressing after download
 
-from rosa.abilities.queries import ASSESS2
-from rosa.abilities.config import LOGGING_LEVEL, LOCAL_DIR, XCONFIG, MAX_ALLOWED_PACKET, RED, GREEN, YELLOW, RESET
+from rosa.configurables.queries import ASSESS2
+from rosa.configurables.config import LOGGING_LEVEL, LOCAL_DIR, XCONFIG, MAX_ALLOWED_PACKET, RED, GREEN, YELLOW, RESET
 
 """
 Library of functions used in the management scripts. Many functions overlap and share uses, so moving them here is much easier for 
@@ -33,7 +33,7 @@ logger = logging.getLogger('rosa.log')
 def init_logger(logging_level):
 	if logging_level:
 		file_ = Path(__file__)
-		log_dest = file_.parent / "rosa.log"
+		log_dest = file_.parent.parent / "rosa.log"
 		
 		# init loggers
 		logger = logging.getLogger('rosa.log')
@@ -90,7 +90,7 @@ def init_logger(logging_level):
 		logger.warning("logger not passed; maybe config isn't configured?")
 		sys.exit(1)
 
-def mini_ps(args): # mini_parser for arguments/flags passed to the scripts
+def mini_ps(args, nomix): # mini_parser for arguments/flags passed to the scripts
 	force = False # no checks - force
 	prints = False # no prints - prints
 
@@ -110,13 +110,15 @@ def mini_ps(args): # mini_parser for arguments/flags passed to the scripts
 
 	else:
 		logger = init_logger(LOGGING_LEVEL.upper())
+	
+	start = time.perf_counter()
 
-	logger.debug('mini parser completed')
-	return logger, force, prints
+	logger.debug(f"[rosa]{nomix} executed & timer started")
+	return logger, force, prints, start
 
 def doit_urself():
 	cd = Path(__file__)
-	rosa = cd.parent
+	rosa = cd.parent.parent
 	rosa_log = rosa / "rosa.log"
 	rosa_records = rosa / "rosa_records"
 
@@ -153,13 +155,15 @@ def doit_urself():
 		else:
 			rosa_records.mkdir(parents=True, exist_ok=True)
 			ctime = f"{time.time():.2f}"
-			subprocess.run(["mv", f"{rosa_log}", f"./rosa_records/rosa_records_{ctime}_"])
+			subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
 
 			logger.debug('backed up & replaced rosa.log')
 	else:
 		logger.info('rosa.log: [ok]')
 
+
 # connection & management thereof
+
 
 @contextlib.contextmanager
 def phones():
@@ -256,7 +260,9 @@ def _safety(conn):
 		logger.warning('couldn\'t rollback due to faulty connection; abandoning')
 		sys.exit(1)
 
+
 # COLLECTING LOCAL DATA
+
 
 def scope_loc(local_dir): # all
 	"""Collect the relative path and 256-bit hash for every file in the given directory. Ignore any files with paths that contain
@@ -279,6 +285,7 @@ def scope_loc(local_dir): # all
 					# logger.debug(f"{item} was rejected due to blocked_list (config)")
 					continue # skip item if blkd item in its path
 				elif item.is_file():
+					logger.debug('log jam')
 					raw_paths.append(item) # the full paths 
 
 				elif item.is_dir():
@@ -316,7 +323,9 @@ def hash_loc(raw_paths, abs_path):
 
 	return raw_hell
 
+
 # COLLECTING SERVER DATA
+
 
 def scope_rem(conn): # all
 	"""Select and return every single relative path and hash from the notes table. Returned as a list of tuples (rel_path, hash_id)."""
@@ -381,7 +390,9 @@ def ping_cass(conn): # all
 		else:
 			return heaven_dirs
 
+
 # COMPARING
+
 
 def contrast(remote_raw, local_raw): # unfiform for all scripts
 	"""Accepts two lists of tupled pairs which each hold a files relative path and hash. It makes a list of the first item for every item in each list; 
@@ -432,19 +443,12 @@ def compare(heaven_dirs, hell_dirs): # all
 	logger.debug('compared directories & id\'d discrepancies')
 	return gates, caves, ledeux # dirs in heaven not found locally, dirs found locally not in heaven
 
-# COMPARISON -ER
-
 def diffr(args, nomic):
 	diff = False
 	data = ([], [])
 
-	mini = mini_ps(args)
+	mini = mini_ps(args, nomic)
 	logger = mini[0]
-
-	logger.info(f"rosa {nomic} executed")
-
-	start = time.perf_counter()
-	logger.info(f"rosa {nomic} timer started")
 
 	with phones() as conn:
 		logger.info('conn is connected; pinging heaven...')
@@ -492,9 +496,11 @@ def diffr(args, nomic):
 			logger.error(f"{RED}err caught while diff'ing directories:{RESET} {e}.", exc_info=True)
 			sys.exit(1)
 
-	return data, diff, start, mini
+	return data, diff, mini
+
 
 # EDIT LOCAL DIRECTORY
+
 
 @contextlib.contextmanager
 def fat_boy(_abs_path):
@@ -539,47 +545,51 @@ def _lil_guy(abs_path, backup, tmp_):
 	"""Handles recovery on error for the context manager fat_boy."""
 	try:
 		if backup and backup.exists():
-			if abs_path.exists():
-				shutil.rmtree(tmp_)
-				if tmp_.exists():
-					try:
-						logger.warning('5 sec pause to retry recursive delete; standby')
-						time.sleep(5)
-						shutil.rmtree(tmp_)
-					except Exception as e:
-						logger.error(f"directory failed to delete even on second round of brute force: {e}.", exc_info=True)
-						raise
-					else:
-						logger.warning('shutil flopped again, but we handled it')
-				else:
-					logger.warning('removed damaged attempt')
+			if tmp_.exists():
+				shutil_fx(tmp_)
 			try:
 				backup.rename(abs_path)
 			except:
 				raise
 			else:
-				logger.warning('moved backup back to original location')
-
-		if tmp_ and tmp_.exists():
-			shutil.rmtree(tmp_)
-			if tmp_.exists():
-				try:
-					logger.warning('5 sec pause to retry recursive delete; standby')
-					time.sleep(5)
-					shutil.rmtree(tmp_)
-				except Exception as e:
-					logger.warning(f"directory failed to delete even on second round of brute force: {e}.", exc_info=True)
-					raise
-				else:
-					logger.warning('shutil flopped again, but we handled it')
-			else:
-				logger.warning('removed damaged temporary directory')
+				logger.warning("moved backup back to original location")
+		else:
+			if tmp_ and tmp_.exists():
+				shutil_fx(tmp_)
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		logger.error(f"{RED}replacement of {abs_path} and cleanup encountered an error: {e}.", exc_info=True)
 		raise
 	else:
 		logger.info("_lil_guy's cleanup complete")
+
+def shutil_fx(dir_):
+	if dir_.exists() and dir_.is_dir():
+		try:
+			shutil.rmtree(dir_)
+		except:
+			logger.warning('err for shutil fx, letting her relax and retrying')
+			time.sleep(7)
+			if dir_.exists():
+				try:
+					shutil.rmtree(dir_)
+				except:
+					logger.warning('failed twice, calling it')
+					raise
+		else:
+			if dir_.exists():
+				try:
+					shutil.rmtree(dir_)
+				except:
+					logger.warning('failed twice, calling it')
+					raise
+	else:
+		logger.warning('shutil_fx passed something that was not a directory')
+	
+	if dir_.exists():
+		logger.warning(f"shutil_fx could not delete {dir_}")
+	else:
+		logging.debug(f"shutil_fx deleted {dir_}")
 
 def configure(abs_path): # raise err & say 'run get all or fix config's directory; there is no folder here'
 	"""Configure the temporary directory & move the original to a backup location. 
@@ -765,31 +775,29 @@ def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggr
 
 						except KeyboardInterrupt as c:
 							pbar.leave = False
+							pbar.close()
 							try:
 								cursor.fetchall()
 								cursor.close()
 							except:
 								pass
-							tqdm.write(f"{"\033[91m"}boss killed it; deleting partial download")
 							logger.warning(f"{RED}boss killed it; deleting partial downlaod")
-							pbar.close()
 							raise
 						except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
 							logger.error(f"err while trying to downwrite data: {c}.", exc_info=True)
+							pbar.leave = False
+							pbar.close()
 							try:
 								cursor.fetchall()
 								cursor.close()
 							except:
 								pass
-							tqdm.write(f"{RED}err caught while downloading; removing tmp_ directory")
-							pbar.close()
 							raise
 
 	except KeyboardInterrupt as c:
 		raise
 	else:
 		logger.debug('atomic wr w.batched download completed w.o exception')
-
 
 def wr_batches(data, tmp_):
 	"""Writes each batch to the _tmp directory as they are pulled. Each file has it and its parent directory flushed from memory for assurance of atomicy."""
@@ -811,7 +819,6 @@ def wr_batches(data, tmp_):
 	# else:
 		# logger.debug('wrote batch w.o exception')
 
-
 def apply_atomicy(tmp_, abs_path, backup):
 	"""If the download and write batches functions both complete entirely w.o error, this function moved the _tmp directory back to the original abs_path. 
 	If this completes w.o error, the backup is deleted.
@@ -824,20 +831,7 @@ def apply_atomicy(tmp_, abs_path, backup):
 		raise
 	else:
 		logger.debug('temporary directory renamed w.o exception')
-		if backup.exists():
-			try:
-				shutil.rmtree(backup)
-			except:
-				logger.warning('5 sec pause before retry recursive delete; standby')
-				time.sleep(5)
-				try:
-					shutil.rmtree(backup) # these are all over the place, it should be its own fx
-				except:
-					raise
-				else:
-					logger.warning('removed backup after execution w.One exception')
-			else:
-				logger.debug('removed backup after execution w.o exception')
+		shutil_fx(backup)
 
 def mk_rrdir(raw_directories, abs_path):
 	"""Takes the list of remote-only directories as dicts from contrast & writes them on the disk."""
@@ -859,7 +853,9 @@ def mk_rrdir(raw_directories, abs_path):
 			else:
 				logger.debug('created directory tree on disk w.o exception')
 
-# EDIT SERVER - rosaGIVE
+
+# EDIT SERVER
+
 
 def rm_remdir(conn, gates): # only give 3.0
 	"""Remove remote-only directories from the server. Paths [gates] passed as list of dictionaries for executemany(). This, and every other call to 
@@ -1012,7 +1008,9 @@ def upload_edited(conn, soul_data): # only give 3.0
 	# else:
 	# 	logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
 
+
 # USER INPUT & HANDLING
+
 
 def counter(start, nomic):
     if start:
@@ -1023,32 +1021,6 @@ def counter(start, nomic):
             logger.info(f"upload time [in minutes] for rosa {nomic}: {duration_minutes:.3f}")
         else:
             logger.info(f"upload time [in seconds] for rosa {nomic}: {duration:.3f}")
-
-def confirm_(conn): # give
-	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
-	confirm = input("commit changes to server? y/n: ").lower()
-	if confirm in ('y', ' y', 'y ', ' y ', 'yes', 'yeah', 'i guess', 'i suppose'):
-		try:
-			conn.commit()
-
-		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}err encountered while attempting to commit changes to server:{RESET} {c}", exc_info=True)
-			raise
-		else:
-			logger.info('commited changes to server')
-
-	elif confirm in ('n', ' n', 'n ', ' n ', 'no', 'nope', 'hell no', 'naw'):
-		try:
-			conn.rollback()
-
-		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
-			raise
-		else:
-			logger.info('changes rolled back')
-	else:
-		logger.error('unknown response; rolling server back')
-		raise
 
 def confirm(conn, force=False): # give
 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""

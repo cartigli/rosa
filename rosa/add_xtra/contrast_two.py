@@ -6,8 +6,8 @@ import xxhash
 from pathlib import Path
 
 if __name__!="__main__":
-	from rosa.abilities.config import *
-	from rosa.abilities.lib import(mini_ps, diffr,
+	from rosa.guts.config import *
+	from rosa.guts.lib import(mini_ps, diffr,
 		scope_loc, scope_rem, ping_cass,
 		contrast, compare, init_logger, 
 		doit_urself, phones, counter
@@ -17,7 +17,7 @@ if __name__!="__main__":
 Compare local data to server, report back.
 """
 
-NOMIC = "[diff]"
+NOMIC = "[diff2]"
 
 def scope_rem2(conn): # all
 	"""Select and return every single relative path and hash from the notes table. Returned as a list of tuples (rel_path, hash_id)."""
@@ -158,15 +158,14 @@ def hash_loc2(raw_paths, abs_path):
 
 	return demon_id
 
-def main(args):
-	start = time.perf_counter()
-
+def main(args=None):
 	diff = False
-	mini = mini_ps(args)
+	mini = mini_ps(args, NOMIC)
 
 	logger = mini[0]
 	force = mini[1]
 	prints = mini[2]
+	start = mini[3]
 
 	with phones() as conn:
 		logger.info('conn is connected; pinging heaven...')

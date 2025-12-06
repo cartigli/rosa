@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 import sys
 import time
+from pathlib import Path
 
-if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.lib import (
-        diffr, phones, counter, fat_boy, 
-        download_batches5, mk_rrdir, 
-        save_people, counter, calc_batch
-    )
+if __name__=="__main__":
+    cd = Path(__file__).resolve().parent.parent
+    if str(cd) not in sys.path:
+        sys.path.insert(0, str(cd))
+
+from rosa.configurables.config import *
+
+from rosa.guts.analyst import diffr
+from rosa.guts.dispatch import phones
+from rosa.guts.technician import counter
+from rosa.guts.contractor import fat_boy, download_batches5, mk_rrdir, save_people, calc_batch
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
@@ -16,13 +21,15 @@ server, download/write all hash discrepancies, and delete all files not found in
 delete old ones.
 """
 
-NOMIC = "[get]"
+NOMIX = "[get]"
 
 def main(args=None):
-    data, diff, start, mini = diffr(args, NOMIC)
+    data, diff, mini = diffr(args, NOMIX)
 
     logger = mini[0]
+    force = mini[1]
     prints = mini[2]
+    start = mini[3]
 
     if diff is True:
         cherubs = data[0][0]
@@ -95,18 +102,11 @@ def main(args=None):
 
     logger.info('[get] complete')
 
-    counter(start, NOMIC)
+    counter(start, NOMIX)
 
     if prints is True:
         print('All set.')
 
 
 if __name__=="__main__":
-    from config import *
-    from lib import (
-        diffr, phones, counter, fat_boy, 
-        download_batches5, mk_rrdir, 
-        save_people, counter
-    )
-
-    main(args)
+    main()

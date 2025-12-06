@@ -10,9 +10,9 @@ import subprocess
 import xxhash
 # import datetime
 
-from config import *
+from rosa.configurables.config import *
 
-LOCAL_DIR = "/Volumes/HomeXx/compuir/texts7"
+LOCAL_DIR = "/Volumes/HomeXx/compuir/texts8"
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -136,24 +136,24 @@ def main():
                         # hash alter-er [1 in 777] & file delete-r [1 in 8]
                         if item.is_file():
                             item_no += 1
-                            # if (item_no % 2 == 0) or (item_no % 3 == 0):
-                            #     content = item.read_bytes()
-                            #     hasher.reset()
-                            #     hasher.update(content)
-                            #     before = hasher.digest()
-                            #     with open(item, 'a', encoding='utf-8') as f:
-                            #         f.write("hello, world")
-                            #     a_content = item.read_bytes()
-                            #     hasher.reset()
-                            #     hasher.update(a_content)
-                            #     after = hasher.digest()
-                            #     if before == after:
-                            #         print("WE FUCKD UP")
-                            #     else:
-                            #         print(f"{RED}we fuckd that one up (good){RESET}")
-                            if item_no % 125 == 0: # deletes abt 98% of files in a 17300 ish file directory
-                                item.unlink()
-                                print(f"{RED}deleted a file{RESET}")
+                            if item_no % 137 == 0:
+                                content = item.read_bytes()
+                                hasher.reset()
+                                hasher.update(content)
+                                before = hasher.digest()
+                                with open(item, 'a', encoding='utf-8') as f:
+                                    f.write("hello, world")
+                                a_content = item.read_bytes()
+                                hasher.reset()
+                                hasher.update(a_content)
+                                after = hasher.digest()
+                                if before == after:
+                                    print("WE FUCKD UP")
+                                else:
+                                    print(f"{RED}we fuckd that one up (good){RESET}")
+                            # if item_no % 125 == 0: # deletes abt 98% of files in a 17300 ish file directory
+                            #     item.unlink()
+                            #     print(f"{RED}deleted a file{RESET}")
 
                         # # removes remote files
                         # if item.is_file():

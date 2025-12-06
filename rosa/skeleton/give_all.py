@@ -3,23 +3,27 @@ import sys
 import time
 from pathlib import Path
 
-from tqdm import tqdm
+from tqdm import tqdm # this does not belong here
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.lib import(
-        phones, mini_ps, scope_rem, 
-        ping_cass, collect_info, 
-        collect_data, upload_dirs, 
-        upload_created, confirm
-    )
+if __name__=="__main__":
+    cd = Path(__file__).resolve().parent.parent
+    if str(cd) not in sys.path:
+        sys.path.insert(0, str(cd))
+
+from rosa.configurables.config import *
+
+from rosa.guts.dispatch import phones, mini_ps
+from rosa.guts.analyst import scope_rem, ping_cass
+from rosa.guts.technician import collect_info, collect_data, upload_dirs, upload_created, confirm, counter
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
 upload/update all files with hash discrepancies, and delete files not found locally but existing in server. Delete from the list
 of directories if not found locally, and add new ones.
 """
+
+NOMIX = "[give][all]"
 
 def scraper():
     local_dir = LOCAL_DIR
@@ -49,15 +53,8 @@ def scraper():
     
     return serpents, caves, abs_path
 
-
 def main(args=None):
-    logger, force, prints = mini_ps(args)
-
-    logger.info('rosa [give] executed')
-
-    start = time.perf_counter()
-    if start:
-        logger.info('[give] [all] timer started')
+    logger, force, prints, start = mini_ps(args, NOMIX)
 
     with phones() as conn:
         logger.info('conn is connected')
@@ -87,7 +84,7 @@ def main(args=None):
                                     if serpent_data:
                                         upload_created(conn, serpent_data)
 
-                    counter(start, NOMIC)
+                    counter(start, NOMIX)
 
                 except (ConnectionError, TimeoutError) as c:
                     logger.critical(f"{RED}exception encountered while uploading data:{RESET} {c}", exc_info=True)
@@ -107,19 +104,27 @@ def main(args=None):
 
     logger.info('[give] [all] complete')
 
-    counter(start, NOMIC) # two counters in case -f isn't used - commit question takes time
+    counter(start, NOMIX) # two counters in case -f isn't used - commit question takes time
 
     if prints is True:
         print('All set.')
 
-
 if __name__=="__main__":
-    from config import *
-    from lib import(
-        phones, mini_ps, scope_rem, 
-        ping_cass, collect_info, 
-        collect_data, upload_dirs, 
-        upload_created, confirm
-    )
+    # cd = Path(__file__)
+    # rosa_ = cd.parent.parent
+    # if rosa_ not in sys.path:
+    #     sys.path.insert(0, rosa_)
 
-    main(args)
+    # from rosa.configurables.config import *
+    # # from lib import(
+    # #     phones, mini_ps, scope_rem, 
+    # #     ping_cass, collect_info, 
+    # #     collect_data, upload_dirs, 
+    # #     upload_created, confirm
+    # # )
+    # from rosa.guts.dispatch import phones, mini_ps
+    # from rosa.guts.analyst import scope_rem, ping_cass
+    # from rosa.guts.technician import collect_info, collect_data, upload_dirs, upload_created, confirm, counter
+    # main(args=None)
+
+    main()

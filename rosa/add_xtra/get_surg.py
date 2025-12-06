@@ -4,8 +4,8 @@ import time
 from pathlib import Path
 
 if __name__!="__main__":
-    from rosa.abilities.config import LOCAL_DIR
-    from rosa.abilities.lib import (
+    from rosa.guts.config import LOCAL_DIR
+    from rosa.guts.lib import (
         calc_batch, download_batches5, 
         mini_ps, mk_rrdir, phones, diffr, counter
     )

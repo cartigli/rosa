@@ -4,9 +4,9 @@ import logging
 from pathlib import Path
 
 if __name__!="__main__":
-    from rosa.abilities.config import *
-    from rosa.abilities.queries import SNAP
-    from rosa.abilities.lib import fat_boy, calc_batch, download_batches2, phone_duty, init_logger, mini_ps
+    from rosa.guts.config import *
+    from rosa.guts.queries import SNAP
+    from rosa.guts.lib import fat_boy, calc_batch, download_batches2, phone_duty, init_logger, mini_ps
 
 """
 Downloads the servers contents from a given moment using recorded UTC timestamps.
@@ -58,13 +58,12 @@ def get_dest(LOCAL_DIR):
 
 
 def main(args):
-    logger, force, prints = mini_ps(args)
+    logger, force, prints, start = mini_ps(args, NOMIC)
 
-    logger.info('Rosa [get] [moment] executed.')
-
-    start = time.perf_counter()
-    if start:
-        logger.info('[get] [moment] timer started.')
+    # logger.info('Rosa [get] [moment] executed.')
+    # start = time.perf_counter()
+    # if start:
+    #     logger.info('[get] [moment] timer started.')
 
     abs_path = Path(LOCAL_DIR).resolve()
 
