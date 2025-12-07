@@ -6,16 +6,17 @@ from pathlib import Path
 from tqdm import tqdm # this does not belong here
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-if __name__=="__main__":
-    cd = Path(__file__).resolve().parent.parent
-    if str(cd) not in sys.path:
-        sys.path.insert(0, str(cd))
+# if __name__=="__main__":
+#     cd = Path(__file__).resolve().parent.parent
+#     if str(cd) not in sys.path:
+#         sys.path.insert(0, str(cd))
 
-from rosa.configurables.config import *
+from rosa.confs.config import *
 
-from rosa.guts.dispatch import phones, mini_ps
-from rosa.guts.analyst import scope_rem, ping_cass
-from rosa.guts.technician import collect_info, collect_data, upload_dirs, upload_created, confirm, counter
+from rosa.lib.opps import mini_ps, counter
+from rosa.lib.dispatch import phones, confirm
+from rosa.lib.analyst import scope_rem, ping_cass
+from rosa.lib.technician import collect_info, collect_data, upload_dirs, upload_created
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -23,7 +24,7 @@ upload/update all files with hash discrepancies, and delete files not found loca
 of directories if not found locally, and add new ones.
 """
 
-NOMIX = "[give][all]"
+NOMIC = "[give][all]"
 
 def scraper():
     local_dir = LOCAL_DIR
@@ -54,7 +55,7 @@ def scraper():
     return serpents, caves, abs_path
 
 def main(args=None):
-    logger, force, prints, start = mini_ps(args, NOMIX)
+    logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
         logger.info('conn is connected')
@@ -69,22 +70,23 @@ def main(args=None):
                 logger.info('collected local paths; uploading...')
 
                 try:
-                    if caves: 
+                    if caves:
                         logger.info('uploading local-only directory[s]...')
                         upload_dirs(conn, caves) # upload local-only[s] to server
 
                     if serpents:
                         logger.info('uploading local-only file[s]...')
+
                         with logging_redirect_tqdm(loggers=[logger]): # tqdm method
                             with tqdm(collect_info(serpents, abs_path), unit="batches", leave=False) as pbar:
 
                                 for batch in pbar:
-                                    serpent_data = collect_data(batch, abs_path, conn)
+                                    serpent_data = collect_data(batch, abs_path)
 
                                     if serpent_data:
                                         upload_created(conn, serpent_data)
 
-                    counter(start, NOMIX)
+                    counter(start, NOMIC)
 
                 except (ConnectionError, TimeoutError) as c:
                     logger.critical(f"{RED}exception encountered while uploading data:{RESET} {c}", exc_info=True)
@@ -94,37 +96,13 @@ def main(args=None):
                     sys.exit(1)
                 else:
                     confirm(conn, force)
-
             else:
                 logger.warning(f"{RED}local directory doesn\'t exist{RESET}")
                 sys.exit(1)
-
-        else: # if server is empty, let em know
+        else:
             logger.info('server contains data; truncate tables before attempting again. aborting')
-
-    logger.info('[give] [all] complete')
-
-    counter(start, NOMIX) # two counters in case -f isn't used - commit question takes time
-
-    if prints is True:
-        print('All set.')
+    
+    finale(NOMIC, start, prints)
 
 if __name__=="__main__":
-    # cd = Path(__file__)
-    # rosa_ = cd.parent.parent
-    # if rosa_ not in sys.path:
-    #     sys.path.insert(0, rosa_)
-
-    # from rosa.configurables.config import *
-    # # from lib import(
-    # #     phones, mini_ps, scope_rem, 
-    # #     ping_cass, collect_info, 
-    # #     collect_data, upload_dirs, 
-    # #     upload_created, confirm
-    # # )
-    # from rosa.guts.dispatch import phones, mini_ps
-    # from rosa.guts.analyst import scope_rem, ping_cass
-    # from rosa.guts.technician import collect_info, collect_data, upload_dirs, upload_created, confirm, counter
-    # main(args=None)
-
     main()

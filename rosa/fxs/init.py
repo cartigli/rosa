@@ -4,14 +4,16 @@ import time
 import logging
 from pathlib import Path
 
-if __name__=="__main__":
-    cd = Path(__file__).resolve().parent.parent
-    if str(cd) not in sys.path:
-        sys.path.insert(0, str(cd))
+# if __name__=="__main__":
+#     cd = Path(__file__).resolve().parent.parent
+#     if str(cd) not in sys.path:
+#         sys.path.insert(0, str(cd))
 
-from rosa.configurables.config import *
-from rosa.configurables.queries import *
-from rosa.guts.lib import phones, confirm, init_conn, init_logger, mini_ps, counter, doit_urself
+from rosa.confs.config import *
+from rosa.confs.queries import *
+
+from rosa.lib.dispatch import phones, confirm
+from rosa.lib.opps import mini_ps, counter, doit_urself, finale
 
 """
 Helper for executing the queries for:
@@ -195,16 +197,13 @@ def main(args=None):
             raise
         else:
             logger.info('initiation faced no exceptions')
-
-    logger.info('[init] complete')
-
-    counter(start, NOMIC)
-
-    doit_urself()
-
-    if prints is True:
-        print('All set.')
-
+    
+    finale(NOMIC, start, prints)
+    # logger.info('[init] complete')
+    # counter(start, NOMIC)
+    # doit_urself()
+    # if prints is True:
+    #     print('All set.')
 
 if __name__=="__main__":
     main()

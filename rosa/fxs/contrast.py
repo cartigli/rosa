@@ -4,30 +4,24 @@ import time
 import logging
 from pathlib import Path
 
-if __name__=="__main__":
-    cd = Path(__file__).resolve().parent.parent
-    if str(cd) not in sys.path:
-        sys.path.insert(0, str(cd))
+# if __name__=="__main__":
+#     cd = Path(__file__).resolve().parent.parent
+#     if str(cd) not in sys.path:
+#         sys.path.insert(0, str(cd))
 
-from rosa.configurables.config import *
-
-from rosa.guts.technician import counter
-from rosa.guts.dispatch import doit_urself
-from rosa.guts.analyst import diffr
+from rosa.confs.config import *
+from rosa.lib.analyst import diffr
+from rosa.lib.opps import finale, doit_urself, mini_ps, counter
 
 """
 Compare local data to server, report back.
 """
 
-NOMIC = "[diff]"
+NOMIX = "[diff]"
 
-def log():
-    logger = logging.getLogger('rosa.log')
-    return logger
+logger = logging.getLogger('rosa.log')
 
 def ask_to_share(diff_data, force):
-    logger = log()
-
     logger.info('discrepancy[s] found between the server and local data:')
 
     for i in diff_data:
@@ -61,13 +55,12 @@ def ask_to_share(diff_data, force):
 
 
 def main(args=None):
-    data, diff, mini = diffr(args, NOMIC)
-
-    logger = mini[0]
-    force = mini[1]
-    prints = mini[2]
-    start = mini[3]
-
+    logger, force, prints, start = mini_ps(args, NOMIX)
+    data, diff = diffr()
+    # logger = mini[0]
+    # force = mini[1]
+    # prints = mini[2]
+    # start = mini[3]
     if diff is True:
         remote_only = data[0][0]
         deltas = data[0][1]
@@ -161,18 +154,13 @@ def main(args=None):
                 logger.info(f"{(100 - dratio):.4f} % of files were altered [failed hash verification]")
             else:
                 logger.info(f"{dratio:.4f} % of files are unaltered [verified by hash]")
-    
-    # wrap_up() here would be nice for all files
-    
-    doit_urself()
 
-    counter(start, NOMIC)
-
-    logger.info('[diff] completed') # these three
-
-    if prints is True:
-        print('All set.')
-
+    finale(NOMIX, start, prints) # ops
+    # doit_urself()
+    # counter(start, NOMIX)
+    # logger.info('[diff] completed') # these three
+    # if prints is True:
+    #     print('All set.')
 
 if __name__=="__main__":
     main()

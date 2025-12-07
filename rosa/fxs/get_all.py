@@ -5,17 +5,17 @@ import shutil
 import logging
 from pathlib import Path
 
-if __name__=="__main__":
-    cd = Path(__file__).resolve().parent.parent
-    if str(cd) not in sys.path:
-        sys.path.insert(0, str(cd))
+# if __name__=="__main__":
+#     cd = Path(__file__).resolve().parent.parent
+#     if str(cd) not in sys.path:
+#         sys.path.insert(0, str(cd))
 
-from rosa.configurables.config import *
+from rosa.confs.config import *
 
-from rosa.guts.technician import counter
-from rosa.guts.analyst import ping_rem, ping_cass
-from rosa.guts.dispatch import mini_ps, phones
-from rosa.guts.contractor import calc_batch, download_batches5, fat_boy, save_people, mk_rrdir
+from rosa.lib.dispatch import phones
+from rosa.lib.analyst import ping_rem, ping_cass
+from rosa.lib.opps import mini_ps, counter, finale
+from rosa.lib.contractor import calc_batch, download_batches5, sfat_boy, save_people, mk_rrdir
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
@@ -76,41 +76,42 @@ def main(args=None):
     if abs_path.exists():
         rm_origin(abs_path, force)
 
+    # with sfat_boy(abs_path) as _abs_path:
+
     with phones() as conn:
-        logger.info('conn is connected')
-        raw_heaven = ping_rem(conn) # raw remote files & hash_id's
+        with sfat_boy(abs_path) as _abs_path: # sfat_boy inside phones ensures sfat_boy catches errors before phones
+            logger.info('conn is connected')
+            raw_heaven = ping_rem(conn) # raw remote files & hash_id's
 
-        logger.info('raw heaven returned')
-        souls = {s[0] for s in raw_heaven}
+            logger.info('raw heaven returned')
+            souls = {s[0] for s in raw_heaven}
 
-        heavenly_dirs = ping_cass(conn) # raw remote dirs' rpath's
-        logger.info('heavenly dirs returned')
+            heavenly_dirs = ping_cass(conn) # raw remote dirs' rpath's
+            logger.info('heavenly dirs returned')
 
-        if any((souls, heavenly_dirs)): # remote hashes & relative paths
-            logger.info(f"data was returned from heaven; proceeding to processing...")
+            if any((souls, heavenly_dirs)): # remote hashes & relative paths
+                logger.info(f"data was returned from heaven; proceeding to processing...")
 
-            logger.info('getting batch size...')
-            batch_size, row_size = calc_batch(conn)
-            # logger.info('optimal batch size returned')
+                logger.info('getting batch size...')
+                batch_size, row_size = calc_batch(conn)
+                # logger.info('optimal batch size returned')
 
-            if heavenly_dirs:
-                logger.info('...downloading directories...')
-                mk_rrdir(heavenly_dirs, abs_path) # write directory heirarchy to abs_path directory
+                if heavenly_dirs:
+                    logger.info('...downloading directories...')
+                    mk_rrdir(heavenly_dirs, _abs_path) # write directory heirarchy to abs_path directory
 
-            if souls:
-                logger.info('...downloading files...')
-                download_batches5(souls, conn, batch_size, row_size, abs_path)
-        
-        else:
-            logger.info('server is devoid of data')
-            sys.exit(0)
+                if souls:
+                    logger.info('...downloading files...')
+                    download_batches5(souls, conn, batch_size, row_size, _abs_path)
+            else:
+                logger.info('server is devoid of data')
+                sys.exit(0)
 
-    logger.info('[get] [all] completed')
-
-    counter(start, NOMIC)
-
-    if prints is True:
-        print('All set.')
+    finale(NOMIC, start, prints)
+    # logger.info('[get] [all] completed')
+    # counter(start, NOMIC)
+    # if prints is True:
+    #     print('All set.')
 
 if __name__=="__main__":
     main()

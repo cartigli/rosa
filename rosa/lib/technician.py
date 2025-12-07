@@ -1,35 +1,22 @@
-import os
-import sys
-import time
-import shutil
 import logging
-import tempfile
-# import hashlib
-import subprocess
-import contextlib
 from pathlib import Path
-from itertools import batched
 
-# these three are the only external packages required
-from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
-import xxhash # this one is optional and can be replaced with hashlib which is more secure & in the native python library
-import mysql.connector # to connect with the mysql server - helps prevent injection while building queries as well
-# from mysql.connector impor
-# import zstandard as zstd # compressor for files before uploading and decompressing after download
+import xxhash # can be replaced w.native hashlib
+import mysql.connector # to connect with the mysql server
 
-from rosa.configurables.queries import ASSESS2
-from rosa.configurables.config import LOGGING_LEVEL, LOCAL_DIR, XCONFIG, MAX_ALLOWED_PACKET, RED, GREEN, YELLOW, RESET
+from rosa.confs.config import MAX_ALLOWED_PACKET, RED, RESET
+
+"""
+Counter-component to contractor: editing and uploading to the server. 
+Slightly more complicated than downloading, hence the name: 'technician'.
+"""
 
 logger = logging.getLogger('rosa.log')
 
 # EDIT SERVER
 
 def rm_remdir(conn, gates): # only give 3.0
-	"""Remove remote-only directories from the server. Paths [gates] passed as list of dictionaries for executemany(). This, and every other call to 
-	make an edit on the database, is rolled back on errors. Its only for specific calls to change the information in them. The default with mysql - conn
-	is to roll back on disconnect, so its an ok safety net, but its supposed to be all over this shit.
-	"""
+	"""Remove remote-only directories from the server."""
 	logger.debug('...deleting remote-only drectory[s] from server...')
 	g = "DELETE FROM directories WHERE drp = %(drp)s;"
 
@@ -58,13 +45,28 @@ def rm_remfile(conn, cherubs): # only give 3.0
 		else:
 			logger.debug('removed remote-only file[s] from server w.o exception')
 
+
+# def upload_afbatches(lists, abs_path, conn): 
+# 	"""Cleaner and legible-r."""
+# 	batches = collect_info(lists, abs_path)
+
+# 	with tqdm(batches) as pbar:
+# 		for batch in pbar:
+# 			batch_data = collect_data(batch, abs_path, conn)
+# 			upload_created(conn, batch_data)
+
+# 	# for batch in batches:
+# 	# 	batch_data = collect_data(batch, abs_path, conn)
+# 	# 	upload_created(conn, batch_data)
+
+
+
 def collect_info(dicts_, _abs_path): # give - a
 	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is pased to the upload functions as required. Both functions use the same three variables for every file, so they can all
-	be built with this function. Order is irrelevant for the dictionaries & %(variable)s method with executemany().
-	For batched uploads, the script reads the files to get their size so it can optimize queries-per-execution within the 
-	limitation for packet sizes. Pretty inneficient because reading every file just for its size when we already have the content 
-	in memory is a waste.
+	This is passed to the upload functions as required. Both functions [upload_edited(), upload_created()] use the same three variables, 
+	so their batches can all be defined with this function. Order is irrelevant for the individual items if using the %(variable)s method 
+	with executemany(). For batched uploads, the queries the files' metadata for its disk size in bytes. Makes one big list for all the 
+	batches & files needed, and returns this single item. [give] calls this twice.
 	"""
 	# logger.debug('...collecting info on file[s] sizes to upload...')
 	# cmpr = zstd.ZstdCompressor(level=3)
@@ -79,7 +81,8 @@ def collect_info(dicts_, _abs_path): # give - a
 		size = 0
 		item = ( abs_path / i )
 
-		size = os.path.getsize(item) 
+		size = i.stat().st_size
+		# size = os.path.getsize(item) 
 
 		if size > MAX_ALLOWED_PACKET:
 			logger.error(f"{RED}a single file is larger than the maximum packet size allowed:{RESET} {item}")
@@ -101,11 +104,11 @@ def collect_info(dicts_, _abs_path): # give - a
 	logger.debug('all batches collected')
 	return all_batches
 
-def collect_data(dicts_, _abs_path, conn): # give - redundant
+def collect_data(dicts_, _abs_path): # lol why would this need conn
 	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is pased to the upload functions as required. Both functions use the same three variables for every file, so they can all
-	be built with this function. Order is irrelevant for the dictionaries & %(variable)s method with executemany(). Works with the 
-	output of the collect_info function in terms of data type & format.
+	This is pased to the upload functions as required. Both this fx and collect_info() use the same three variables for every file, so 
+	they can all be built with this function. Order is irrelevant for the individual items when using the %(variable)s method with 
+	executemany(). Works with the output of the collect_info function in terms of data type & format.
 	"""
 	# logger.debug('...collecting data on file[s] to upload...')
 	abs_path = Path(_abs_path)
@@ -131,7 +134,7 @@ def collect_data(dicts_, _abs_path, conn): # give - redundant
 	return item_data
 
 def upload_dirs(conn, caves): # give
-	"""Insert into the directories table any local-only directories found."""
+	"""Insert into the directories table any local-only directories found. DML so executemany()."""
 	# logger.debug('...uploading local-only directory[s] to server...')
 	h = "INSERT INTO directories (drp) VALUES (%(drp)s);"
 	with conn.cursor() as cursor:
@@ -145,7 +148,7 @@ def upload_dirs(conn, caves): # give
 		#     logger.debug('local-only directory[s] written to server w.o exception')
 
 def upload_created(conn, serpent_data): # give
-	"""Insert into the notes table the new record for local-only files that do not exist in the server. *This function triggers no actions in the database*."""
+	"""Insert into the notes table the new record for local-only files that do not exist in the server. DML again."""
 	# logger.debug('...writing new file[s] to server...')
 	i = "INSERT INTO notes (content, hash_id, frp) VALUES (%s, %s, %s);"
 
@@ -177,52 +180,71 @@ def upload_edited(conn, soul_data): # only give 3.0
 	# 	logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
 
 
-# USER INPUT & HANDLING
+# USER INPUT & DYNAMIC ASSESSMENT[2]
 
 
-def counter(start, nomic):
-    if start:
-        end = time.perf_counter()
-        duration = end - start
-        if duration > 60:
-            duration_minutes = duration / 60
-            logger.info(f"time [in minutes] for rosa {nomic}: {duration_minutes:.3f}")
-        else:
-            logger.info(f"time [in seconds] for rosa {nomic}: {duration:.3f}")
+# def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
+# 	"""Get the average row size of the notes table to estimate optimal batch size for downloading. ASSESS2 is 1/100 the speed of ASSESS"""
+# 	batch_size = 5 # default
+# 	row_size = 10 # don't divide by 0
 
-def confirm(conn, force=False): # give
-	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
-	if force is True:
-		try:
-			logger.debug('forcing commit...')
-			conn.commit()
-		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}err encountered while attempting to --force commit to server:{RESET} {c}", exc_info=True)
-			raise
-		else:
-			logger.info('--forced commit to server')
-	else:
+# 	with conn.cursor() as cursor:
+# 		try:
+# 			cursor.execute(ASSESS2)
+# 			row_size = cursor.fetchone()
 
-		confirm = input("commit changes to server? y/n: ").lower()
-		if confirm in ('y', ' y', 'y ', ' y ', 'yes', 'yeah', 'i guess', 'i suppose'):
-			try:
-				conn.commit()
+# 		except (ConnectionError, TimeoutError, Exception) as c:
+# 			logger.error(f"err encountered while attempting to find avg_row_size: {c}", exc_info=True)
+# 			raise
+# 		else:
+# 			if row_size and row_size[0]:
+# 				try:
+# 					batch_size = max(1, int((0.94*MAX_ALLOWED_PACKET) / row_size[0]))
 
-			except (mysql.connector.Error, ConnectionError, Exception) as c:
-				logger.error(f"{RED}err encountered while attempting to commit changes to server:{RESET} {c}", exc_info=True)
-				raise
-			else:
-				logger.info('commited changes to server')
+# 				except ZeroDivisionError:
+# 					logger.warning("returned row_size was 0, can't divide by 0! returning default batch_sz")
+# 					return batch_size, row_size
+# 				else:
+# 					logger.debug(f"batch size: {batch_size}")
+# 					return batch_size, row_size
+# 			else:
+# 				logger.warning("ASSESS2 returned nothing usable, returning default batch size")
+# 				return batch_size, row_size
 
-		elif confirm in ('n', ' n', 'n ', ' n ', 'no', 'nope', 'hell no', 'naw'):
-			try:
-				conn.rollback()
 
-			except (mysql.connector.Error, ConnectionError, Exception) as c:
-				logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
-				raise
-			else:
-				logger.info('changes rolled back')
-		else:
-			logger.error('unknown response; rolling server back')
-			raise
+# def confirm(conn, force=False): # to dispatch? or could be to opps?
+# 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
+# 	if force is True:
+# 		try:
+# 			logger.debug('forcing commit...')
+# 			conn.commit()
+# 		except (mysql.connector.Error, ConnectionError, Exception) as c:
+# 			logger.error(f"{RED}err encountered while attempting to --force commit to server:{RESET} {c}", exc_info=True)
+# 			raise
+# 		else:
+# 			logger.info('--forced commit to server')
+# 	else:
+
+# 		confirm = input("commit changes to server? y/n: ").lower()
+# 		if confirm in ('y', ' y', 'y ', ' y ', 'yes', 'yeah', 'i guess', 'i suppose'):
+# 			try:
+# 				conn.commit()
+
+# 			except (mysql.connector.Error, ConnectionError, Exception) as c:
+# 				logger.error(f"{RED}err encountered while attempting to commit changes to server:{RESET} {c}", exc_info=True)
+# 				raise
+# 			else:
+# 				logger.info('commited changes to server')
+
+# 		elif confirm in ('n', ' n', 'n ', ' n ', 'no', 'nope', 'hell no', 'naw'):
+# 			try:
+# 				conn.rollback()
+
+# 			except (mysql.connector.Error, ConnectionError, Exception) as c:
+# 				logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
+# 				raise
+# 			else:
+# 				logger.info('changes rolled back')
+# 		else:
+# 			logger.error('unknown response; rolling server back')
+# 			raise

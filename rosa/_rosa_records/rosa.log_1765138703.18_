@@ -1,0 +1,200 @@
+[2025-12-07 14:02:05,977][DEBUG][ops:163]: [rosa][get] executed & timer started
+[2025-12-07 14:02:05,977][DEBUG][dispatch:25]: ...phone call, connecting...
+[2025-12-07 14:02:05,981][DEBUG][protocol:340]: Starting authorization phase
+[2025-12-07 14:02:05,981][DEBUG][protocol:354]: The provided initial strategy is caching_sha2_password
+[2025-12-07 14:02:05,981][INFO][__init__:149]: package: mysql.connector.plugins
+[2025-12-07 14:02:05,981][INFO][__init__:150]: plugin_name: caching_sha2_password
+[2025-12-07 14:02:05,981][INFO][__init__:154]: AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+[2025-12-07 14:02:05,981][DEBUG][authentication:271]: Exchanging further packets
+[2025-12-07 14:02:05,981][DEBUG][authentication:278]: caching_sha2_password completed succesfully
+[2025-12-07 14:02:05,981][INFO][analyst:226]: conn is connected; pinging heaven...
+[2025-12-07 14:02:05,981][INFO][analyst:228]: ...pinging heaven...
+[2025-12-07 14:02:05,981][DEBUG][analyst:95]: ...scoping remote files...
+[2025-12-07 14:02:06,035][DEBUG][analyst:99]: server returned data from query
+[2025-12-07 14:02:06,035][INFO][analyst:231]: ...pinging cass...
+[2025-12-07 14:02:06,035][DEBUG][analyst:142]: ...scoping remote directory[s]...
+[2025-12-07 14:02:06,038][DEBUG][analyst:147]: server returned data from query
+[2025-12-07 14:02:06,038][INFO][analyst:235]: confirmed data was returned from heaven; processing...
+[2025-12-07 14:02:06,038][WARNING][analyst:50]: local directory does not exist
+[2025-12-07 14:02:06,038][CRITICAL][dispatch:54]: uncaught exception found by phones; abandoning & rolling back
+[2025-12-07 14:02:06,038][WARNING][dispatch:88]: _safety called to rollback server due to err
+[2025-12-07 14:02:06,038][WARNING][dispatch:111]: _safety recovered w.o exception
+[2025-12-07 14:02:06,038][INFO][dispatch:62]: phones closed conn [finally]
+[2025-12-07 14:02:06,038][INFO][ops:92]: rosa log is @: /Volumes/HomeXx/compuir/xxhash/rosa/rosa.log
+[2025-12-07 14:02:06,038][INFO][ops:93]: rosa records are @: /Volumes/HomeXx/compuir/xxhash/rosa/_rosa_records
+[2025-12-07 14:02:06,038][INFO][ops:134]: rosa.log: [ok]
+[2025-12-07 14:02:06,038][INFO][ops:175]: time [in seconds] for rosa [get]: 0.061
+[2025-12-07 14:02:06,038][INFO][ops:184]: rosa [get] complete
+[2025-12-07 14:02:15,315][DEBUG][ops:163]: [rosa][get][all] executed & timer started
+[2025-12-07 14:02:15,315][DEBUG][dispatch:25]: ...phone call, connecting...
+[2025-12-07 14:02:15,316][DEBUG][protocol:340]: Starting authorization phase
+[2025-12-07 14:02:15,316][DEBUG][protocol:354]: The provided initial strategy is caching_sha2_password
+[2025-12-07 14:02:15,316][INFO][__init__:149]: package: mysql.connector.plugins
+[2025-12-07 14:02:15,316][INFO][__init__:150]: plugin_name: caching_sha2_password
+[2025-12-07 14:02:15,317][INFO][__init__:154]: AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+[2025-12-07 14:02:15,317][DEBUG][authentication:271]: Exchanging further packets
+[2025-12-07 14:02:15,317][DEBUG][authentication:278]: caching_sha2_password completed succesfully
+[2025-12-07 14:02:15,317][DEBUG][contractor:88]: fat boy made /Volumes/HomeXx/compuir/texts11; yielding...
+[2025-12-07 14:02:15,317][INFO][get_all:83]: conn is connected
+[2025-12-07 14:02:15,317][DEBUG][analyst:118]: ...scoping remote files...
+[2025-12-07 14:02:15,365][DEBUG][analyst:122]: server returned data from query
+[2025-12-07 14:02:15,365][INFO][get_all:86]: raw heaven returned
+[2025-12-07 14:02:15,366][DEBUG][analyst:142]: ...scoping remote directory[s]...
+[2025-12-07 14:02:15,369][DEBUG][analyst:147]: server returned data from query
+[2025-12-07 14:02:15,369][INFO][get_all:90]: heavenly dirs returned
+[2025-12-07 14:02:15,369][INFO][get_all:93]: data was returned from heaven; proceeding to processing...
+[2025-12-07 14:02:15,369][INFO][get_all:95]: getting batch size...
+[2025-12-07 14:02:15,380][DEBUG][contractor:201]: batch size: 15
+[2025-12-07 14:02:15,380][INFO][get_all:100]: ...downloading directories...
+[2025-12-07 14:02:15,380][DEBUG][contractor:383]: ...writing directory tree to disk...
+[2025-12-07 14:02:15,441][DEBUG][contractor:399]: created directory tree on disk w.o exception
+[2025-12-07 14:02:15,441][INFO][get_all:104]: ...downloading files...
+[2025-12-07 14:02:15,442][DEBUG][contractor:274]: split list into 1487 batches
+[2025-12-07 14:03:29,334][DEBUG][contractor:345]: atomic wr w.batched download completed w.o exception
+[2025-12-07 14:03:29,336][INFO][contractor:102]: sfat_boy caught no exeptions while writing_all
+[2025-12-07 14:03:29,336][DEBUG][dispatch:57]: phones executed w.o exception
+[2025-12-07 14:03:29,337][INFO][dispatch:62]: phones closed conn [finally]
+[2025-12-07 14:03:29,337][INFO][ops:92]: rosa log is @: /Volumes/HomeXx/compuir/xxhash/rosa/rosa.log
+[2025-12-07 14:03:29,337][INFO][ops:93]: rosa records are @: /Volumes/HomeXx/compuir/xxhash/rosa/_rosa_records
+[2025-12-07 14:03:29,337][INFO][ops:134]: rosa.log: [ok]
+[2025-12-07 14:03:29,337][INFO][ops:173]: time [in minutes] for rosa [get][all]: 1.234
+[2025-12-07 14:03:29,337][INFO][ops:184]: rosa [get][all] complete
+[2025-12-07 14:05:36,575][DEBUG][ops:163]: [rosa][diff] executed & timer started
+[2025-12-07 14:05:36,575][DEBUG][dispatch:25]: ...phone call, connecting...
+[2025-12-07 14:05:36,580][DEBUG][protocol:340]: Starting authorization phase
+[2025-12-07 14:05:36,580][DEBUG][protocol:354]: The provided initial strategy is caching_sha2_password
+[2025-12-07 14:05:36,580][INFO][__init__:149]: package: mysql.connector.plugins
+[2025-12-07 14:05:36,580][INFO][__init__:150]: plugin_name: caching_sha2_password
+[2025-12-07 14:05:36,580][INFO][__init__:154]: AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+[2025-12-07 14:05:36,580][DEBUG][authentication:271]: Exchanging further packets
+[2025-12-07 14:05:36,581][DEBUG][authentication:278]: caching_sha2_password completed succesfully
+[2025-12-07 14:05:36,582][INFO][analyst:226]: conn is connected; pinging heaven...
+[2025-12-07 14:05:36,582][INFO][analyst:228]: ...pinging heaven...
+[2025-12-07 14:05:36,582][DEBUG][analyst:95]: ...scoping remote files...
+[2025-12-07 14:05:36,637][DEBUG][analyst:99]: server returned data from query
+[2025-12-07 14:05:36,637][INFO][analyst:231]: ...pinging cass...
+[2025-12-07 14:05:36,637][DEBUG][analyst:142]: ...scoping remote directory[s]...
+[2025-12-07 14:05:36,640][DEBUG][analyst:147]: server returned data from query
+[2025-12-07 14:05:36,640][INFO][analyst:235]: confirmed data was returned from heaven; processing...
+[2025-12-07 14:05:36,640][DEBUG][analyst:37]: ...scoping local directory...
+[2025-12-07 14:05:37,012][DEBUG][analyst:60]: finished collecting local paths
+[2025-12-07 14:05:37,012][INFO][analyst:239]: ...data returned from local directory; hashing file[s] found...
+[2025-12-07 14:05:37,012][DEBUG][analyst:68]: ...hashing...
+[2025-12-07 14:05:50,096][INFO][analyst:244]: contrasting file[s]...
+[2025-12-07 14:05:50,102][DEBUG][analyst:181]: found 0 cherubs, 0 serpents, and 22303 people. comparing each persons' hash now
+[2025-12-07 14:05:50,105][DEBUG][analyst:192]: found 0 altered files [failed hash verification] and 22303 unchanged file[s] [hash verified]
+[2025-12-07 14:05:50,106][INFO][analyst:247]: comparing directory[s]...
+[2025-12-07 14:05:50,106][DEBUG][analyst:209]: found 0 gates [server-only], 0 caves [local-only], and 1181 ledeux's [found in both]
+[2025-12-07 14:05:50,106][DEBUG][analyst:211]: compared directories & id'd discrepancies
+[2025-12-07 14:05:50,106][INFO][analyst:259]: no diff!
+[2025-12-07 14:05:50,106][DEBUG][dispatch:57]: phones executed w.o exception
+[2025-12-07 14:05:50,107][INFO][dispatch:62]: phones closed conn [finally]
+[2025-12-07 14:05:50,112][INFO][ops:92]: rosa log is @: /Volumes/HomeXx/compuir/xxhash/rosa/rosa.log
+[2025-12-07 14:05:50,112][INFO][ops:93]: rosa records are @: /Volumes/HomeXx/compuir/xxhash/rosa/_rosa_records
+[2025-12-07 14:05:50,112][INFO][ops:134]: rosa.log: [ok]
+[2025-12-07 14:05:50,112][INFO][ops:175]: time [in seconds] for rosa [diff]: 13.537
+[2025-12-07 14:05:50,112][INFO][ops:184]: rosa [diff] complete
+[2025-12-07 14:17:28,930][DEBUG][ops:163]: [rosa][get] executed & timer started
+[2025-12-07 14:17:28,930][DEBUG][dispatch:25]: ...phone call, connecting...
+[2025-12-07 14:17:28,933][DEBUG][protocol:340]: Starting authorization phase
+[2025-12-07 14:17:28,933][DEBUG][protocol:354]: The provided initial strategy is caching_sha2_password
+[2025-12-07 14:17:28,933][INFO][__init__:149]: package: mysql.connector.plugins
+[2025-12-07 14:17:28,933][INFO][__init__:150]: plugin_name: caching_sha2_password
+[2025-12-07 14:17:28,933][INFO][__init__:154]: AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+[2025-12-07 14:17:28,934][DEBUG][authentication:271]: Exchanging further packets
+[2025-12-07 14:17:28,934][DEBUG][authentication:278]: caching_sha2_password completed succesfully
+[2025-12-07 14:17:28,935][INFO][analyst:227]: conn is connected; pinging heaven...
+[2025-12-07 14:17:28,935][INFO][analyst:229]: ...pinging heaven...
+[2025-12-07 14:17:28,935][DEBUG][analyst:96]: ...scoping remote files...
+[2025-12-07 14:17:28,990][DEBUG][analyst:100]: server returned data from query
+[2025-12-07 14:17:28,990][INFO][analyst:232]: ...pinging cass...
+[2025-12-07 14:17:28,990][DEBUG][analyst:143]: ...scoping remote directory[s]...
+[2025-12-07 14:17:28,995][DEBUG][analyst:148]: server returned data from query
+[2025-12-07 14:17:28,995][INFO][analyst:236]: confirmed data was returned from heaven; processing...
+[2025-12-07 14:17:28,995][DEBUG][analyst:37]: ...scoping local directory...
+[2025-12-07 14:17:29,416][DEBUG][analyst:60]: finished collecting local paths
+[2025-12-07 14:17:29,416][INFO][analyst:240]: ...data returned from local directory; hashing file[s] found...
+[2025-12-07 14:17:29,416][DEBUG][analyst:68]: ...hashing...
+[2025-12-07 14:17:42,279][INFO][analyst:245]: contrasting file[s]...
+[2025-12-07 14:17:42,285][DEBUG][analyst:182]: found 0 cherubs, 0 serpents, and 22303 people. comparing each persons' hash now
+[2025-12-07 14:17:42,287][DEBUG][analyst:193]: found 0 altered files [failed hash verification] and 22303 unchanged file[s] [hash verified]
+[2025-12-07 14:17:42,288][INFO][analyst:248]: comparing directory[s]...
+[2025-12-07 14:17:42,288][DEBUG][analyst:210]: found 0 gates [server-only], 0 caves [local-only], and 1181 ledeux's [found in both]
+[2025-12-07 14:17:42,288][DEBUG][analyst:212]: compared directories & id'd discrepancies
+[2025-12-07 14:17:42,288][INFO][analyst:260]: no diff!
+[2025-12-07 14:17:42,288][DEBUG][dispatch:57]: phones executed w.o exception
+[2025-12-07 14:17:42,290][INFO][dispatch:62]: phones closed conn [finally]
+[2025-12-07 14:17:42,294][INFO][ops:92]: rosa log is @: /Volumes/HomeXx/compuir/xxhash/rosa/rosa.log
+[2025-12-07 14:17:42,294][INFO][ops:93]: rosa records are @: /Volumes/HomeXx/compuir/xxhash/rosa/_rosa_records
+[2025-12-07 14:17:42,294][INFO][ops:134]: rosa.log: [ok]
+[2025-12-07 14:17:42,294][INFO][ops:176]: time [in seconds] for rosa [get]: 13.365
+[2025-12-07 14:17:42,294][INFO][ops:186]: rosa [get] complete
+[2025-12-07 14:18:13,171][DEBUG][ops:163]: [rosa][get] executed & timer started
+[2025-12-07 14:18:13,171][DEBUG][dispatch:25]: ...phone call, connecting...
+[2025-12-07 14:18:13,174][DEBUG][protocol:340]: Starting authorization phase
+[2025-12-07 14:18:13,174][DEBUG][protocol:354]: The provided initial strategy is caching_sha2_password
+[2025-12-07 14:18:13,174][INFO][__init__:149]: package: mysql.connector.plugins
+[2025-12-07 14:18:13,174][INFO][__init__:150]: plugin_name: caching_sha2_password
+[2025-12-07 14:18:13,174][INFO][__init__:154]: AUTHENTICATION_PLUGIN_CLASS: MySQLCachingSHA2PasswordAuthPlugin
+[2025-12-07 14:18:13,174][DEBUG][authentication:271]: Exchanging further packets
+[2025-12-07 14:18:13,174][DEBUG][authentication:278]: caching_sha2_password completed succesfully
+[2025-12-07 14:18:13,174][INFO][analyst:227]: conn is connected; pinging heaven...
+[2025-12-07 14:18:13,174][INFO][analyst:229]: ...pinging heaven...
+[2025-12-07 14:18:13,174][DEBUG][analyst:96]: ...scoping remote files...
+[2025-12-07 14:18:13,229][DEBUG][analyst:100]: server returned data from query
+[2025-12-07 14:18:13,229][INFO][analyst:232]: ...pinging cass...
+[2025-12-07 14:18:13,229][DEBUG][analyst:143]: ...scoping remote directory[s]...
+[2025-12-07 14:18:13,233][DEBUG][analyst:148]: server returned data from query
+[2025-12-07 14:18:13,233][INFO][analyst:236]: confirmed data was returned from heaven; processing...
+[2025-12-07 14:18:13,233][DEBUG][analyst:37]: ...scoping local directory...
+[2025-12-07 14:18:13,518][DEBUG][analyst:60]: finished collecting local paths
+[2025-12-07 14:18:13,518][INFO][analyst:240]: ...data returned from local directory; hashing file[s] found...
+[2025-12-07 14:18:13,518][DEBUG][analyst:68]: ...hashing...
+[2025-12-07 14:18:23,050][INFO][analyst:245]: contrasting file[s]...
+[2025-12-07 14:18:23,055][DEBUG][analyst:182]: found 5535 cherubs, 0 serpents, and 16768 people. comparing each persons' hash now
+[2025-12-07 14:18:23,057][DEBUG][analyst:193]: found 162 altered files [failed hash verification] and 16606 unchanged file[s] [hash verified]
+[2025-12-07 14:18:23,057][INFO][analyst:248]: comparing directory[s]...
+[2025-12-07 14:18:23,058][DEBUG][analyst:210]: found 0 gates [server-only], 0 caves [local-only], and 1181 ledeux's [found in both]
+[2025-12-07 14:18:23,058][DEBUG][analyst:212]: compared directories & id'd discrepancies
+[2025-12-07 14:18:23,058][INFO][analyst:253]: discrepancies discovered
+[2025-12-07 14:18:23,058][DEBUG][dispatch:57]: phones executed w.o exception
+[2025-12-07 14:18:23,058][INFO][dispatch:62]: phones closed conn [finally]
+[2025-12-07 14:18:23,061][DEBUG][dispatch:25]: ...phone call, connecting...
+[2025-12-07 14:18:23,062][DEBUG][protocol:340]: Starting authorization phase
+[2025-12-07 14:18:23,062][DEBUG][protocol:354]: The provided initial strategy is caching_sha2_password
+[2025-12-07 14:18:23,062][DEBUG][authentication:271]: Exchanging further packets
+[2025-12-07 14:18:23,062][DEBUG][authentication:278]: caching_sha2_password completed succesfully
+[2025-12-07 14:18:23,073][DEBUG][contractor:202]: batch size: 15
+[2025-12-07 14:18:23,073][INFO][get:46]: batch size returned
+[2025-12-07 14:18:23,074][DEBUG][contractor:165]: local directory moved to backup
+[2025-12-07 14:18:23,074][DEBUG][contractor:168]: /Volumes/HomeXx/compuir/tmpe6lipot5 and /Volumes/HomeXx/compuir/Backup_1765138703.073299 configured by [configure]
+[2025-12-07 14:18:23,074][DEBUG][contractor:174]: temporary directory created & original directory moved to backup w.o exception
+[2025-12-07 14:18:23,074][DEBUG][contractor:44]: fat boy made /Volumes/HomeXx/compuir/tmpe6lipot5 and /Volumes/HomeXx/compuir/Backup_1765138703.073299; yielding...
+[2025-12-07 14:18:23,074][INFO][get:51]: copying orignal directory structure from unchanged directory[s]
+[2025-12-07 14:18:23,074][DEBUG][contractor:385]: ...writing directory tree to disk...
+[2025-12-07 14:18:23,128][DEBUG][contractor:401]: created directory tree on disk w.o exception
+[2025-12-07 14:18:23,128][INFO][get:55]: hard-linking unchanged files from backup to tmp_
+[2025-12-07 14:18:23,128][ERROR][contractor:53]: [31;1merr encountered while attempting atomic wr:[0m 'PosixPath' object has no attribute 'link_to'.
+Traceback (most recent call last):
+  File "/Volumes/HomeXx/compuir/xxhash/rosa/guts/contractor.py", line 45, in fat_boy
+    yield tmp_, backup # return these & freeze in place
+    ^^^^^^^^^^^^^^^^^^
+  File "/Volumes/HomeXx/compuir/xxhash/rosa/skeleton/get.py", line 56, in main
+    save_people(stags, backup, tmp_) # hard link unchanged files - fast[er]
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/HomeXx/compuir/xxhash/rosa/guts/contractor.py", line 222, in save_people
+    curr.link_to(tmpd)
+    ^^^^^^^^^^^^
+AttributeError: 'PosixPath' object has no attribute 'link_to'. Did you mean: 'symlink_to'?
+[2025-12-07 14:18:23,176][WARNING][contractor:117]: moved backup back to original location
+[2025-12-07 14:18:23,177][INFO][contractor:126]: _lil_guy's cleanup complete
+[2025-12-07 14:18:23,177][CRITICAL][dispatch:54]: uncaught exception found by phones; abandoning & rolling back
+[2025-12-07 14:18:23,177][WARNING][dispatch:88]: _safety called to rollback server due to err
+[2025-12-07 14:18:23,177][WARNING][dispatch:111]: _safety recovered w.o exception
+[2025-12-07 14:18:23,177][INFO][dispatch:62]: phones closed conn [finally]
+[2025-12-07 14:18:23,177][DEBUG][get:95]: hung up phone
+[2025-12-07 14:18:23,177][INFO][ops:92]: rosa log is @: /Volumes/HomeXx/compuir/xxhash/rosa/rosa.log
+[2025-12-07 14:18:23,177][INFO][ops:93]: rosa records are @: /Volumes/HomeXx/compuir/xxhash/rosa/_rosa_records
+[2025-12-07 14:18:23,183][DEBUG][ops:121]: deleted record of log to make room, and moved current log to records
+[2025-12-07 14:18:23,183][INFO][ops:176]: time [in seconds] for rosa [get]: 10.012
+[2025-12-07 14:18:23,183][INFO][ops:186]: rosa [get] complete

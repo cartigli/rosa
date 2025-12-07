@@ -10,9 +10,9 @@ import subprocess
 import xxhash
 # import datetime
 
-from rosa.configurables.config import *
+from rosa.confs.config import *
 
-LOCAL_DIR = "/Volumes/HomeXx/compuir/texts8"
+LOCAL_DIR = "/Volumes/HomeXx/compuir/texts11"
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -151,9 +151,9 @@ def main():
                                     print("WE FUCKD UP")
                                 else:
                                     print(f"{RED}we fuckd that one up (good){RESET}")
-                            # if item_no % 125 == 0: # deletes abt 98% of files in a 17300 ish file directory
-                            #     item.unlink()
-                            #     print(f"{RED}deleted a file{RESET}")
+                            elif item_no % 4 == 0: # deletes abt 98% of files in a 17300 ish file directory
+                                item.unlink()
+                                print(f"{RED}deleted a file{RESET}")
 
                         # # removes remote files
                         # if item.is_file():

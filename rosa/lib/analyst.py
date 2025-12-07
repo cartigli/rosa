@@ -1,35 +1,30 @@
-import os
 import sys
 import time
-import shutil
 import logging
-import tempfile
-# import hashlib
-import subprocess
-import contextlib
 from pathlib import Path
-from itertools import batched
 
-# these three are the only external packages required
 from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
-import xxhash # this one is optional and can be replaced with hashlib which is more secure & in the native python library
-import mysql.connector # to connect with the mysql server - helps prevent injection while building queries as well
-# from mysql.connector impor
-# import zstandard as zstd # compressor for files before uploading and decompressing after download
+from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
+import xxhash # can be replaced with hashlib
+import mysql.connector
 
-from rosa.configurables.queries import ASSESS2
-from rosa.configurables.config import LOGGING_LEVEL, LOCAL_DIR, XCONFIG, MAX_ALLOWED_PACKET, RED, GREEN, YELLOW, RESET
+from rosa.confs.config import LOCAL_DIR, RED, RESET
 
-# COLLECTING LOCAL DATA
+"""
+Assesses the state of the local directory, does the same for the server, and compares 
+the two. [ diffr() ] is an engine for all three steps. It is used by: [get, give, & diff].
+"""
 
 logger = logging.getLogger('rosa.log')
 
+# COLLECTING LOCAL DATA
+
 def scope_loc(local_dir): # all
-	"""Collect the relative path and 256-bit hash for every file in the given directory. Ignore any files with paths that contain
-	the '.DS_Store', '.git', or '.obsidian'. Record the hash in BINARY format. Hex for python ( and UNHEX for the sql queries ). 
-	Every file that meets the criteria has its relative path and hash generated and recorded. Returns the pairs of paths/hashes 
-	in a tuple to match data returned from the server.
+	"""Collects the full paths of all files and the relative path of all directories from the given directory. The simplified blocking
+	logic just skips the item if its path has *any of the blocked items [config.py] within it. So if a file is in .git, it, and everything
+	else in there, will be ignored because their paths contain the blocked item. Same for files like .DS_Store, if the file has '.DS_Store'
+	anywhere in its path, it will be ignored. Returns the files' paths, directories' relative paths, and the directory's pathlib object.
+	*This used to also generate and then hex the hash, but hexing is no longer used & hashing logic is now segregated from file-searching.
 	"""
 	blk_list = ['.DS_Store', '.git', '.obsidian'] 
 	abs_path = Path(local_dir).resolve()
@@ -46,7 +41,6 @@ def scope_loc(local_dir): # all
 					# logger.debug(f"{item} was rejected due to blocked_list (config)")
 					continue # skip item if blkd item in its path
 				elif item.is_file():
-					# logger.debug('log jam')
 					raw_paths.append(item) # the full paths 
 
 				elif item.is_dir():
@@ -67,20 +61,22 @@ def scope_loc(local_dir): # all
 	return raw_paths, hell_dirs, abs_path
 
 def hash_loc(raw_paths, abs_path):
+	"""For every file, hash it and tuple it with the relative path."""
 	hasher = xxhash.xxh64()
 	raw_hell = []
 
 	logger.debug('...hashing...')
 
-	with tqdm(raw_paths, unit="hashes", leave=True) as pbar:
-		for item in pbar:
-			hasher.reset()
-			hasher.update(item.read_bytes())
-			hash_id = hasher.digest()
+	with tqdm_(loggers=[logger]):
+		with tqdm(raw_paths, unit="hashes", leave=True) as pbar:
+			for item in pbar:
+				hasher.reset()
+				hasher.update(item.read_bytes())
+				hash_id = hasher.digest()
 
-			frp = item.relative_to(abs_path).as_posix()
+				frp = item.relative_to(abs_path).as_posix()
 
-			raw_hell.append((frp, hash_id))
+				raw_hell.append((frp, hash_id))
 
 	return raw_hell
 
@@ -88,8 +84,11 @@ def hash_loc(raw_paths, abs_path):
 # COLLECTING SERVER DATA
 
 
-def scope_rem(conn): # all
-	"""Select and return every single relative path and hash from the notes table. Returned as a list of tuples (rel_path, hash_id)."""
+def scope_rem(conn): # thinking all fx's that use conn to do _ w.the server should be together in a file (except most of technician & contractor's downloads because they are specialties of those scripts]
+	"""
+	Select and return every single relative path and hash from the 
+	notes table. Returned as a list of tuples: (rel_path, hash_id).
+	"""
 	q = "SELECT frp, hash_id FROM notes;"
 
 	with conn.cursor() as cursor:
@@ -108,8 +107,11 @@ def scope_rem(conn): # all
 		else:
 			return raw_heaven
 
-def ping_rem(conn): # all
-	"""Select and return every single relative path and hash from the notes table. Returned as a list of tuples (rel_path, hash_id)."""
+def ping_rem(conn): # ditto
+	"""
+	Select and return every single files' relative path from the 
+	notes table. Returned as a list of single-item tuples: (frp,).
+	"""
 	q = "SELECT frp FROM notes;"
 
 	with conn.cursor() as cursor:
@@ -128,9 +130,11 @@ def ping_rem(conn): # all
 		else:
 			return raw_heaven
 
-def ping_cass(conn): # all
-	"""Ping the kid Cass because you just need a quick hand with the directories. If a directory is empty or contais only subdirectories and no files,
-	Cass is the kid to clutch it. He returns a list of directories as tuples containing their relative paths.
+def ping_cass(conn): # tritto
+	"""
+	Ping the kid Cass because you just need a quick hand with the directories. If a directory is empty or contais only subdirectories and no 
+	files, Cass is the kid to clutch it. He returns a list of directories as tuples containing their relative paths. He solved a problem no 
+	longer present, but the function is still useful and implemented for assurance the directory tree is a 1:1 replica of the local directory.
 	"""
 	q = "SELECT * FROM directories;" # drp's
 
@@ -156,12 +160,13 @@ def ping_cass(conn): # all
 
 
 def contrast(remote_raw, local_raw): # unfiform for all scripts
-	"""Accepts two lists of tupled pairs which each hold a files relative path and hash. It makes a list of the first item for every item in each list; 
-	every file's relative path. It compares these lists to get the files that are remote-only and local-only and makes each one into a dictionary with 
-	the same key for every item: 'frp'. Then, for the files that are in both locations, they ar emade into a new dictionary containing each file's 
-	respective hash and relative path. Using their key values, each item in the local directory's hash is compared to the remote file's hash. If a 
-	discrepancy is found, it is added to the same dictionary key values as the first two result sets: 'frp'. 'frp' is the substitution key for the 
-	mysql queries these lists of dictionaries will be used for.
+	"""
+	Takes the raw tuples returned from scope_rem() & ping_cass(). There is an initial sorting of the paired items into a dictionary for the remote 
+	and local files, which makes comparison much easier. The initial comparison is done by pulling the .keys() from both dictionaries and finding which
+	files, if any, are missing from the server AND/OR the local directory. Remote-only files' relative path was not in the directory's set, and vice 
+	versa for the local-only files. For all the files' relative paths present in the server AND the local directory, the original dictionary uses their 
+	path to 'look up' the files' hash and identifies files whose hashes' were unequal.
+	Remote, local, and unverified files get output as a list of dictionaries for mysql_connector formatting, uploading, or updating.
 	"""
 	remote = {file_path: hash_id for file_path, hash_id in remote_raw}
 	local = {file_path: hash_id for file_path, hash_id in local_raw}
@@ -174,7 +179,7 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 
 	both = remote_files & local_files # those in both - unaltered
 
-	logger.info(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
+	logger.debug(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
 
 	deltas = []
 	nodiffs = []
@@ -185,12 +190,15 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 		else:
 			deltas.append({'frp': file_path})
 
-	logger.info(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
+	logger.debug(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
 
 	return remote_only, deltas, nodiffs, local_only # files in server but not present, files present not in server, files in both, files in both but with hash discrepancies
 
 def compare(heaven_dirs, hell_dirs): # all
-	"""Makes a set of each list of directories and formats them each into a dictionary. It compares the differences and returns a list of remote-only and local-only directories."""
+	"""
+	Makes a set of each list of directories and formats them each into a dictionary very similarly to contrast. It 
+	compares the differences and returns a list of remote-only and local-only directories as a list of dictionaries.
+	"""
 	heaven = set(heaven_dirs)
 	hell = set(hell_dirs)
 
@@ -204,14 +212,16 @@ def compare(heaven_dirs, hell_dirs): # all
 	logger.debug('compared directories & id\'d discrepancies')
 	return gates, caves, ledeux # dirs in heaven not found locally, dirs found locally not in heaven
 
-def diffr(args, nomic):
-	from rosa.guts.dispatch import mini_ps, phones
+def diffr():
+	"""
+	[get], [give], and [diff] use this as their main fx. It was being repeated across many files and moved here for uniformity across the scripts.
+	Having nomix passed to it makes the logging much cleaner and much clearer. Only weird thing is mini_ps() needs to be imported here, so this
+	file will likely receive additional fx's or this fx will be moved, TBD. Sike, this design sucks, too weird to follow and not worth the trouble.
+	"""
+	from rosa.lib.dispatch import phones
 
 	diff = False
 	data = ([], [])
-
-	mini = mini_ps(args, nomic)
-	logger = mini[0]
 
 	with phones() as conn:
 		logger.info('conn is connected; pinging heaven...')
@@ -259,5 +269,5 @@ def diffr(args, nomic):
 			logger.error(f"{RED}err caught while diff'ing directories:{RESET} {e}.", exc_info=True)
 			sys.exit(1)
 
-	return data, diff, mini
+	return data, diff #, mini
 
