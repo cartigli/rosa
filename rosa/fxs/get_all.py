@@ -5,22 +5,16 @@ import shutil
 import logging
 from pathlib import Path
 
-# if __name__=="__main__":
-#     cd = Path(__file__).resolve().parent.parent
-#     if str(cd) not in sys.path:
-#         sys.path.insert(0, str(cd))
-
-from rosa.confs.config import *
-
-from rosa.lib.dispatch import phones
-from rosa.lib.analyst import ping_rem, ping_cass
-from rosa.lib.opps import mini_ps, counter, finale
-from rosa.lib.contractor import calc_batch, download_batches5, sfat_boy, save_people, mk_rrdir
+from rosa.confs import *
+from rosa.lib import phones, ping_rem, ping_cass, download_batches5, calc_batch, sfat_boy, save_people, mk_rrdir, mini_ps, counter, finale
 
 """
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
 server, download/write all hash discrepancies, and delete all files not found in the server. Make parent directories if needed & 
 delete old ones.
+
+Doesn't diff, so no dictionaries. 
+Uses souls for downloading and heavenly_dirs raw.
 """
 
 NOMIC = "[get][all]"
@@ -76,20 +70,18 @@ def main(args=None):
     if abs_path.exists():
         rm_origin(abs_path, force)
 
-    # with sfat_boy(abs_path) as _abs_path:
-
     with phones() as conn:
         with sfat_boy(abs_path) as _abs_path: # sfat_boy inside phones ensures sfat_boy catches errors before phones
             logger.info('conn is connected')
             raw_heaven = ping_rem(conn) # raw remote files & hash_id's
 
             logger.info('raw heaven returned')
-            souls = {s[0] for s in raw_heaven}
+            # souls = {s[0] for s in raw_heaven}
 
             heavenly_dirs = ping_cass(conn) # raw remote dirs' rpath's
             logger.info('heavenly dirs returned')
 
-            if any((souls, heavenly_dirs)): # remote hashes & relative paths
+            if any((raw_heaven, heavenly_dirs)): # remote hashes & relative paths
                 logger.info(f"data was returned from heaven; proceeding to processing...")
 
                 logger.info('getting batch size...')
@@ -100,18 +92,14 @@ def main(args=None):
                     logger.info('...downloading directories...')
                     mk_rrdir(heavenly_dirs, _abs_path) # write directory heirarchy to abs_path directory
 
-                if souls:
+                if raw_heaven:
                     logger.info('...downloading files...')
-                    download_batches5(souls, conn, batch_size, row_size, _abs_path)
+                    download_batches5(raw_heaven, conn, batch_size, row_size, _abs_path)
             else:
                 logger.info('server is devoid of data')
                 sys.exit(0)
 
     finale(NOMIC, start, prints)
-    # logger.info('[get] [all] completed')
-    # counter(start, NOMIC)
-    # if prints is True:
-    #     print('All set.')
 
 if __name__=="__main__":
     main()

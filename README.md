@@ -20,7 +20,7 @@ The lib now includes:
   - Dispatch: manages the connection to the server: initiates, yields, and handles errors for the connection object
   - Opps: handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
 
-The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The router.py script's imports were corrected and the following commands are the main functions of rosa [rosa...]:
+The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following commands are the main functions of rosa [rosa...]:
   - [give] finds changes between the local and remote data, uploads new files/directories, removes old ones, and updates altered files
   - [give][all] does not consider changes and brute forces upload of the entire local directory to the server (faster and simpler than [give])
 
@@ -33,12 +33,13 @@ The scripts were moved into a seperate directory named 'fxs' and import the need
 
 All scripts accept certain flags with their behavior outlined below:
     - [force] (-f), (--force) if the scripts asks for confirmation or input normally, it will skip and proceed with the default
-    - [prints] (-p), (--prints) if the script prints something (all scripts print 'All set.' by defualt), it will ignore the print statement
     - [verbose] (-v), (--verbose) sets the logging_level to DEBUG for maximum logging output
     - [silent] (-s), (--silent) sets the logging_level to CRITICAL for minimum logging output
         - *Neither the silent nor verbose flags affect the rosa.log file's contents; it logs at the DEBUG level regardless of flags used*
 
 Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
+
+To install and run, navigate to the project directory and run 'pip install .', which will configure the needed packages and configure the path for rosa. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in the parent directory.
 
 Required packages:
   - xxhash (unless using hashlib; xxhash is mad fast but less secure. Just swap the code with xxhash for the commented out hashlib functions)

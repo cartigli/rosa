@@ -1,12 +1,21 @@
 import os
 
-LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
+LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'warning')
 # .upper() is applied so don't worry about capitilization
 
-DB_USER = os.getenv('DB_USER','username')
-DB_PSWD = os.getenv('DB_PSWD','mysql_password')
-DB_NAME = os.getenv('DB_NAME','database_name')
-DB_ADDR = os.getenv('DB_ADDR','ip_addr_ofServer')
+# DB_USER = os.getenv('DB_USER','username') # OLD CONFIG
+# DB_PSWD = os.getenv('DB_PSWD','mysql_password')
+# DB_NAME = os.getenv('DB_NAME','database_name')
+# DB_ADDR = os.getenv('DB_ADDR','ip_addr_ofServer')
+
+XCONFIG = os.getenv('XCONFIG',
+            {
+    'user': 'username',
+    'pswd': 'mysql_password',
+    'name': 'database_name',
+    'addr': 'ip_addr_ofServer'
+    }
+)
 
 MAX_ALLOWED_PACKET = os.getenv('MAX_ALLOWED_PACKET', 5_000_000) # 5 mb
 # MAX_ALLOWED_PACKET = os.getenv('MAX_ALLOWED_PACKET', 10_000_000) # 10 mb

@@ -2,19 +2,25 @@ import sys
 import time
 import logging
 import subprocess
-
 from pathlib import Path
 
-from rosa.confs.config import LOGGING_LEVEL
+from rosa.confs import LOGGING_LEVEL
 
 """
-logger and connection management, recovery, and initiation.
-This file could be made strictly for connections and error handling, moving logging to operations.
-"""
+Applies the logger configuration & does the initiation. 
+Also holds 'helper' fx's for the scripts [finaly, mini_ps, counter].
 
-# logging / er
+[functions]
+init_logger(logging_level),
+doit_urself(),
+mini_ps(args, nomix),
+counter(start, nomix),
+finale(nomix, start, prints)
+"""
 
 logger = logging.getLogger('rosa.log')
+
+# INITIATE LOGGER & RECORDS MANAGER
 
 def init_logger(logging_level): # (operations)
 	"""
@@ -77,7 +83,6 @@ def init_logger(logging_level): # (operations)
 		logger.warning("logger not passed; maybe config isn't configured?")
 		sys.exit(1)
 
-
 def doit_urself():
 	"""
 	If rosa.log is over 64 kb, it is moved to rosa_records. If rosa_records has 
@@ -89,15 +94,14 @@ def doit_urself():
 	rosa_log = rosa / "rosa.log"
 	rosa_records = rosa / "_rosa_records"
 
-	logger.info(f"rosa log is @: {rosa_log}")
-	logger.info(f"rosa records are @: {rosa_records}")
+	logger.debug(f"rosa log is @: {rosa_log}")
+	logger.debug(f"rosa records are @: {rosa_records}")
 
 	rosasz = rosa_log.stat().st_size
 	rosakb = rosasz / 1024
 
 	rosa_records_max = 5 # if 5 files when rosa_log is moved, delete oldest record
-	if rosakb >= 16.0: # 64 kb, and then move it to records
-	# if rosakb >= 64.0: # 64 kb, and then move it to records
+	if rosakb >= 64.0: # 64 kb, and then move it to records
 		if rosa_records.resolve().exists():
 			if rosa_records.is_file():
 				logger.error(f"there is a file named rosa_records where a logging record should be; abandoning")
@@ -133,7 +137,6 @@ def doit_urself():
 	else:
 		logger.info('rosa.log: [ok]')
 
-
 def mini_ps(args, nomix): # (operations)
 	"""
 	Mini-parser for arguments/flags passed to the scripts. Starts timer & announces 
@@ -163,18 +166,16 @@ def mini_ps(args, nomix): # (operations)
 	logger.debug(f"[rosa]{nomix} executed & timer started")
 	return logger, force, prints, start
 
-
-def counter(start, nomic):
+def counter(start, nomix):
 	"""Counts diff between end and start for timing functions."""
 	if start:
 		end = time.perf_counter()
 		duration = end - start
 		if duration > 60:
 			duration_minutes = duration / 60
-			logger.info(f"time [in minutes] for rosa {nomic}: {duration_minutes:.3f}")
+			logger.info(f"time [in minutes] for rosa {nomix}: {duration_minutes:.3f}")
 		else:
-			logger.info(f"time [in seconds] for rosa {nomic}: {duration:.3f}")
-
+			logger.info(f"time [in seconds] for rosa {nomix}: {duration:.3f}")
 
 def finale(nomix, start, prints):
 	"""Wraps up each files' execution & logging statements."""

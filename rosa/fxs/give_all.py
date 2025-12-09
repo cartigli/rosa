@@ -3,25 +3,15 @@ import sys
 import time
 from pathlib import Path
 
-from tqdm import tqdm # this does not belong here
-from tqdm.contrib.logging import logging_redirect_tqdm
-
-# if __name__=="__main__":
-#     cd = Path(__file__).resolve().parent.parent
-#     if str(cd) not in sys.path:
-#         sys.path.insert(0, str(cd))
-
-from rosa.confs.config import *
-
-from rosa.lib.opps import mini_ps, counter
-from rosa.lib.dispatch import phones, confirm
-from rosa.lib.analyst import scope_rem, ping_cass
-from rosa.lib.technician import collect_info, collect_data, upload_dirs, upload_created
+from rosa.confs import *
+from rosa.lib import phones, scope_rem, ping_cass, collect_info, collect_data, upload_dirs, upload_created, confirm, mini_ps, counter, finale, _collector_
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
 upload/update all files with hash discrepancies, and delete files not found locally but existing in server. Delete from the list
 of directories if not found locally, and add new ones.
+Doesn't use differ so nothing is ever given in dictionary format.
+Doesn't have or use cherubs, stags, souls, gates, or ledeux.
 """
 
 NOMIC = "[give][all]"
@@ -43,14 +33,12 @@ def scraper():
             if item.is_file():
                 frp = item.relative_to(abs_path).as_posix()
 
-                serpents.append(frp)
+                serpents.append((frp,))
 
             elif item.is_dir():
                 drp = item.relative_to(abs_path).as_posix()
 
-                caves.append({
-                    'drp':drp
-                }) # keep the empty list of dirs
+                caves.append((drp,))
     
     return serpents, caves, abs_path
 
@@ -75,16 +63,17 @@ def main(args=None):
                         upload_dirs(conn, caves) # upload local-only[s] to server
 
                     if serpents:
+                        key = "new_file"
                         logger.info('uploading local-only file[s]...')
 
-                        with logging_redirect_tqdm(loggers=[logger]): # tqdm method
-                            with tqdm(collect_info(serpents, abs_path), unit="batches", leave=False) as pbar:
+                        _collector_(conn, serpents, abs_path, key)
 
-                                for batch in pbar:
-                                    serpent_data = collect_data(batch, abs_path)
-
-                                    if serpent_data:
-                                        upload_created(conn, serpent_data)
+                        # with logging_redirect_tqdm(loggers=[logger]): # tqdm method
+                        #     with tqdm(collect_info(serpents, abs_path), unit="batches", leave=False) as pbar:
+                        #         for batch in pbar:
+                        #             serpent_data = collect_data(batch, abs_path)
+                        #             if serpent_data:
+                        #                 upload_created(conn, serpent_data)
 
                     counter(start, NOMIC)
 

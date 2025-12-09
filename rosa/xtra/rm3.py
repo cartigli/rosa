@@ -12,7 +12,7 @@ import xxhash
 
 from rosa.confs.config import *
 
-LOCAL_DIR = "/Volumes/HomeXx/compuir/texts11"
+# LOCAL_DIR = "/Volumes/HomeXx/compuir/texts9"
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -99,7 +99,7 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 		return conn
 
 
-def main():
+def self_destruct():
     local_dir = LOCAL_DIR
 
     print(f"{RED}[rm3] executed{RESET}")
@@ -119,8 +119,8 @@ def main():
                         continue # skip item if blkd item in path
                     else:
                         # # counts files
-                        # if item.is_file():
-                        #     item_no += 1
+                        if item.is_file():
+                            item_no += 1
 
                         # # removes empty directories
                         # if item.is_dir():
@@ -133,27 +133,30 @@ def main():
                         #     if files == 0:
                         #         shutil.rmtree(item)
 
-                        # hash alter-er [1 in 777] & file delete-r [1 in 8]
-                        if item.is_file():
-                            item_no += 1
-                            if item_no % 137 == 0:
-                                content = item.read_bytes()
-                                hasher.reset()
-                                hasher.update(content)
-                                before = hasher.digest()
-                                with open(item, 'a', encoding='utf-8') as f:
-                                    f.write("hello, world")
-                                a_content = item.read_bytes()
-                                hasher.reset()
-                                hasher.update(a_content)
-                                after = hasher.digest()
-                                if before == after:
-                                    print("WE FUCKD UP")
-                                else:
-                                    print(f"{RED}we fuckd that one up (good){RESET}")
-                            elif item_no % 4 == 0: # deletes abt 98% of files in a 17300 ish file directory
+                        # # hash alter-er [1 in 777] & file delete-r [1 in 8]
+                        # if item.is_file():
+                        #     item_no += 1
+                        #     if item_no % 1387 == 0:
+                        #         content = item.read_bytes()
+                        #         hasher.reset()
+                        #         hasher.update(content)
+                        #         before = hasher.digest()
+                        #         with open(item, 'a', encoding='utf-8') as f:
+                        #             f.write("hello, world")
+                        #         a_content = item.read_bytes()
+                        #         hasher.reset()
+                        #         hasher.update(a_content)
+                        #         after = hasher.digest()
+                        #         if before == after:
+                        #             print("WE FUCKD UP")
+                        #         else:
+                        #             print(f"{RED}we fuckd that one up (good){RESET}")
+                            if item_no % 2595 == 0: # deletes abt 98% of files in a 17300 ish file directory
                                 item.unlink()
                                 print(f"{RED}deleted a file{RESET}")
+                            # # renamer
+                            # elif item_no % 3248 == 0:
+                            #     item.rename(str(item_no))
 
                         # # removes remote files
                         # if item.is_file():
@@ -180,9 +183,19 @@ def main():
                         #     dir_no += 1
                         #     if dir_no % 5 == 0:
                         #         shutil.rmtree(item)
-                        #         print('Deleted one directory.')
-                        # else:
-                        #     continue
+                        #         print(f"{RED}deleted one directory{RESET}")
+
+                        # if item.is_dir():
+                        #     dir_no += 1
+                        #     if dir_no % 317 == 0:
+                        #         # item.rename(str(item_no))
+                        #         dirp = item.parent
+                        #         subprocess.run(["mv", f"{item}", f"{dirp}/{item_no}" ])
+
+                        #         # shutil.rmtree(item)
+                        #         print(f"{RED}deleted one directory{RESET}")
+                        else:
+                            continue
 
         else:
             logger.info('Local directory does not exist; repair the config or run "rosa get all".')
@@ -203,4 +216,4 @@ def main():
 
 if __name__=="__main__":
     logger = logging.getLogger('rosa.log')
-    main()
+    self_destruct()

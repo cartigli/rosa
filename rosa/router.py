@@ -13,19 +13,19 @@ def init(args):
 	init.main(args)
 
 def diff(args):
-	from rosa.fxs import contrast
-	contrast.main(args)
+	from rosa.fxs import diff
+	diff.main(args)
 
 def get_all(args):
 	from rosa.fxs import get_all
 	get_all.main(args)
 
 def few(args):
-	from rosa.add_xtra import get_surg
+	from rosa._xtra import get_surg
 	get_surg.main(args)
 
 def moment(args):
-	from rosa.add_extra import rosa_get_moment
+	from rosa._extra import rosa_get_moment
 	rosa_get_moment.main(args)
 
 def give_all(args):
@@ -34,7 +34,7 @@ def give_all(args):
 
 def test(args):
 	# print('Hello, world.')
-	from rosa.add_extra import contrast_two
+	from rosa._extra import contrast_two
 	contrast_two.main(args)
 
 rosa = {
@@ -137,8 +137,7 @@ def main():
 	args = ops.parse_args()
 	args.func(args)
 
-
-# def ex_main():
+# def ex_main(): # OLD PARSING INITIATION
 # 	ps = argparse.ArgumentParser()
 # 	sp = ps.add_subparsers(dest='rosa', required=True)
 # 	# SHALLOWS

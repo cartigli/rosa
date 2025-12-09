@@ -4,17 +4,13 @@ import time
 import logging
 from pathlib import Path
 
-# if __name__=="__main__":
-#     cd = Path(__file__).resolve().parent.parent
-#     if str(cd) not in sys.path:
-#         sys.path.insert(0, str(cd))
-
-from rosa.confs.config import *
-from rosa.lib.analyst import diffr
-from rosa.lib.opps import finale, doit_urself, mini_ps, counter
+from rosa.confs import *
+from rosa.lib import diffr, phones, finale, doit_urself, mini_ps, counter
 
 """
 Compare local data to server, report back.
+
+Takes the files / directories out of their dictionaries to present them, but uses dictionary to its advantage.
 """
 
 NOMIX = "[diff]"
@@ -39,11 +35,14 @@ def ask_to_share(diff_data, force):
 
                 if decis0 in ('yes', 'y', ' y', 'y ', 'ye', 'yeah','sure'):
                     c = []
+                    [c.append(item) for item in i["details"]]
 
-                    if dict_key == "frp":
-                        [c.append(item["frp"]) for item in i["details"]]
-                    else:
-                        [c.append(item["drp"]) for item in i["details"]]
+                    # if dict_key == "frp":
+                    #     [c.append(item) for item in i["details"]]
+                    #     # [c.append(item["frp"]) for item in i["details"]]
+                    # else:
+                    #     [c.append(item) for item in i["details"]]
+                        # [c.append(item["drp"]) for item in i["details"]]
 
                     [formatted.append(f"\n{item}") for item in c]
                     logger.info(f".../{title} ({descr}):\n{''.join(formatted)}")
@@ -53,46 +52,43 @@ def ask_to_share(diff_data, force):
                 else:
                     logger.info('ok, freak')
 
-
 def main(args=None):
     logger, force, prints, start = mini_ps(args, NOMIX)
-    data, diff = diffr()
-    # logger = mini[0]
-    # force = mini[1]
-    # prints = mini[2]
-    # start = mini[3]
-    if diff is True:
-        remote_only = data[0][0]
-        deltas = data[0][1]
-        nodiffs = data[0][2]
-        local_only = data[0][3]
+    
+    with phones() as conn:
+        data, diff = diffr(conn)
 
-        remote_only_directories = data[1][0]
-        local_only_directories = data[1][1]
-        ledeux = data[1][2]
+        if conn and conn.is_connected():
+            conn.close()
+
+    if diff is True:
+        file_data, dir_data = data
+
+        remote_only_files, altered_files, unchanged_files, local_only_files = file_data
+        remote_only_directories, local_only_directories, unchanged_directories = dir_data
 
         diff_data = []
 
         diff_data.append(
-            {
-                "type": "remote_only", 
-                "details": remote_only, 
+            { # CHERUBS
+                "type": "remote_only_files", 
+                "details": remote_only_files, # still a list of dicts at this point
                 "message": "file[s] that only exist in server", 
                 "key": "frp"
             }
         )
         diff_data.append(
-            {
-                "type": "local_only", 
-                "details": local_only, 
+            { # SERPENTS
+                "type": "local_only_files", 
+                "details": local_only_files, # ditto here
                 "message": "local-only file[s]", 
                 "key": "frp"
             }
         )
         diff_data.append(
-            {
-                "type": "deltas", 
-                "details": deltas, 
+            { #
+                "type": "altered_files", 
+                "details": altered_files, # and here
                 "message": "file[s] with hash discrepancies", 
                 "key": "frp"
             }
@@ -101,7 +97,7 @@ def main(args=None):
         diff_data.append(
             {
                 "type": "remote only directory[s]", 
-                "details": remote_only_directories, 
+                "details": remote_only_directories, # ...
                 "message": "directory[s] that only exist in the server", 
                 "key": "drp"
             }
@@ -109,7 +105,7 @@ def main(args=None):
         diff_data.append(
             {
                 "type": "local_only_directory", 
-                "details": local_only_directories, 
+                "details": local_only_directories, # finally, here too
                 "message": "directory[s] that are local only", 
                 "key": "drp"
             }
@@ -122,8 +118,8 @@ def main(args=None):
         t_deltas = 0
         unchanged = 0
         
-        t_deltas += len(remote_only) + len(local_only) + len(deltas)
-        unchanged += len(nodiffs)
+        t_deltas += len(remote_only_files) + len(local_only_files) + len(altered_files)
+        unchanged += len(unchanged_files)
         tot += unchanged + t_deltas
 
         fratio = (t_deltas / tot)*100
@@ -134,7 +130,7 @@ def main(args=None):
         unchangedd = 0
         
         d_deltas += len(remote_only_directories) + len(local_only_directories)
-        unchangedd += len(ledeux)
+        unchangedd += len(unchanged_directories)
         d_tot += unchangedd + d_deltas
 
         dratio = (d_deltas / d_tot)*100
@@ -156,11 +152,6 @@ def main(args=None):
                 logger.info(f"{dratio:.4f} % of files are unaltered [verified by hash]")
 
     finale(NOMIX, start, prints) # ops
-    # doit_urself()
-    # counter(start, NOMIX)
-    # logger.info('[diff] completed') # these three
-    # if prints is True:
-    #     print('All set.')
 
 if __name__=="__main__":
     main()

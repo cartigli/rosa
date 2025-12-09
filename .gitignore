@@ -10,8 +10,7 @@ abilities/rosa_records/
 abilities/
 abilities/__pycache__/
 abilities/config.py
-abilities/__init__.py
 add_extra/config.py
 add_extra/__pycache__/
-__init__.py
+_rosa_records/
 build/

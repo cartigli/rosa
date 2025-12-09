@@ -1,64 +1,44 @@
 import logging
 from pathlib import Path
 
-import xxhash # can be replaced w.native hashlib
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
 import mysql.connector # to connect with the mysql server
+import xxhash # can be replaced w.native hashlib
 
-from rosa.confs.config import MAX_ALLOWED_PACKET, RED, RESET
+from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET
 
 """
 Counter-component to contractor: editing and uploading to the server. 
-Slightly more complicated than downloading, hence the name: 'technician'.
+Slightly more complicated than downloading, hence the name.
+
+[functions]
+rm_remdir(conn, gates),
+rm_rem_file(conn, cherubs),
+collect_info(dicts_, _abs_path),
+collect_data(dicts_, _abs_path),
+upload_dirs(conn, caves),
+upload_created(conn, serpent_data),
+upload_edited(conn, soul_data)
 """
 
 logger = logging.getLogger('rosa.log')
 
 # EDIT SERVER
 
-def rm_remdir(conn, gates): # only give 3.0
-	"""Remove remote-only directories from the server."""
-	logger.debug('...deleting remote-only drectory[s] from server...')
-	g = "DELETE FROM directories WHERE drp = %(drp)s;"
+def _collector_(conn, _list, abs_path, key):
 
-	with conn.cursor() as cursor:
-		try:
-			cursor.executemany(g, gates)
+	with tqdm_(loggers=[logger]):
+		with tqdm(collect_info(_list, abs_path)) as pbar:
 
-		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}error encountered when trying to delete directory[s] from server:{RESET} {c}.", exc_info=True)
-			raise
-		else:
-			logger.debug('removed remote-only directory[s] from server w.o exception')
+			for batch in pbar:
+				batch_data = collect_data(batch, abs_path)
+				if batch_data:
 
-def rm_remfile(conn, cherubs): # only give 3.0
-	"""Remove remote-only files from the server. Paths [cherubs] passed as a list of dictionaries for executemany()."""
-	logger.debug('...deleting remote-only file[s] from server...')
-	f = "DELETE FROM notes WHERE frp = %(frp)s;"
-
-	with conn.cursor() as cursor:
-		try:
-			cursor.executemany(f, cherubs)
-
-		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}err encountered when trying to delete file[s] from server:{RESET} {c}", exc_info=True)
-			raise
-		else:
-			logger.debug('removed remote-only file[s] from server w.o exception')
-
-
-# def upload_afbatches(lists, abs_path, conn): 
-# 	"""Cleaner and legible-r."""
-# 	batches = collect_info(lists, abs_path)
-
-# 	with tqdm(batches) as pbar:
-# 		for batch in pbar:
-# 			batch_data = collect_data(batch, abs_path, conn)
-# 			upload_created(conn, batch_data)
-
-# 	# for batch in batches:
-# 	# 	batch_data = collect_data(batch, abs_path, conn)
-# 	# 	upload_created(conn, batch_data)
-
+					if key == "new_file":
+						upload_created(conn, batch_data)
+					elif key == "altered_file":
+						upload_edited(conn, batch_data)
 
 
 def collect_info(dicts_, _abs_path): # give - a
@@ -79,10 +59,9 @@ def collect_info(dicts_, _abs_path): # give - a
 	
 	for i in dicts_:
 		size = 0
-		item = ( abs_path / i )
+		item = Path( abs_path / i[0] ) # [tuple management]
 
-		size = i.stat().st_size
-		# size = os.path.getsize(item) 
+		size = item.stat().st_size
 
 		if size > MAX_ALLOWED_PACKET:
 			logger.error(f"{RED}a single file is larger than the maximum packet size allowed:{RESET} {item}")
@@ -119,8 +98,8 @@ def collect_data(dicts_, _abs_path): # lol why would this need conn
 	hasher = xxhash.xxh64()
 
 	for tupled_batch in dicts_:
-		for paths in tupled_batch:
-			item = ( abs_path / paths ).resolve()
+		for path in tupled_batch:
+			item = ( abs_path / path[0] ).resolve() # [tuple management]
 			hasher.reset()
 
 			content = item.read_bytes()
@@ -129,14 +108,49 @@ def collect_data(dicts_, _abs_path): # lol why would this need conn
 			hasher.update(content)
 			hash_id = hasher.digest()
 
-			item_data.append((content, hash_id, paths))
+			item_data.append((content, hash_id, path[0])) # [tuple management]
 
 	return item_data
+
+# UPLOAD THE COLLECTED
+
+def rm_remdir(conn, gates):
+	"""Remove remote-only directories from the server."""
+	logger.debug('...deleting remote-only drectory[s] from server...')
+	g = "DELETE FROM directories WHERE drp = %s;"
+	# g = "DELETE FROM directories WHERE drp = %(drp)s;"
+
+	with conn.cursor() as cursor:
+		try:
+			cursor.executemany(g, gates)
+
+		except (mysql.connector.Error, ConnectionError, Exception) as c:
+			logger.error(f"{RED}error encountered when trying to delete directory[s] from server:{RESET} {c}.", exc_info=True)
+			raise
+		else:
+			logger.debug('removed remote-only directory[s] from server w.o exception')
+
+def rm_remfile(conn, cherubs):
+	"""Remove remote-only files from the server. Paths [cherubs] passed as a list of dictionaries for executemany()."""
+	logger.debug('...deleting remote-only file[s] from server...')
+	f = "DELETE FROM notes WHERE frp = %s;"
+	# f = "DELETE FROM notes WHERE frp = %(frp)s;"
+
+	with conn.cursor() as cursor:
+		try:
+			cursor.executemany(f, cherubs)
+
+		except (mysql.connector.Error, ConnectionError, Exception) as c:
+			logger.error(f"{RED}err encountered when trying to delete file[s] from server:{RESET} {c}", exc_info=True)
+			raise
+		else:
+			logger.debug('removed remote-only file[s] from server w.o exception')
 
 def upload_dirs(conn, caves): # give
 	"""Insert into the directories table any local-only directories found. DML so executemany()."""
 	# logger.debug('...uploading local-only directory[s] to server...')
-	h = "INSERT INTO directories (drp) VALUES (%(drp)s);"
+	h = "INSERT INTO directories (drp) VALUES (%s);"
+	# h = "INSERT INTO directories (drp) VALUES (%(drp)s);"
 	with conn.cursor() as cursor:
 		try:
 			cursor.executemany(h, caves)
@@ -176,75 +190,5 @@ def upload_edited(conn, soul_data): # only give 3.0
 	except (mysql.connector.Error, ConnectionError, Exception) as c:
 		logger.error(f"err encountered while attempting to upload altered file to server:{RESET} {c}", exc_info=True)
 		raise
-	# else:
 	# 	logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
-
-
-# USER INPUT & DYNAMIC ASSESSMENT[2]
-
-
-# def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
-# 	"""Get the average row size of the notes table to estimate optimal batch size for downloading. ASSESS2 is 1/100 the speed of ASSESS"""
-# 	batch_size = 5 # default
-# 	row_size = 10 # don't divide by 0
-
-# 	with conn.cursor() as cursor:
-# 		try:
-# 			cursor.execute(ASSESS2)
-# 			row_size = cursor.fetchone()
-
-# 		except (ConnectionError, TimeoutError, Exception) as c:
-# 			logger.error(f"err encountered while attempting to find avg_row_size: {c}", exc_info=True)
-# 			raise
-# 		else:
-# 			if row_size and row_size[0]:
-# 				try:
-# 					batch_size = max(1, int((0.94*MAX_ALLOWED_PACKET) / row_size[0]))
-
-# 				except ZeroDivisionError:
-# 					logger.warning("returned row_size was 0, can't divide by 0! returning default batch_sz")
-# 					return batch_size, row_size
-# 				else:
-# 					logger.debug(f"batch size: {batch_size}")
-# 					return batch_size, row_size
-# 			else:
-# 				logger.warning("ASSESS2 returned nothing usable, returning default batch size")
-# 				return batch_size, row_size
-
-
-# def confirm(conn, force=False): # to dispatch? or could be to opps?
-# 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
-# 	if force is True:
-# 		try:
-# 			logger.debug('forcing commit...')
-# 			conn.commit()
-# 		except (mysql.connector.Error, ConnectionError, Exception) as c:
-# 			logger.error(f"{RED}err encountered while attempting to --force commit to server:{RESET} {c}", exc_info=True)
-# 			raise
-# 		else:
-# 			logger.info('--forced commit to server')
-# 	else:
-
-# 		confirm = input("commit changes to server? y/n: ").lower()
-# 		if confirm in ('y', ' y', 'y ', ' y ', 'yes', 'yeah', 'i guess', 'i suppose'):
-# 			try:
-# 				conn.commit()
-
-# 			except (mysql.connector.Error, ConnectionError, Exception) as c:
-# 				logger.error(f"{RED}err encountered while attempting to commit changes to server:{RESET} {c}", exc_info=True)
-# 				raise
-# 			else:
-# 				logger.info('commited changes to server')
-
-# 		elif confirm in ('n', ' n', 'n ', ' n ', 'no', 'nope', 'hell no', 'naw'):
-# 			try:
-# 				conn.rollback()
-
-# 			except (mysql.connector.Error, ConnectionError, Exception) as c:
-# 				logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
-# 				raise
-# 			else:
-# 				logger.info('changes rolled back')
-# 		else:
-# 			logger.error('unknown response; rolling server back')
-# 			raise
+	# else:

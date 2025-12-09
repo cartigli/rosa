@@ -5,14 +5,22 @@ from pathlib import Path
 
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
-import xxhash # can be replaced with hashlib
 import mysql.connector
+import xxhash # can be replaced with hashlib
 
-from rosa.confs.config import LOCAL_DIR, RED, RESET
+from rosa.confs import LOCAL_DIR, RED, RESET
 
 """
 Assesses the state of the local directory, does the same for the server, and compares 
 the two. [ diffr() ] is an engine for all three steps. It is used by: [get, give, & diff].
+
+[functions]
+scope_loc(local_dir),
+scope_rem(conn), ping_cass(conn), and ping_rem(conn),
+hash_loc(raw_paths, abs_path),
+contrast(remote_raw, local_raw),
+compare(heaven_dirs, hell_dirs),
+diffr(conn)
 """
 
 logger = logging.getLogger('rosa.log')
@@ -80,9 +88,7 @@ def hash_loc(raw_paths, abs_path):
 
 	return raw_hell
 
-
-# COLLECTING SERVER DATA
-
+# COLLECTING REMOTE DATA [AND SOME]
 
 def scope_rem(conn): # thinking all fx's that use conn to do _ w.the server should be together in a file (except most of technician & contractor's downloads because they are specialties of those scripts]
 	"""
@@ -168,31 +174,44 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 	path to 'look up' the files' hash and identifies files whose hashes' were unequal.
 	Remote, local, and unverified files get output as a list of dictionaries for mysql_connector formatting, uploading, or updating.
 	"""
-	remote = {file_path: hash_id for file_path, hash_id in remote_raw}
-	local = {file_path: hash_id for file_path, hash_id in local_raw}
+	remote = {file_path: hash_id for file_path, hash_id in remote_raw} # map each file to its hash in a dictionary
+	local = {file_path: hash_id for file_path, hash_id in local_raw} # makes comparison easier
 
-	remote_files = set(remote.keys())
-	local_files = set(local.keys())
+	remote_files = set(remote.keys()) # get a set of the keys() in the dictionaries
+	local_files = set(local.keys()) # which are just both sets of files' relative paths
 
-	remote_only = [{'frp':cherub} for cherub in remote_files - local_files] # get - cherubs as a dict: 'frp'
-	local_only = [{'frp':serpent} for serpent in local_files - remote_files]
+	remote_only = [((cherub,)) for cherub in remote_files - local_files] # will have to double check that tuples are needed here
+	local_only = [((serpent,)) for serpent in local_files - remote_files]
 
-	both = remote_files & local_files # those in both - unaltered
+	# TUPLED 
+	# remote_only = [(cherub,) for cherub in remote_files - local_files] # will have to double check that tuples are needed here
+	# local_only = [(serpent,) for serpent in local_files - remote_files]
+	both = remote_files & local_files # those in both (people) # unchanged from original
+
+	# remote_only = [{'frp':cherub} for cherub in remote_files - local_files] # remote-only (cherubs) # original
+	# local_only = [{'frp':serpent} for serpent in local_files - remote_files] # local-only (serpents)
 
 	logger.debug(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
 
 	deltas = []
 	nodiffs = []
 
-	for file_path in both:
-		if local.get(file_path) == remote.get(file_path):
-			nodiffs.append(file_path)
+	for rel_path in both:
+		if local.get(rel_path) == remote.get(rel_path):
+			nodiffs.append((rel_path,)) # unchanged, hash verified
 		else:
-			deltas.append({'frp': file_path})
+			deltas.append((rel_path,))
+
+	# for file_path in both:
+	# 	if local.get(file_path) == remote.get(file_path):
+	# 		nodiffs.append(file_path) # unchanged, present in both (stags)
+	# 	else:
+	# 		deltas.append({'frp': file_path}) # transient, like water, buddy (souls)
 
 	logger.debug(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
 
-	return remote_only, deltas, nodiffs, local_only # files in server but not present, files present not in server, files in both, files in both but with hash discrepancies
+	return remote_only, deltas, nodiffs, local_only
+
 
 def compare(heaven_dirs, hell_dirs): # all
 	"""
@@ -202,72 +221,77 @@ def compare(heaven_dirs, hell_dirs): # all
 	heaven = set(heaven_dirs)
 	hell = set(hell_dirs)
 
-	gates = [{'drp':gate[0]} for gate in heaven - hell]
-	caves = [{'drp':cave[0]} for cave in hell - heaven]
+	gates = [((gate[0],)) for gate in heaven - hell]
+	caves = [((cave[0],)) for cave in hell - heaven]
 
-	ledeux = heaven & hell
+	# gates = [{'drp':gate[0]} for gate in heaven - hell] # remote-only (gates)
+	# caves = [{'drp':cave[0]} for cave in hell - heaven] # local-only (caves)
+
+	ledeux = heaven & hell # present in both (ledeux)
 
 	logger.debug(f"found {len(gates)} gates [server-only], {len(caves)} caves [local-only], and {len(ledeux)} ledeux's [found in both]")
 
 	logger.debug('compared directories & id\'d discrepancies')
 	return gates, caves, ledeux # dirs in heaven not found locally, dirs found locally not in heaven
 
-def diffr():
+
+def diffr(conn): # requires conn as argument so phones doesn't need to be imported
 	"""
 	[get], [give], and [diff] use this as their main fx. It was being repeated across many files and moved here for uniformity across the scripts.
 	Having nomix passed to it makes the logging much cleaner and much clearer. Only weird thing is mini_ps() needs to be imported here, so this
 	file will likely receive additional fx's or this fx will be moved, TBD. Sike, this design sucks, too weird to follow and not worth the trouble.
 	"""
-	from rosa.lib.dispatch import phones
-
 	diff = False
 	data = ([], [])
 
-	with phones() as conn:
-		logger.info('conn is connected; pinging heaven...')
-		try:
-			logger.info('...pinging heaven...')
-			raw_heaven = scope_rem(conn)
+	logger.info('conn is connected; pinging heaven...')
+	try:
+		logger.info('...pinging heaven...')
+		raw_heaven = scope_rem(conn)
 
-			logger.info('...pinging cass...')
-			heaven_dirs = ping_cass(conn)
+		logger.info('...pinging cass...')
+		heaven_dirs = ping_cass(conn)
 
-			if any((raw_heaven, heaven_dirs)):
-				logger.info('confirmed data was returned from heaven; processing...')
-				raw_paths, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
+		if any((raw_heaven, heaven_dirs)):
+			logger.info('confirmed data was returned from heaven; processing...')
+			raw_paths, hell_dirs, abs_path = scope_loc(LOCAL_DIR)
 
-				if any(raw_paths):
-					logger.info('...data returned from local directory; hashing file[s] found...')
-					raw_hell = hash_loc(raw_paths, abs_path)
+			if any(raw_paths):
+				logger.info('...data returned from local directory; hashing file[s] found...')
+				raw_hell = hash_loc(raw_paths, abs_path)
 
-					# logger.info("file[s] hashed; proceeding to compare & contrast...")
+				# logger.info("file[s] hashed; proceeding to compare & contrast...")
 
-					logger.info('contrasting file[s]...')
-					remote_only, deltas, nodiffs, local_only = contrast(raw_heaven, raw_hell)
+				logger.info('contrasting file[s]...')
+				remote_only, deltas, nodiffs, local_only = contrast(raw_heaven, raw_hell)
 
-					logger.info('comparing directory[s]...')
-					gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
+				logger.info('comparing directory[s]...')
+				gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
 
-					if any((remote_only, local_only, deltas, gates, caves)):
-						diff = True
-						logger.info('discrepancies discovered')
+				discoveries = ((remote_only, local_only, deltas, gates, caves))
 
-						file_data = [remote_only, deltas, nodiffs, local_only]
-						dir_data = [gates, caves, ledeux]
-						data = (file_data, dir_data)
+				for returns in discoveries: # quick assert
+					assert all(isinstance(returned, tuple) for returned in returns)
 
-					else:
-						logger.info('no diff!')
+				if any(discoveries):
+					diff = True
+					logger.info('discrepancies discovered')
+
+					file_data = remote_only, deltas, nodiffs, local_only
+					dir_data = gates, caves, ledeux
+					data = file_data, dir_data
+
 				else:
-					logger.error(f"no paths returned from scan of {abs_path}. does it have any files?")
-					sys.exit(1)
+					logger.info('no diff!')
 			else:
-				logger.info('no heaven data; have you uploaded?')
+				logger.error(f"no paths returned from scan of {abs_path}. does it have any files?")
 				sys.exit(1)
-
-		except (ConnectionError, KeyboardInterrupt, Exception) as e:
-			logger.error(f"{RED}err caught while diff'ing directories:{RESET} {e}.", exc_info=True)
+		else:
+			logger.info('no heaven data; have you uploaded?')
 			sys.exit(1)
 
-	return data, diff #, mini
+	except (ConnectionError, KeyboardInterrupt, Exception) as e:
+		logger.error(f"{RED}err caught while diff'ing directories:{RESET} {e}.", exc_info=True)
+		sys.exit(1)
 
+	return data, diff #, mini
