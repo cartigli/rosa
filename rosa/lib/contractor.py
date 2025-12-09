@@ -25,13 +25,13 @@ of functions, and lack of conciseness, especially in the error handling.
 fat_boy(_abs_path),
 (contextmanager)
 sfat_boy(abs_path),
-_lil_guy(abs_path, backup, tmp_),
+_lil_guy(abs_path, backup, tmpd),
 shutil_fx(dir_),
 configure(abs_path),
-apply_atomicy(tmp_, abs_path, backup),
-save_people(people, backup, tmp_),
-download_batches5(souls, conn, batch_size, row_size, tmp_),
-wr_batches(data, tmp_),
+apply_atomicy(tmpd, abs_path, backup),
+save_people(people, backup, tmpd),
+download_batches5(souls, conn, batch_size, row_size, tmpd),
+wr_batches(data, tmpd),
 mk_rrdir(raw_directories, abs_path)
 """
 
@@ -45,39 +45,39 @@ def fat_boy(_abs_path):
 	Context manager for temporary directory and backup. Takes over if error 
 	is caught or occurs while downloading & writing to disk. Fairly aggressive.
 	"""
-	tmp_ = None # ORIGINAL
+	tmpd = None # ORIGINAL
 	backup = None
 
 	abs_path = Path(_abs_path)
 	try:
 
-		tmp_, backup = configure(abs_path)
-		if tmp_ and backup:
+		tmpd, backup = configure(abs_path)
+		if tmpd and backup:
 
-			logger.debug(f"fat boy made {tmp_} and {backup}; yielding...")
-			yield tmp_, backup # return these & freeze in place
+			logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
+			yield tmpd, backup # return these & freeze in place
 
 	except KeyboardInterrupt as e:
 		logger.warning('boss killed it; wrap it up')
-		_lil_guy(abs_path, backup, tmp_)
+		_lil_guy(abs_path, backup, tmpd)
 		sys.exit(0)
 
 	except (FileNotFoundError, PermissionError, Exception) as e:
 		logger.error(f"{RED}err caught while backup & temporary directories:{RESET} {e}.", exc_info=True)
-		_lil_guy(abs_path, backup, tmp_)
+		_lil_guy(abs_path, backup, tmpd)
 		sys.exit(1)
 	else:
 		try:
-			apply_atomicy(tmp_, abs_path, backup)
+			apply_atomicy(tmpd, abs_path, backup)
 
 		except KeyboardInterrupt as c:
 			logger.warning('boss killed it; wrap it up')
-			_lil_guy(abs_path, backup, tmp_)
+			_lil_guy(abs_path, backup, tmpd)
 			sys.exit(0)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}err encountered while attempting to apply atomicy: {c}.", exc_info=True)
-			_lil_guy(abs_path, backup, tmp_)
+			_lil_guy(abs_path, backup, tmpd)
 			sys.exit(1)
 		else:
 			logger.debug("fat boy finished w.o exception")
@@ -87,39 +87,39 @@ def sfat_boy(_abs_path):
 	"""
 	Context manager for the get_all because there is nothing to backup.
 	"""
-	tmp_ = Path(_abs_path)
+	tmpd = Path(_abs_path)
 
 	try:
-		if tmp_:
-			if tmp_.is_dir():
+		if tmpd:
+			if tmpd.is_dir():
 				pass
 			else:
-				tmp_.mkdir(parents=True, exist_ok=True)
+				tmpd.mkdir(parents=True, exist_ok=True)
 
-			logger.debug(f"fat boy made {tmp_}; yielding...")
-			yield tmp_ # return these & freeze in place
+			logger.debug(f"fat boy made {tmpd}; yielding...")
+			yield tmpd # return these & freeze in place
 
 	except KeyboardInterrupt as e:
 		logger.warning('boss killed it; wrap it up')
-		shutil_fx(tmp_)
+		shutil_fx(tmpd)
 		sys.exit(0)
 	except (mysql.connector.Error, ConnectionError, Exception) as e:
 		logger.error(f"{RED}err encountered while attempting atomic wr:{RESET} {e}", exc_info=True)
-		shutil_fx(tmp_)
+		shutil_fx(tmpd)
 		sys.exit(1)
 	else:
 		logger.info('sfat_boy caught no exeptions while writing_all')
 
-def _lil_guy(abs_path, backup, tmp_):
+def _lil_guy(abs_path, backup, tmpd):
 	"""Handles recovery on error for the context manager fat_boy (don't have to rewrite it for every error caught)."""
 	try:
 		if backup and backup.exists():
-			if tmp_ and tmp_.exists():
-				shutil_fx(tmp_)
+			if tmpd and tmpd.exists():
+				shutil_fx(tmpd)
 				backup.rename(abs_path)
 				logger.warning("moved backup back to original location & deleted the temporary directory")
-		elif tmp_ and tmp_.exists():
-			shutil_fx(tmp_)
+		elif tmpd and tmpd.exists():
+			shutil_fx(tmpd)
 			logger.warning(f"_lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
 		else:
 			logger.debug('_lil_guy called on error but no directories to recover were found')
@@ -189,12 +189,12 @@ def configure(abs_path): # raise err & say 'run get all or fix config's director
 		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
 		sys.exit(1)
 
-def apply_atomicy(tmp_, abs_path, backup):
+def apply_atomicy(tmpd, abs_path, backup):
 	"""If the download and write batches functions both complete entirely w.o error, this function moved the _tmp directory back to the original abs_path. 
 	If this completes w.o error, the backup is deleted.
 	"""
 	try:
-		tmp_.rename(abs_path)
+		tmpd.rename(abs_path)
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		logger.critical(f"{RED}exception encountered while attempting atomic write:{RESET} {e}.", exc_info=True)
@@ -205,22 +205,22 @@ def apply_atomicy(tmp_, abs_path, backup):
 
 # WRITING TO DISK
 
-def save_people(people, backup, tmp_):
+def save_people(people, backup, tmpd):
 	"""Hard-links unchanged files present in the server and locally from the backup directory (original) 
 	to the _tmp directory. Huge advantage over copying because the file doesn't need to move."""
 	with tqdm_(loggers=[logger]):
 		with tqdm(people, unit="hard-links", leave=True) as pbar:
 			for person in pbar:
 				try:
-					curr = Path( backup / person ) # x[tuple management]
-					tmpd = Path( tmp_ / person ) # x[tuple management]
+					curr = Path( backup / person )
+					tmpd = Path( tmpd / person )
 
 					tmpd.hardlink_to(curr)
 
 				except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
 					raise
 
-def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggressive )
+def download_batches5(souls, conn, batch_size, row_size, tmpd): # get_all ( aggressive )
 	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
 	dictionaries from contrast and makes them into queries for the given file[s]. *Executemany() cannot be used with SELECT; it is for DML quries only.
 	This function passes the found data to the wr_data function, which writes the new data structure to the disk.
@@ -228,8 +228,6 @@ def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggr
 	above this one, which is the WORST and only used by one ex_fxs, but this is due to procrastination. 
 	Using Offset/Limit with 100,000+ files was a terrible idea and needs to be completely removed. 
 	"""
-	# souls = [soul[0] for soul in xsouls] # x[tuple management]
-
 	batch_count = int(len(souls) / batch_size)
 	if len(souls) % batch_size:
 		batch_count += 1
@@ -266,8 +264,7 @@ def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggr
 							cursor.execute(query, bunch)
 							batch = cursor.fetchall()							
 							if batch:
-								# logger.debug('...passing batch to wr_batches...')
-								wr_batches(batch, tmp_)
+								wr_batches(batch, tmpd)
 
 								pbar.set_postfix_str(f"{spd_str}")
 
@@ -297,13 +294,13 @@ def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggr
 	else:
 		logger.debug('atomic wr w.batched download completed w.o exception')
 
-def wr_batches(data, tmp_):
+def wr_batches(data, tmpd):
 	"""Writes each batch to the _tmp directory as they are pulled. Each file has it and its parent directory flushed from memory for assurance of atomicy."""
 	# logger.debug('...writing batch to disk...')
 	# dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh
 	try:
 		for frp, content in data:
-			t_path = Path ( tmp_ / frp ) #.resolve()
+			t_path = Path ( tmpd / frp ) #.resolve()
 			(t_path.parent).mkdir(parents=True, exist_ok=True)
 
 			# d_content = dcmpr.decompress(content)

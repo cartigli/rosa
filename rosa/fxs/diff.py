@@ -63,7 +63,7 @@ def main(args=None):
         diff_data.append(
             { # CHERUBS
                 "type": "remote_only_files", 
-                "details": remote_only_files, # still a list of dicts at this point
+                "details": remote_only_files,
                 "message": "file[s] that only exist in server", 
                 "key": "frp"
             }
@@ -71,7 +71,7 @@ def main(args=None):
         diff_data.append(
             { # SERPENTS
                 "type": "local_only_files", 
-                "details": local_only_files, # ditto here
+                "details": local_only_files,
                 "message": "local-only file[s]", 
                 "key": "frp"
             }
@@ -79,7 +79,7 @@ def main(args=None):
         diff_data.append(
             { # SOULS
                 "type": "altered_files", 
-                "details": altered_files, # and here
+                "details": altered_files,
                 "message": "file[s] with hash discrepancies", 
                 "key": "frp"
             }
@@ -88,7 +88,7 @@ def main(args=None):
         diff_data.append(
             { # GATES
                 "type": "remote only directory[s]", 
-                "details": remote_only_directories, # ...
+                "details": remote_only_directories,
                 "message": "directory[s] that only exist in the server", 
                 "key": "drp"
             }
@@ -96,7 +96,7 @@ def main(args=None):
         diff_data.append(
             { # CAVES
                 "type": "local_only_directory", 
-                "details": local_only_directories, # finally, here too
+                "details": local_only_directories,
                 "message": "directory[s] that are local only", 
                 "key": "drp"
             }

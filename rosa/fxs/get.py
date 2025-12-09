@@ -26,7 +26,6 @@ def main(args=None):
         cherubs, souls, stags, serpents = file_data
         gates, caves, ledeux = dir_data
 
-        # try: # phones covers this 
         with phones() as conn:
             batch_size, row_size = calc_batch(conn)
             logger.info('batch size returned')

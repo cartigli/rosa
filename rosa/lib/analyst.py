@@ -90,7 +90,7 @@ def hash_loc(raw_paths, abs_path):
 
 # COLLECTING REMOTE DATA [AND SOME]
 
-def scope_rem(conn): # thinking all fx's that use conn to do _ w.the server should be together in a file (except most of technician & contractor's downloads because they are specialties of those scripts]
+def scope_rem(conn):
 	"""
 	Select and return every single relative path and hash from the 
 	notes table. Returned as a list of tuples: (rel_path, hash_id).
@@ -181,9 +181,6 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 	remote_only = remote_files - local_files
 	local_only = local_files - remote_files
 
-	# remote_only = [((cherub,)) for cherub in remote_files - local_files] # will have to double check that tuples are needed here
-	# local_only = [((serpent,)) for serpent in local_files - remote_files]
-
 	both = remote_files & local_files # those in both (people) # unchanged from original
 
 	logger.debug(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
@@ -196,18 +193,6 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 			nodiffs.append(rel_path) # unchanged, hash verified
 		else:
 			deltas.append(rel_path)
-
-	# for rel_path in both:
-	# 	if local.get(rel_path) == remote.get(rel_path):
-	# 		nodiffs.append((rel_path,)) # unchanged, hash verified
-	# 	else:
-	# 		deltas.append((rel_path,))
-
-	# for file_path in both:
-	# 	if local.get(file_path) == remote.get(file_path):
-	# 		nodiffs.append(file_path) # unchanged, present in both (stags)
-	# 	else:
-	# 		deltas.append({'frp': file_path}) # transient, like water, buddy (souls)
 
 	logger.debug(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
 
@@ -254,8 +239,6 @@ def diffr(conn): # requires conn as argument so phones doesn't need to be import
 				logger.info('...data returned from local directory; hashing file[s] found...')
 				raw_hell = hash_loc(raw_paths, abs_path)
 
-				# logger.info("file[s] hashed; proceeding to compare & contrast...")
-
 				logger.info('contrasting file[s]...')
 				remote_only, deltas, nodiffs, local_only = contrast(raw_heaven, raw_hell)
 
@@ -263,9 +246,6 @@ def diffr(conn): # requires conn as argument so phones doesn't need to be import
 				gates, caves, ledeux = compare(heaven_dirs, hell_dirs)
 
 				discoveries = ((remote_only, local_only, deltas, gates, caves))
-
-				# for returns in discoveries: # quick assert
-				# 	assert all(isinstance(returned, tuple) for returned in returns)
 
 				if any(discoveries):
 					diff = True

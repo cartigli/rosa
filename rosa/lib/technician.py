@@ -59,7 +59,7 @@ def collect_info(dicts_, _abs_path): # give - a
 	
 	for i in dicts_:
 		size = 0
-		item = Path( abs_path / i ) # x[tuple management]
+		item = Path( abs_path / i )
 
 		size = item.stat().st_size
 
@@ -99,7 +99,7 @@ def collect_data(dicts_, _abs_path): # lol why would this need conn
 
 	for tupled_batch in dicts_:
 		for path in tupled_batch:
-			item = ( abs_path / path ).resolve() # x[tuple management]
+			item = ( abs_path / path ).resolve()
 			hasher.reset()
 
 			content = item.read_bytes()
@@ -108,7 +108,7 @@ def collect_data(dicts_, _abs_path): # lol why would this need conn
 			hasher.update(content)
 			hash_id = hasher.digest()
 
-			item_data.append((content, hash_id, path)) # x[tuple management]
+			item_data.append((content, hash_id, path))
 
 	return item_data
 

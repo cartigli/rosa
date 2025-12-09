@@ -30,11 +30,8 @@ def main(args=None):
         gates, caves, ledeux = dir_data
 
         with phones() as conn:
-            # try: # phones() already catches this KeyboardInterrupt
             if gates:
                 logger.info('removing remote-only directory[s] from server...')
-
-                # gates_ = [(item['drp'],) for item in gates]
 
                 rm_remdir(conn, gates) # delete remote-only[s] from server
 
@@ -42,8 +39,6 @@ def main(args=None):
                 # when uploading to server, order of when to upload new directory[s] is not as sensitive 
                 # as rosa_get is when writing to disk (writing a file require's its parent to exist)
                 logger.info('uploading local-only directory[s] to server...')
-
-                # caves_ = [(item['drp'],) for item in caves]
 
                 upload_dirs(conn, caves) # upload local-only[s] to server
 

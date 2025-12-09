@@ -54,9 +54,6 @@ def phones():
 	except (ConnectionRefusedError, TimeoutError, Exception) as e:
 		logger.error(f"error encountered while connecting to the server:{RESET} {e}.", exc_info=True)
 		_safety(conn)
-	# except:
-	# 	logger.critical('uncaught exception found by phones; abandoning & rolling back')
-	# 	_safety(conn)
 	else:
 		logger.debug('phones executed w.o exception')
 	finally:
@@ -126,25 +123,6 @@ def _safety(conn):
 		logger.warning('connection lost; relying on autocommit=False (reconnection would be fruitless)')
 		return
 
-	# 	# except (mysql.connector.Error, ConnectionRefusedError, TimeoutError, BrokenPipeError) as cre:
-	# 		logger.error(f"{RED}_safety caught an error while rolling back, will try reconnecting now{RESET}")
-	# 		if conn:
-	# 			conn.ping(reconnect=True, attempts=3, delay=1)
-	# 			if conn and conn.is_connected():
-	# 				conn.rollback()
-	# 				logger.warning('conn is connnected & server rolled back (after caught exception & reconnection)')
-	# 			else:
-	# 				logger.warning('could not ping server; abandoning')
-	# 				sys.exit(1)
-	# 		else:
-	# 			logger.warning('conn object completely lost; abandoning')
-	# 			sys.exit(1)
-	# 	else:
-	# 		logger.warning('_safety recovered w.o exception')
-	# else:
-	# 	logger.warning('couldn\'t rollback due to faulty connection; abandoning')
-	# 	sys.exit(1)
-
 def confirm(conn, force=False): # to dispatch? or could be to opps?
 	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
 	if force is True:
@@ -169,15 +147,7 @@ def confirm(conn, force=False): # to dispatch? or could be to opps?
 				logger.info('commited changes to server')
 
 		elif confirm in ('n', ' n', 'n ', ' n ', 'no', 'nope', 'hell no', 'naw'):
-			# try:
-				# conn.rollback()
 			_safety(conn)
-
-			# except (mysql.connector.Error, ConnectionError, Exception) as c:
-			# 	logger.error(f"{RED}err encountered while attempting to rollback changes to server:{RESET} {c}", exc_info=True)
-			# 	raise
-			# else:
-			# 	logger.info('changes rolled back')
 		else:
 			logger.error('unknown response; rolling server back')
 			raise
