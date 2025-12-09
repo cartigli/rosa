@@ -14,8 +14,6 @@ import mysql.connector # only for error codes in this file
 from rosa.confs import ASSESS2
 from rosa.confs import LOCAL_DIR, MAX_ALLOWED_PACKET, RED, RESET
 
-logger = logging.getLogger('rosa.log')
-
 """
 Handles all the functions for downloading and writing data to the disk. [ fat_boy() ] is a key contextmanager that handles recovery 
 on error. [ download_batches() ] is the most efficient downloader and writer, but it is not used by get_all due to formatting.
@@ -37,7 +35,7 @@ wr_batches(data, tmp_),
 mk_rrdir(raw_directories, abs_path)
 """
 
-# logger = logging.getLogger('rosa.log')
+logger = logging.getLogger('rosa.log')
 
 # SETUP EDITOR FOR LOCAL DISK
 
@@ -214,15 +212,15 @@ def save_people(people, backup, tmp_):
 		with tqdm(people, unit="hard-links", leave=True) as pbar:
 			for person in pbar:
 				try:
-					curr = Path( backup / person[0] ) # [tuple management]
-					tmpd = Path( tmp_ / person[0] ) # [tuple management]
+					curr = Path( backup / person ) # x[tuple management]
+					tmpd = Path( tmp_ / person ) # x[tuple management]
 
 					tmpd.hardlink_to(curr)
 
 				except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
 					raise
 
-def download_batches5(xsouls, conn, batch_size, row_size, tmp_): # get_all ( aggressive )
+def download_batches5(souls, conn, batch_size, row_size, tmp_): # get_all ( aggressive )
 	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
 	dictionaries from contrast and makes them into queries for the given file[s]. *Executemany() cannot be used with SELECT; it is for DML quries only.
 	This function passes the found data to the wr_data function, which writes the new data structure to the disk.
@@ -230,7 +228,7 @@ def download_batches5(xsouls, conn, batch_size, row_size, tmp_): # get_all ( agg
 	above this one, which is the WORST and only used by one ex_fxs, but this is due to procrastination. 
 	Using Offset/Limit with 100,000+ files was a terrible idea and needs to be completely removed. 
 	"""
-	souls = [soul[0] for soul in xsouls] # [tuple management]
+	# souls = [soul[0] for soul in xsouls] # x[tuple management]
 
 	batch_count = int(len(souls) / batch_size)
 	if len(souls) % batch_size:

@@ -161,9 +161,7 @@ def ping_cass(conn): # tritto
 		else:
 			return heaven_dirs
 
-
 # COMPARING
-
 
 def contrast(remote_raw, local_raw): # unfiform for all scripts
 	"""
@@ -180,16 +178,13 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 	remote_files = set(remote.keys()) # get a set of the keys() in the dictionaries
 	local_files = set(local.keys()) # which are just both sets of files' relative paths
 
-	remote_only = [((cherub,)) for cherub in remote_files - local_files] # will have to double check that tuples are needed here
-	local_only = [((serpent,)) for serpent in local_files - remote_files]
+	remote_only = remote_files - local_files
+	local_only = local_files - remote_files
 
-	# TUPLED 
-	# remote_only = [(cherub,) for cherub in remote_files - local_files] # will have to double check that tuples are needed here
-	# local_only = [(serpent,) for serpent in local_files - remote_files]
+	# remote_only = [((cherub,)) for cherub in remote_files - local_files] # will have to double check that tuples are needed here
+	# local_only = [((serpent,)) for serpent in local_files - remote_files]
+
 	both = remote_files & local_files # those in both (people) # unchanged from original
-
-	# remote_only = [{'frp':cherub} for cherub in remote_files - local_files] # remote-only (cherubs) # original
-	# local_only = [{'frp':serpent} for serpent in local_files - remote_files] # local-only (serpents)
 
 	logger.debug(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
 
@@ -198,9 +193,15 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 
 	for rel_path in both:
 		if local.get(rel_path) == remote.get(rel_path):
-			nodiffs.append((rel_path,)) # unchanged, hash verified
+			nodiffs.append(rel_path) # unchanged, hash verified
 		else:
-			deltas.append((rel_path,))
+			deltas.append(rel_path)
+
+	# for rel_path in both:
+	# 	if local.get(rel_path) == remote.get(rel_path):
+	# 		nodiffs.append((rel_path,)) # unchanged, hash verified
+	# 	else:
+	# 		deltas.append((rel_path,))
 
 	# for file_path in both:
 	# 	if local.get(file_path) == remote.get(file_path):
@@ -221,17 +222,12 @@ def compare(heaven_dirs, hell_dirs): # all
 	heaven = set(heaven_dirs)
 	hell = set(hell_dirs)
 
-	gates = [((gate[0],)) for gate in heaven - hell]
+	gates = [((gate[0],)) for gate in heaven - hell] # used by both so tuple format is useful
 	caves = [((cave[0],)) for cave in hell - heaven]
-
-	# gates = [{'drp':gate[0]} for gate in heaven - hell] # remote-only (gates)
-	# caves = [{'drp':cave[0]} for cave in hell - heaven] # local-only (caves)
 
 	ledeux = heaven & hell # present in both (ledeux)
 
 	logger.debug(f"found {len(gates)} gates [server-only], {len(caves)} caves [local-only], and {len(ledeux)} ledeux's [found in both]")
-
-	logger.debug('compared directories & id\'d discrepancies')
 	return gates, caves, ledeux # dirs in heaven not found locally, dirs found locally not in heaven
 
 
@@ -243,8 +239,6 @@ def diffr(conn): # requires conn as argument so phones doesn't need to be import
 	"""
 	diff = False
 	data = ([], [])
-
-	logger.info('conn is connected; pinging heaven...')
 	try:
 		logger.info('...pinging heaven...')
 		raw_heaven = scope_rem(conn)
@@ -270,8 +264,8 @@ def diffr(conn): # requires conn as argument so phones doesn't need to be import
 
 				discoveries = ((remote_only, local_only, deltas, gates, caves))
 
-				for returns in discoveries: # quick assert
-					assert all(isinstance(returned, tuple) for returned in returns)
+				# for returns in discoveries: # quick assert
+				# 	assert all(isinstance(returned, tuple) for returned in returns)
 
 				if any(discoveries):
 					diff = True
@@ -291,7 +285,7 @@ def diffr(conn): # requires conn as argument so phones doesn't need to be import
 			sys.exit(1)
 
 	except (ConnectionError, KeyboardInterrupt, Exception) as e:
-		logger.error(f"{RED}err caught while diff'ing directories:{RESET} {e}.", exc_info=True)
+		logger.error(f"{RED}err caught while diff'ing data:{RESET} {e}.", exc_info=True)
 		sys.exit(1)
 
 	return data, diff #, mini

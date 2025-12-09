@@ -20,15 +20,11 @@ Helper for executing the queries for:
 Asks to user to confirm before committing to the server, just like rosa_give.
 """
 
+logger = logging.getLogger('rosa.log')
+
 NOMIC = "[init]"
 
-def log():
-    logger = logging.getLogger('rosa.log')
-    return logger
-
 def table_helper(conn, force=False):
-    logger = log()
-
     if force is True:
         return
 
@@ -89,8 +85,6 @@ def table_helper(conn, force=False):
             logger.info('no selection made')
 
 def trigger_helper(conn, force=False):
-    logger = log()
-
     if force is True:
         return
     else:
@@ -148,8 +142,6 @@ def trigger_helper(conn, force=False):
                     logger.info('couldn\'t catch that')
 
 def force_initiation(conn, force=False):
-    logger = log()
-
     if force is True:
         force_init_cmds = [INITIATION, EDIT_TRIGGER, DELETE_TRIGGER]
 
@@ -168,6 +160,7 @@ def force_initiation(conn, force=False):
                     logger.info('forced database initiation w.o exception')
     else:
         return
+
 
 def main(args=None):
     logger, force, prints, start = mini_ps(args, NOMIC)

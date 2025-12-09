@@ -12,19 +12,12 @@ from rosa.lib import phones, ping_rem, ping_cass, download_batches5, calc_batch,
 Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
 server, download/write all hash discrepancies, and delete all files not found in the server. Make parent directories if needed & 
 delete old ones.
-
-Doesn't diff, so no dictionaries. 
-Uses souls for downloading and heavenly_dirs raw.
 """
 
 NOMIC = "[get][all]"
 
-def log():
-    logger = logging.getLogger('rosa.log')
-    return logger
-
 def rm_origin(abs_path, force=False):
-    logger = log()
+    logger = logging.getLogger('rosa.log')
 
     if force is True:
         logger.info(f"staying silent & deleting {abs_path}.")
@@ -62,6 +55,7 @@ def rm_origin(abs_path, force=False):
                 abs_path.unlink()
                 logger.warning(f"{abs_path} was deleted from your disk.")
 
+
 def main(args=None):
     logger, force, prints, start = mini_ps(args, NOMIC)
 
@@ -76,7 +70,6 @@ def main(args=None):
             raw_heaven = ping_rem(conn) # raw remote files & hash_id's
 
             logger.info('raw heaven returned')
-            # souls = {s[0] for s in raw_heaven}
 
             heavenly_dirs = ping_cass(conn) # raw remote dirs' rpath's
             logger.info('heavenly dirs returned')
@@ -86,7 +79,6 @@ def main(args=None):
 
                 logger.info('getting batch size...')
                 batch_size, row_size = calc_batch(conn)
-                # logger.info('optimal batch size returned')
 
                 if heavenly_dirs:
                     logger.info('...downloading directories...')

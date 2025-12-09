@@ -27,17 +27,7 @@ def main(args=None):
         file_data, dir_data = data
 
         cherubs, souls, stags, serpents = file_data
-
         gates, caves, ledeux = dir_data
-
-        # cherubs = data[0][0]
-        # souls = data[0][1]
-        # stags = data[0][2]
-        # serpents = data[0][3]
-
-        # gates = data[1][0]
-        # caves = data[1][1]
-        # ledeux = data[1][2]
 
         with phones() as conn:
             # try: # phones() already catches this KeyboardInterrupt
@@ -61,19 +51,14 @@ def main(args=None):
             if cherubs: # now this file uses all lists for uploading files, no dictionaries
                 logger.info('removing remote-only file[s]...')
 
-                # cherubs_ = [(item['frp'],) for item in cherubs]
-
-                # cherub_params = [(cherub,) for cherub in cherubs]
+                cherub_params = [(cherub,) for cherub in cherubs]
 
                 rm_remfile(conn, cherub_params) # delete remote-only file[s]
-                # rm_remfile(conn, cherubs) # delete remote-only file[s]
 
             if souls:
                 key = "altered_file"
                 # create lists of files to upload based on their size & the MAX_ALLOWED_PACKET
                 logger.info('uploading altered file[s] to the server...')
-
-                # souls_ = [item['frp'] for item in souls]
 
                 _collector_(conn, souls, LOCAL_DIR, key) # REVISED; OFFLOADED
 
@@ -81,8 +66,6 @@ def main(args=None):
                 key = "new_file"
                 # twin to souls upload block
                 logger.info('uploading serpents to the server...')
-
-                # serpents_ = [item['frp'] for item in serpents]
 
                 _collector_(conn, serpents, LOCAL_DIR, key)
 

@@ -37,6 +37,10 @@ def test(args):
 	from rosa._extra import contrast_two
 	contrast_two.main(args)
 
+def rm(args):
+	from rosa.xtra import rm3
+	rm3.main(args)
+
 rosa = {
 	'get': {
 		'func': get, 
@@ -89,6 +93,10 @@ rosa = {
 	'test': {
 		'func': test, 
 		'name': 'test'
+	},
+	'rm': {
+		'func': rm,
+		'name': 'rm'
 	}
 }
 

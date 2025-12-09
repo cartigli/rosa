@@ -9,15 +9,12 @@ from rosa.lib import diffr, phones, finale, doit_urself, mini_ps, counter
 
 """
 Compare local data to server, report back.
-
-Takes the files / directories out of their dictionaries to present them, but uses dictionary to its advantage.
 """
 
 NOMIX = "[diff]"
 
-logger = logging.getLogger('rosa.log')
-
 def ask_to_share(diff_data, force):
+    logger = logging.getLogger('rosa.log')
     logger.info('discrepancy[s] found between the server and local data:')
 
     for i in diff_data:
@@ -37,13 +34,6 @@ def ask_to_share(diff_data, force):
                     c = []
                     [c.append(item) for item in i["details"]]
 
-                    # if dict_key == "frp":
-                    #     [c.append(item) for item in i["details"]]
-                    #     # [c.append(item["frp"]) for item in i["details"]]
-                    # else:
-                    #     [c.append(item) for item in i["details"]]
-                        # [c.append(item["drp"]) for item in i["details"]]
-
                     [formatted.append(f"\n{item}") for item in c]
                     logger.info(f".../{title} ({descr}):\n{''.join(formatted)}")
 
@@ -51,6 +41,7 @@ def ask_to_share(diff_data, force):
                     logger.info('heard')
                 else:
                     logger.info('ok, freak')
+
 
 def main(args=None):
     logger, force, prints, start = mini_ps(args, NOMIX)
@@ -86,7 +77,7 @@ def main(args=None):
             }
         )
         diff_data.append(
-            { #
+            { # SOULS
                 "type": "altered_files", 
                 "details": altered_files, # and here
                 "message": "file[s] with hash discrepancies", 
@@ -95,7 +86,7 @@ def main(args=None):
         )
 
         diff_data.append(
-            {
+            { # GATES
                 "type": "remote only directory[s]", 
                 "details": remote_only_directories, # ...
                 "message": "directory[s] that only exist in the server", 
@@ -103,7 +94,7 @@ def main(args=None):
             }
         )
         diff_data.append(
-            {
+            { # CAVES
                 "type": "local_only_directory", 
                 "details": local_only_directories, # finally, here too
                 "message": "directory[s] that are local only", 
@@ -151,7 +142,7 @@ def main(args=None):
             else:
                 logger.info(f"{dratio:.4f} % of files are unaltered [verified by hash]")
 
-    finale(NOMIX, start, prints) # ops
+    finale(NOMIX, start, prints)
 
 if __name__=="__main__":
     main()

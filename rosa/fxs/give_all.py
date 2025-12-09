@@ -42,6 +42,7 @@ def scraper():
     
     return serpents, caves, abs_path
 
+
 def main(args=None):
     logger, force, prints, start = mini_ps(args, NOMIC)
 
@@ -67,13 +68,6 @@ def main(args=None):
                         logger.info('uploading local-only file[s]...')
 
                         _collector_(conn, serpents, abs_path, key)
-
-                        # with logging_redirect_tqdm(loggers=[logger]): # tqdm method
-                        #     with tqdm(collect_info(serpents, abs_path), unit="batches", leave=False) as pbar:
-                        #         for batch in pbar:
-                        #             serpent_data = collect_data(batch, abs_path)
-                        #             if serpent_data:
-                        #                 upload_created(conn, serpent_data)
 
                     counter(start, NOMIC)
 

@@ -20,16 +20,7 @@ upload/update all files with hash discrepancies, and delete files not found loca
 of directories if not found locally, and add new ones.
 """
 
-# logger = logging.getLogger('rosa.log')
-
-XCONFIG = os.getenv('XCONFIG',
-            {
-    'user': 'root',
-    'pswd': 'koipo222',
-    'name': 'notation',
-    'addr': 'local_host'
-    }
-)
+logger = logging.getLogger('rosa.log')
 
 @contextlib.contextmanager
 def phones():
@@ -99,7 +90,7 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 		return conn
 
 
-def self_destruct():
+def main(args=None):
     local_dir = LOCAL_DIR
 
     print(f"{RED}[rm3] executed{RESET}")
@@ -216,4 +207,4 @@ def self_destruct():
 
 if __name__=="__main__":
     logger = logging.getLogger('rosa.log')
-    self_destruct()
+    main()
