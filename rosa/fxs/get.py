@@ -1,20 +1,32 @@
 #!/usr/bin/env python3
+"""Write the server's state to the disk.
+
+Make remote-only files/directories, 
+delete local-only files/directories, 
+and updated content for altered files. 
+Abandon if the server or local directory are empty.
+"""
+
 import sys
 import time
 from pathlib import Path
 
 from rosa.confs import *
-from rosa.lib import diffr, phones, calc_batch, fat_boy, download_batches5, mk_rrdir, save_people, mini_ps, counter, finale
-
-"""
-Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
-server, download/write all hash discrepancies, and delete all files not found in the server. Make parent directories if needed & 
-delete old ones.
-"""
+from rosa.lib import (
+    diffr, phones, calc_batch, fat_boy, 
+    download_batches5, mk_rrdir, 
+    save_people, mini_ps, finale
+)
 
 NOMIC = "[get]"
 
 def main(args=None):
+    """Forces the remote state onto the local disk. 
+    
+    Downloads/writes new and altered files to the disk. 
+    Removes files/directories not found in the server.
+    Quits if server or local directory is empty.
+    """
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
@@ -45,8 +57,6 @@ def main(args=None):
 
                     if gates: # gates removes dict formatting, serpents are ignored, and stags/ledeux never get dictionary format regardless
                         logger.info('writing new directory[s] to disk')
-                        # gates_ = [gate['frp'] for gate in gates]
-
                         mk_rrdir(gates, tmp_) # write directory heirarchy to tmp_ directory
                         # logger.info('new directory[s] [gates] written to disk')
 
@@ -55,15 +65,11 @@ def main(args=None):
 
                     if cherubs: # all the files use lists and no dictionaries here
                         logger.info('pulling cherubs...')
-                        # cherubs_ = [cherub['frp'] for cherub in cherubs]
-
                         download_batches5(cherubs, conn, batch_size, row_size, tmp_)
                         # handles pulling new file data, giving it batch by batch
 
                     if souls:
                         logger.info('pulling souls...')
-                        # souls_ = [soul['frp'] for soul in souls]
-
                         download_batches5(souls, conn, batch_size, row_size, tmp_)
                         # same here as w.cherubs but for altered file[s] (hash discrepancies)
 
@@ -78,11 +84,6 @@ def main(args=None):
             logger.info('fat boy closed')
         
         logger.debug('hung up phone')
-
-        # except KeyboardInterrupt as ko:
-        #     conn.close()
-        #     logger.warning('no edits have been made; irish goodbye')
-        #     sys.exit(0)
     
     finale(NOMIC, start, prints)
 

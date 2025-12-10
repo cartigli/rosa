@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
+"""Upload local state to the database.
+
+Upload local-only files/directories, 
+delete remote-only files/directories, 
+and update altered files. 
+Abandon if the server or local directory are empty.
+"""
+
 import sys
 import time
 from pathlib import Path
 
 from rosa.confs import *
-from rosa.lib import diffr, phones, collect_info, collect_data, upload_created, upload_edited, upload_dirs, rm_remfile, rm_remdir, confirm, mini_ps, counter, finale, _collector_
-
-"""
-Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
-upload/update all files with hash discrepancies, and delete files not found locally but existing in server. Delete from the list
-of directories if not found locally, and add new ones.
-Takes serpents and souls out of dictionary format, but not cherubs.
-Neither caves nor gates are taken out of their dictionaires.
-Ignored stags and ledeux.
-"""
+from rosa.lib import (
+    diffr, phones, upload_dirs, 
+    rm_remfile, rm_remdir, confirm, 
+    mini_ps, counter, finale, collector
+)
 
 NOMIC = "[give]"
 
 def main(args=None):
+    """Forces the local state onto the server. 
+    
+    Uploads new and altered files to the server. 
+    Removes files/directories not found locally.
+    Quits if server or local directory is empty.
+    """
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
@@ -32,37 +41,29 @@ def main(args=None):
         with phones() as conn:
             if gates:
                 logger.info('removing remote-only directory[s] from server...')
-
                 rm_remdir(conn, gates) # delete remote-only[s] from server
 
             if caves:
-                # when uploading to server, order of when to upload new directory[s] is not as sensitive 
-                # as rosa_get is when writing to disk (writing a file require's its parent to exist)
                 logger.info('uploading local-only directory[s] to server...')
-
                 upload_dirs(conn, caves) # upload local-only[s] to server
-
 
             if cherubs: # now this file uses all lists for uploading files, no dictionaries
                 logger.info('removing remote-only file[s]...')
 
                 cherub_params = [(cherub,) for cherub in cherubs]
-
                 rm_remfile(conn, cherub_params) # delete remote-only file[s]
 
             if souls:
                 key = "altered_file"
                 # create lists of files to upload based on their size & the MAX_ALLOWED_PACKET
                 logger.info('uploading altered file[s] to the server...')
-
-                _collector_(conn, souls, LOCAL_DIR, key) # REVISED; OFFLOADED
+                collector(conn, souls, LOCAL_DIR, key) # REVISED; OFFLOADED
 
             if serpents:
                 key = "new_file"
                 # twin to souls upload block
                 logger.info('uploading serpents to the server...')
-
-                _collector_(conn, serpents, LOCAL_DIR, key)
+                collector(conn, serpents, LOCAL_DIR, key)
 
             counter(start, NOMIC) # one before confirm so user input doesn't get timed
 

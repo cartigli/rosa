@@ -1,3 +1,12 @@
+"""Handles data on the disk.
+
+Configures directories for safe writing.
+Downloads data, creates directories, and writes files.
+Also deletes directories and files.
+Majority of the logic is for handling errors, and ensuring
+the original LOCAL_DIR is not altered on failure.
+"""
+
 import sys
 import time
 import shutil
@@ -11,29 +20,8 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
 import mysql.connector # only for error codes in this file
 
-from rosa.confs import ASSESS2
-from rosa.confs import LOCAL_DIR, MAX_ALLOWED_PACKET, RED, RESET
+from rosa.confs import RED, RESET
 
-"""
-Handles all the functions for downloading and writing data to the disk. [ fat_boy() ] is a key contextmanager that handles recovery 
-on error. [ download_batches() ] is the most efficient downloader and writer, but it is not used by get_all due to formatting.
-This lib file is fairly specific, it is simply long due to complex logic, iterations 
-of functions, and lack of conciseness, especially in the error handling.
-
-[functions]
-(contextmanager)
-fat_boy(_abs_path),
-(contextmanager)
-sfat_boy(abs_path),
-_lil_guy(abs_path, backup, tmpd),
-shutil_fx(dir_),
-configure(abs_path),
-apply_atomicy(tmpd, abs_path, backup),
-save_people(people, backup, tmpd),
-download_batches5(souls, conn, batch_size, row_size, tmpd),
-wr_batches(data, tmpd),
-mk_rrdir(raw_directories, abs_path)
-"""
 
 logger = logging.getLogger('rosa.log')
 
@@ -41,9 +29,16 @@ logger = logging.getLogger('rosa.log')
 
 @contextlib.contextmanager
 def fat_boy(_abs_path):
-	"""
-	Context manager for temporary directory and backup. Takes over if error 
-	is caught or occurs while downloading & writing to disk. Fairly aggressive.
+	"""Conext manager for the temporary directory and backup of original. 
+	
+	Takes over on error and ensures corrupted data is never kept.
+
+	Args:
+		abs_path (Path): Full path of the LOCAL_DIR from config.py
+	
+	Yields: 
+		tmpd (Path): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as LOCAL_DIR if not.
+		backup (Path): The original LOCAL_DIR after being renamed to a backup location/path. Renamed to LOCAL_DIR on error, deleted if not.
 	"""
 	tmpd = None # ORIGINAL
 	backup = None
@@ -84,8 +79,13 @@ def fat_boy(_abs_path):
 
 @contextlib.contextmanager
 def sfat_boy(_abs_path):
-	"""
-	Context manager for the get_all because there is nothing to backup.
+	"""Simplified context manager for rosa [get][all] because there is no original to backup.
+
+	Args:
+		abs_path (Path): Full path of the LOCAL_DIR from config.py
+	
+	Yields: 
+		tmpd: The temporary directory the new data is being downloaded and written to. Deleted on error.
 	"""
 	tmpd = Path(_abs_path)
 
@@ -111,7 +111,19 @@ def sfat_boy(_abs_path):
 		logger.info('sfat_boy caught no exeptions while writing_all')
 
 def _lil_guy(abs_path, backup, tmpd):
-	"""Handles recovery on error for the context manager fat_boy (don't have to rewrite it for every error caught)."""
+	"""Handles recovery if error occurs and is caught by fat_boy. 
+	
+	Mostly checking which directories exist at the time of the error, 
+	And deleting/renaming accordingly.
+
+	Args:
+		abs_path (Path): Full path of the LOCAL_DIR from config.py
+		backup (Path): Original LOCAL_DIR renamed to a backup location while downloading and writing.
+		tmpd (Path): Temporary directory made to hold the updated LOCAL_DIR. Renamed to LOCAL_DIR if succeeds, deleted if error is caught.
+	
+	Returns:
+		None
+	"""
 	try:
 		if backup and backup.exists():
 			if tmpd and tmpd.exists():
@@ -131,7 +143,17 @@ def _lil_guy(abs_path, backup, tmpd):
 		logger.info("_lil_guy's cleanup had no exceptions")
 
 def shutil_fx(dirx):
-	"""Handles the retry logic & check anytime a function needs to delete a directory (freaking silicon)"""
+	"""Handles deletion of directories. 
+	
+	Since shutil.rmtree() is inconsistent in macOS silicon, 
+	this offers basic retry logic if the directory exists after deletion, or similar.
+
+	Args:
+		dirx (Path): The directory to be removed.
+	
+	Returns:
+		None
+	"""
 	if dirx.exists() and dirx.is_dir():
 		try:
 			shutil.rmtree(dirx)
@@ -163,10 +185,21 @@ def shutil_fx(dirx):
 	if dirx.exists():
 		logger.warning(f"shutil_fx could not delete {dirx}")
 	else:
-		logging.debug(f"shutil_fx deleted {dirx}")
+		logger.debug(f"shutil_fx deleted {dirx}")
 
-def configure(abs_path): # raise err & say 'run get all or fix config's directory; there is no folder here'
-	"""Configure the temporary directory & move the original to a backup location. Returns the _tmp directory's path."""
+def configure(abs_path):
+	"""Configures the backup and creates the tmpd.
+
+	Renames the LOCAL_DIR as a temporary backup name.
+	Creates a temporary directory for keeping the backup clean.
+
+	Args:
+		abs_path (Path): Pathlib object of the LOCAL_DIR's full path.
+	
+	Returns:
+		tmpd (Path): New (empty) temporary directory.
+		backup (Path): LOCAL_DIR renamed to as a backup location/path.
+	"""
 	if abs_path.exists():
 		parent = abs_path.parent
 		try:
@@ -190,8 +223,18 @@ def configure(abs_path): # raise err & say 'run get all or fix config's director
 		sys.exit(1)
 
 def apply_atomicy(tmpd, abs_path, backup):
-	"""If the download and write batches functions both complete entirely w.o error, this function moved the _tmp directory back to the original abs_path. 
-	If this completes w.o error, the backup is deleted.
+	"""Cleans up the 'atomic' writing for fat_boy. 
+	
+	Only runs if no exceptions are caught by fat_boy. 
+	Renames tmpd as LOCAL_DIR & deletes original backup *if no errors occur/caught.
+
+	Args:
+		tmpd (Path): Temporary directory containing the updated directory.
+		abs_path (Path): Original path of the LOCAL_DIR [empty at this point].
+		backup (Path): Location/path the original LOCAL_DIR was moved to.
+	
+	Returns:
+		None
 	"""
 	try:
 		tmpd.rename(abs_path)
@@ -206,8 +249,21 @@ def apply_atomicy(tmpd, abs_path, backup):
 # WRITING TO DISK
 
 def save_people(people, backup, tmpd):
-	"""Hard-links unchanged files present in the server and locally from the backup directory (original) 
-	to the _tmp directory. Huge advantage over copying because the file doesn't need to move."""
+	"""Hard-links unchanges files from the original to the tmpd.
+
+	Takes the relative paths passed and builds two new ones for each directory.
+	Uses .hardlink_to() to make a 'hard-link' between the two directories.
+	Much faster than copying and effectively gets the files in both, 
+	without altering the backup or its contents AND letting them be deleted w.o concern.
+
+	Args:
+		people (list): List of relative paths of unchanged files.
+		backup (Path): Full path of the original LOCAL_DIR.
+		tmpd (Path): Full path of the temporary directory.
+	
+	Returns:
+		None
+	"""
 	with tqdm_(loggers=[logger]):
 		with tqdm(people, unit="hard-links", leave=True) as pbar:
 			for person in pbar:
@@ -221,12 +277,20 @@ def save_people(people, backup, tmpd):
 					raise
 
 def download_batches5(souls, conn, batch_size, row_size, tmpd): # get_all ( aggressive )
-	"""Executes the queries to find the content for the notes that do not exist locally, or whose contents do not exist locally. Takes the list of 
-	dictionaries from contrast and makes them into queries for the given file[s]. *Executemany() cannot be used with SELECT; it is for DML quries only.
-	This function passes the found data to the wr_data function, which writes the new data structure to the disk.
-	This was the fastest form of many I tested, but obviously multitudes faster than download_batches2() 
-	above this one, which is the WORST and only used by one ex_fxs, but this is due to procrastination. 
-	Using Offset/Limit with 100,000+ files was a terrible idea and needs to be completely removed. 
+	"""Manages the batched downloading and writing. 
+	
+	Used for [get] to download/write discrepancies, 
+	Used by [get][all] to download/write the entire directory.
+
+	Args:
+		souls (list): Relative paths found in the server.
+		conn: Connection object.
+		batch_size (int): A calculated value for the maximum size of a single batch.
+		row_size (single-element tuple): The server's average row_length (used to calculate batch's real size).
+		tmpd (Path): Target directory to write to.
+
+	Returns:
+		None
 	"""
 	batch_count = int(len(souls) / batch_size)
 	if len(souls) % batch_size:
@@ -262,26 +326,22 @@ def download_batches5(souls, conn, batch_size, row_size, tmpd): # get_all ( aggr
 							query = f"SELECT frp, content FROM notes WHERE frp IN ({inputs});"
 
 							cursor.execute(query, bunch)
-							batch = cursor.fetchall()							
+							batch = cursor.fetchall()
+
 							if batch:
 								wr_batches(batch, tmpd)
-
 								pbar.set_postfix_str(f"{spd_str}")
 
 						except KeyboardInterrupt as c:
-							pbar.leave = False
-							pbar.close()
+							logger.warning(f"{RED}boss killed it; deleting partial downlaod{RESET}")
 							try:
-								cursor.fetchall()
+								cursor.fetchall() # for UnreadResultError for mysql-connector
 								cursor.close()
 							except:
 								pass
-							logger.warning(f"{RED}boss killed it; deleting partial downlaod{RESET}")
 							raise
 						except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
 							logger.error(f"err while trying to downwrite data: {c}.", exc_info=True)
-							pbar.leave = False
-							pbar.close()
 							try:
 								cursor.fetchall()
 								cursor.close()
@@ -295,7 +355,17 @@ def download_batches5(souls, conn, batch_size, row_size, tmpd): # get_all ( aggr
 		logger.debug('atomic wr w.batched download completed w.o exception')
 
 def wr_batches(data, tmpd):
-	"""Writes each batch to the _tmp directory as they are pulled. Each file has it and its parent directory flushed from memory for assurance of atomicy."""
+	"""Writes each batch's data to the tmpd as they come. 
+	
+	Each files' parent is made if does not exist (faster than checking).
+
+	Args:
+		data (2-element tuple): Tupled list of pairs (relative paths, content).
+		tmpd (Path): Target directory to write to.
+
+	Returns:
+		None
+	"""
 	# logger.debug('...writing batch to disk...')
 	# dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh
 	try:
@@ -314,17 +384,23 @@ def wr_batches(data, tmpd):
 	# else:
 		# logger.debug('wrote batch w.o exception')
 
-def mk_rrdir(raw_directories, abs_path):
-	"""Takes the list of remote-only directories as dicts from contrast & writes them on the disk."""
+def mk_rrdir(raw_directories, tmpd):
+	"""Writes remote directories to the disk.
+
+	Args:
+		raw_directories (list): Single-item tuples (relative paths,) passed immediately from ping_cass().
+		tmpd (Path): Target directory to write the new directories to/in.
+	
+	Returns:
+		None
+	"""
 	logger.debug('...writing directory tree to disk...')
-
-	# directories = {dir_[0] for dir_ in raw_directories} # set comprehension? tf
-
+ 
 	with tqdm_(loggers=[logger]):
 		with tqdm(raw_directories, desc=f"Writing {len(raw_directories)} directories", unit="dirs") as pbar:
 			try:
 				for directory in pbar:
-					fdpath = Path(abs_path / directory[0] ).resolve() # [tuple management]
+					fdpath = Path(tmpd / directory[0] ).resolve() # directories remain in list of tuples
 					fdpath.mkdir(parents=True, exist_ok=True)
 
 			except (PermissionError, FileNotFoundError, Exception) as e:

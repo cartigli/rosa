@@ -1,40 +1,40 @@
+"""Assesses the states and compares contents.
+
+Scopes the local directory for hashes & paths.
+Queries the server for the same & compare result sets.
+If exist in both, compare their hashes. Return results.
+"""
+
 import sys
 import time
 import logging
+import datetime
 from pathlib import Path
 
+import xxhash # can be replaced with hashlib
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
-import mysql.connector
-import xxhash # can be replaced with hashlib
 
 from rosa.confs import LOCAL_DIR, RED, RESET
 
-"""
-Assesses the state of the local directory, does the same for the server, and compares 
-the two. [ diffr() ] is an engine for all three steps. It is used by: [get, give, & diff].
-
-[functions]
-scope_loc(local_dir),
-scope_rem(conn), ping_cass(conn), and ping_rem(conn),
-hash_loc(raw_paths, abs_path),
-contrast(remote_raw, local_raw),
-compare(heaven_dirs, hell_dirs),
-diffr(conn)
-"""
 
 logger = logging.getLogger('rosa.log')
 
 # COLLECTING LOCAL DATA
 
-def scope_loc(local_dir): # all
-	"""Collects the full paths of all files and the relative path of all directories from the given directory. The simplified blocking
-	logic just skips the item if its path has *any of the blocked items [config.py] within it. So if a file is in .git, it, and everything
-	else in there, will be ignored because their paths contain the blocked item. Same for files like .DS_Store, if the file has '.DS_Store'
-	anywhere in its path, it will be ignored. Returns the files' paths, directories' relative paths, and the directory's pathlib object.
-	*This used to also generate and then hex the hash, but hexing is no longer used & hashing logic is now segregated from file-searching.
+def scope_loc(local_dir):
+	"""Walks the given directory through and records all the files (full paths) and directories (relative paths).
+
+	Args:
+		local_dir: The LOCAL_DIR variable from config.py is usually passed here; full path of a directory on the local machine.
+	
+	Returns:
+		A 3-element tuple containing:
+			raw_paths (list): Every files' full path from the given directory.
+			hells_dirs (list): Single-element tuple of every sub-directories' relative path within the local_dir.
+			abs_path (Path): The LOCAL_DIR's full path.
 	"""
-	blk_list = ['.DS_Store', '.git', '.obsidian'] 
+	# blk_list = ['.DS_Store', '.git', '.obsidian'] # should be imported from the config.py file
 	abs_path = Path(local_dir).resolve()
 
 	raw_paths = []
@@ -64,12 +64,20 @@ def scope_loc(local_dir): # all
 	except KeyboardInterrupt as ko:
 		logger.warning("boss killed it; wrap it up")
 		sys.exit(0)
-
-	logger.debug('finished collecting local paths')
-	return raw_paths, hell_dirs, abs_path
+	else:
+		logger.debug('scoping of local directory completed')
+		return raw_paths, hell_dirs, abs_path
 
 def hash_loc(raw_paths, abs_path):
-	"""For every file, hash it and tuple it with the relative path."""
+	"""For every file, hash it, and tuple it with the relative path.
+	
+	Args:
+		raw_paths (list): Every files' full path (collected / passed from scope_loc().
+		abs_path (Path): LOCAL_DIR's full path as a Pathlib object.
+	
+	Returns:
+		raw_hell (list): Tupled (relative paths, hashes) for every file found in scope_loc().
+	"""
 	hasher = xxhash.xxh64()
 	raw_hell = []
 
@@ -80,20 +88,52 @@ def hash_loc(raw_paths, abs_path):
 			for item in pbar:
 				hasher.reset()
 				hasher.update(item.read_bytes())
-				hash_id = hasher.digest()
 
+				hash_id = hasher.digest()
 				frp = item.relative_to(abs_path).as_posix()
 
 				raw_hell.append((frp, hash_id))
 
 	return raw_hell
 
+def track_loc(raw_paths, abs_path):
+	"""For every file, hash it and tuple it with the files' st_mtime.
+	
+	Args:
+		raw_paths (list): Every files' full path (collected / passed from scope_loc().
+		abs_path (Path): LOCAL_DIR's full path as a Pathlib object.
+	
+	Returns:
+		raw_local_times (list): Tupled (relative paths, st_ctimes) for every file found in scope_loc().
+	"""
+	raw_local_times = []
+
+	logger.debug('...hashing...')
+
+	with tqdm_(loggers=[logger]):
+		with tqdm(raw_paths, unit="hashes", leave=True) as pbar:
+			for item in pbar:
+				dob = item.stat().st_ctime
+
+				dob_str = datetime.datetime.fromtimestamp(dob)
+				# dob_str = dob.strftime('%Y-%m-%D-%H:%M:%S')
+
+				frp = item.relative_to(abs_path).as_posix()
+
+				raw_local_times.append((frp, dob_str))
+
+	return raw_local_times
+
 # COLLECTING REMOTE DATA [AND SOME]
 
 def scope_rem(conn):
-	"""
-	Select and return every single relative path and hash from the 
-	notes table. Returned as a list of tuples: (rel_path, hash_id).
+	"""SELECTS every relative path and hash_id currently recorded in the table.
+
+	Args:
+		conn: Connection object.
+	
+	Returns:
+		raw_heaven (list): Tupled (relative paths, hash_ids) for every file recorded in the table.
 	"""
 	q = "SELECT frp, hash_id FROM notes;"
 
@@ -107,16 +147,20 @@ def scope_rem(conn):
 			else:
 				logger.warning("server returned raw_heaven as an empty set")
 
-		except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
+		except (ConnectionError, TimeoutError, Exception) as c:
 			logger.error(f"{RED}err while getting data from server:{RESET} {c}.", exc_info=True)
 			raise
 		else:
 			return raw_heaven
 
-def ping_rem(conn): # ditto
-	"""
-	Select and return every single files' relative path from the 
-	notes table. Returned as a list of single-item tuples: (frp,).
+def ping_rem(conn):
+	"""SELECTS every relative path currently recorded in the table.
+
+	Args:
+		conn: Connection object.
+	
+	Returns:
+		raw_heaven (list): Single-item tuples (relative paths,) for every file recorded in the table.
 	"""
 	q = "SELECT frp FROM notes;"
 
@@ -130,17 +174,47 @@ def ping_rem(conn): # ditto
 			else:
 				logger.warning("server returned raw_heaven as an empty set")
 
-		except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
+		except (ConnectionError, TimeoutError, Exception) as c:
 			logger.error(f"{RED}err while getting data from server:{RESET} {c}.", exc_info=True)
 			raise
 		else:
 			return raw_heaven
 
-def ping_cass(conn): # tritto
+def track_rem(conn):
+	"""SELECTS every file's time-of-last_edit currently recorded in the table.
+
+	Args:
+		conn: Connection object.
+
+	Returns:
+		raw_remote_times (list): Tupled (relative_paths, time-of-last_edits) for every file in the table.
 	"""
-	Ping the kid Cass because you just need a quick hand with the directories. If a directory is empty or contais only subdirectories and no 
-	files, Cass is the kid to clutch it. He returns a list of directories as tuples containing their relative paths. He solved a problem no 
-	longer present, but the function is still useful and implemented for assurance the directory tree is a 1:1 replica of the local directory.
+	q = "SELECT frp, tol_edit FROM notes;"
+
+	with conn.cursor() as cursor:
+		try:
+			logger.debug('...scoping remote files...')
+			cursor.execute(q)
+			raw_remote_times = cursor.fetchall()
+			if raw_remote_times:
+				logger.debug("server returned data from query")
+			else:
+				logger.warning("server returned raw_remote_times as an empty set")
+
+		except (ConnectionError, TimeoutError, Exception) as c:
+			logger.error(f"{RED}err while getting data from server:{RESET} {c}.", exc_info=True)
+			raise
+		else:
+			return raw_remote_times
+
+def ping_cass(conn):
+	"""SELECTS * (everything) from the directories table.
+
+	Args:
+		conn: Connection object.
+
+	Returns:
+		heaven_dirs (list): Single-item tuples (relative paths,) for every directory in the directories table.
 	"""
 	q = "SELECT * FROM directories;" # drp's
 
@@ -155,7 +229,7 @@ def ping_cass(conn): # tritto
 			else:
 				logger.warning("server returned heaven dirs as an empty set")
 
-		except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
+		except (ConnectionError, TimeoutError, Exception) as c:
 			logger.error(f"{RED}err encountered while attempting to collect directory data from server:{RESET} {c}.", exc_info=True)
 			raise
 		else:
@@ -163,14 +237,21 @@ def ping_cass(conn): # tritto
 
 # COMPARING
 
-def contrast(remote_raw, local_raw): # unfiform for all scripts
-	"""
-	Takes the raw tuples returned from scope_rem() & ping_cass(). There is an initial sorting of the paired items into a dictionary for the remote 
-	and local files, which makes comparison much easier. The initial comparison is done by pulling the .keys() from both dictionaries and finding which
-	files, if any, are missing from the server AND/OR the local directory. Remote-only files' relative path was not in the directory's set, and vice 
-	versa for the local-only files. For all the files' relative paths present in the server AND the local directory, the original dictionary uses their 
-	path to 'look up' the files' hash and identifies files whose hashes' were unequal.
-	Remote, local, and unverified files get output as a list of dictionaries for mysql_connector formatting, uploading, or updating.
+def contrast(remote_raw, local_raw):
+	"""Takes lists of tupled pairs (relative paths, hashes) for every file found locally and remotely, and compares them. 
+	
+	Uses sets for uniqueness & dictionaries for accuracy (paths as the keys because they are unique).
+
+	Args:
+		remote_raw (list): Tupled (relative file paths, hashes) from scope_rem().
+		local_raw (list): Tupled (relative file paths, hashes) from scope_loc() and hash_loc().
+
+	Returns:
+		A 4-element tuple containing:
+			remote_only (set): Relative paths found by subtracting remote_keys from local_keys
+			deltas (list): Files present in both (local_set & remote_set) but whose hashes were inequal.
+			nodiffs (list): Files present in both sets but whose hashes were equal.
+			local_only (set): Relative paths found by subtracting local_keys from remote_keys
 	"""
 	remote = {file_path: hash_id for file_path, hash_id in remote_raw} # map each file to its hash in a dictionary
 	local = {file_path: hash_id for file_path, hash_id in local_raw} # makes comparison easier
@@ -198,11 +279,18 @@ def contrast(remote_raw, local_raw): # unfiform for all scripts
 
 	return remote_only, deltas, nodiffs, local_only
 
+def compare(heaven_dirs, hell_dirs):
+	"""Take the lists of tupled-directories (relative_paths,) and compare their sets.
 
-def compare(heaven_dirs, hell_dirs): # all
-	"""
-	Makes a set of each list of directories and formats them each into a dictionary very similarly to contrast. It 
-	compares the differences and returns a list of remote-only and local-only directories as a list of dictionaries.
+	Args:
+		heaven_dirs (list): Single-item tuples containing their relative paths.
+		hell_dirs (list): Single-item tuples containing their relative paths.
+
+	Returns:
+		A 3-element tuple containing:
+			gates (list): Single-item tuples containing remote-only directories' relative paths.
+			caves (list): Single-item tuples containing local-only directories' relative paths.
+			ledeux (set): Directories' relative paths if present in the server & locally.
 	"""
 	heaven = set(heaven_dirs)
 	hell = set(hell_dirs)
@@ -215,12 +303,63 @@ def compare(heaven_dirs, hell_dirs): # all
 	logger.debug(f"found {len(gates)} gates [server-only], {len(caves)} caves [local-only], and {len(ledeux)} ledeux's [found in both]")
 	return gates, caves, ledeux # dirs in heaven not found locally, dirs found locally not in heaven
 
+def track(raw_remote_times, raw_local_times):
+	"""Takes the list of tuples (relative paths, edit-times) and compares them to identify timing differences and possible file discrepancies.
+
+	Args:
+		raw_remote_times (list): Tupled (relative paths, time-of-last_edits) for every file in the table.
+		raw_local_times (list): Tupled (relative paths, st_ctimes) for every file in the local directory.
+	
+	Returns:
+		None; purely logging output made from this assessment, no functionality incorporated.
+	"""
+	remote = {rel_path: tole for rel_path, tole in raw_remote_times}
+	local = {rel_path: ctime for rel_path, ctime in raw_local_times}
+
+	remotes = remote.keys()
+	locales = local.keys()
+
+	remote_only = remotes - locales
+	local_only = locales - remotes
+
+	ledeux = remotes & locales
+
+	logger.info(f"initial assessment revealed {len(remote_only)} remote only files, {len(local_only)} local only files, and {len(ledeux)} files in both places")
+
+	remote_mods = []
+	local_mods = []
+	nodiffs = []
+
+	for rel_path in ledeux:
+		if remote[rel_path] > local[rel_path]:
+			remote_mods.append(rel_path)
+		elif remote[rel_path] < local[rel_path]:
+			local_mods.append(rel_path)
+		else:
+			nodiffs.append(rel_path)
+	
+	if (len(remote_mods) + len(local_mods)) > 0:
+		logger.info(f"tracking times revealed {len(remote_mods)} (files with server updates not seen locally), {len(local_mods)} (unbacked up local changes), and {len(nodiffs)} (unchanged files (via ctime))")
+	else:
+		logger.info('timer detected no changes between the sources')
 
 def diffr(conn): # requires conn as argument so phones doesn't need to be imported
-	"""
-	[get], [give], and [diff] use this as their main fx. It was being repeated across many files and moved here for uniformity across the scripts.
-	Having nomix passed to it makes the logging much cleaner and much clearer. Only weird thing is mini_ps() needs to be imported here, so this
-	file will likely receive additional fx's or this fx will be moved, TBD. Sike, this design sucks, too weird to follow and not worth the trouble.
+	"""Main diff'ing engine. 
+	
+	Uses the connection and environment variables in config.py to assess changes and identify discrepancies.
+	Returns changes found as relative paths in lists of the specific change found; see Returns.
+
+	Args:
+		conn: Connection object.
+
+	Returns:
+		A 2-element tuple containing:
+			data (2-element tuple): Contains two tupled lists:
+				file_data (tuple): (remote_only (set), deltas (list), nodiffs (list), local_only(set))
+					containing relative paths of files, each identifying a type of discrepancy
+				dir_data (tuple): (remote_only (list), local_only (list), ledeux (set))
+					containing relative paths of directories, identified by the same.
+			diff (bool): Variable stating if discrepancies were discovered or not.
 	"""
 	diff = False
 	data = ([], [])
@@ -269,3 +408,19 @@ def diffr(conn): # requires conn as argument so phones doesn't need to be import
 		sys.exit(1)
 
 	return data, diff #, mini
+
+def timer(conn):
+	"""Test function to assess changes based on filesystem metadata (st_mtime/ctime).
+
+	Args:
+		conn: Connection object.
+	
+	Returns:
+		None
+	"""
+	raw_paths, hell_dirs, abs_path= scope_loc(LOCAL_DIR)
+	raw_local_times = track_loc(raw_paths, abs_path)
+
+	raw_remote_times = track_rem(conn)
+
+	track(raw_remote_times, raw_local_times)

@@ -1,8 +1,11 @@
+"""Environment file for getting queries as needed. Source of every query used for database configuration & management.
+
+[queries] INITIATION, EDIT_TRIGGER, DELETE_TRIGGER, ASSESS, ASSESS2, T_CHECK, TRIG_CHECK, TRUNC, DROP, SNAP, SNAP2
+"""
+
 import os
-"""
-[queries]
-INITIATION, EDIT_TRIGGER, DELETE_TRIGGER, ASSESS, ASSESS2, T_CHECK, TRIG_CHECK, TRUNC, DROP
-"""
+
+# INITIATION/CONFIGURATION OF THE DATABASE
 
 INITIATION = os.getenv("""INITIATION""","""
 CREATE TABLE IF NOT EXISTS directories(
@@ -89,67 +92,6 @@ END
 """
 )
 
-SNAP = os.getenv("""SNAP""","""
-SELECT n.frp,
-	COALESCE(de.content, n.content)
-FROM notes n 
-LEFT OUTER JOIN deltas de
-	ON de.id = n.id 
-		AND de.tstart < %s
-		AND de.tfinal > %s
-WHERE n.torigin < %s
-UNION ALL
-SELECT d.frp,
-	COALESCE(dd.content, d.content)
-FROM deleted d 
-LEFT OUTER JOIN dead_deltas dd 
-	ON dd.rmid = d.rmid
-		AND dd.tstart < %s
-		AND dd.tfinal > %s
-WHERE d.tfinal > %s;
-"""
-)
-
-SNAP2 = os.getenv("""SNAP""","""
-SELECT n.id,
-FROM notes n 
-LEFT OUTER JOIN deltas de
-	ON de.id = n.id 
-		AND de.tstart < %s
-		AND de.tfinal > %s
-WHERE n.torigin < %s
-UNION ALL
-SELECT d.id
-FROM deleted d 
-LEFT OUTER JOIN dead_deltas dd 
-	ON dd.rmid = d.rmid
-		AND dd.tstart < %s
-		AND dd.tfinal > %s
-WHERE d.tfinal > %s;
-"""
-)
-
-# SNAP = os.getenv("""SNAP""","""
-# SELECT n.frp,
-# 	COALESCE(de.content, n.content)
-# FROM notes n 
-# LEFT OUTER JOIN deltas de
-# 	ON de.id = n.id 
-# 		AND de.tstart < %(moment)s
-# 		AND de.tfinal > %(moment)s
-# WHERE n.torigin < %(moment)s
-# UNION ALL
-# SELECT d.frp,
-# 	COALESCE(dd.content, d.content)
-# FROM deleted d 
-# LEFT OUTER JOIN dead_deltas dd 
-# 	ON dd.rmid = d.rmid
-# 		AND dd.tstart < %(moment)s
-# 		AND dd.tfinal > %(moment)s
-# WHERE d.tfinal > %(moment)s;
-# """
-# )
-
 ASSESS = os.getenv("""ASSESS""","""
 SELECT AVG(OCTET_LENGTH(content)) FROM notation.notes;
 """
@@ -191,5 +133,47 @@ DROP TABLE deltas;
 DROP TABLE notes;
 DROP TABLE dead_deltas;
 DROP TABLE deleted;
+"""
+)
+
+# GET MOMENT
+
+SNAP = os.getenv("""SNAP""","""
+SELECT n.frp,
+	COALESCE(de.content, n.content)
+FROM notes n 
+LEFT OUTER JOIN deltas de
+	ON de.id = n.id 
+		AND de.tstart < %s
+		AND de.tfinal > %s
+WHERE n.torigin < %s
+UNION ALL
+SELECT d.frp,
+	COALESCE(dd.content, d.content)
+FROM deleted d 
+LEFT OUTER JOIN dead_deltas dd 
+	ON dd.rmid = d.rmid
+		AND dd.tstart < %s
+		AND dd.tfinal > %s
+WHERE d.tfinal > %s;
+"""
+)
+
+SNAP2 = os.getenv("""SNAP""","""
+SELECT n.id,
+FROM notes n 
+LEFT OUTER JOIN deltas de
+	ON de.id = n.id 
+		AND de.tstart < %s
+		AND de.tfinal > %s
+WHERE n.torigin < %s
+UNION ALL
+SELECT d.id
+FROM deleted d 
+LEFT OUTER JOIN dead_deltas dd 
+	ON dd.rmid = d.rmid
+		AND dd.tstart < %s
+		AND dd.tfinal > %s
+WHERE d.tfinal > %s;
 """
 )

@@ -1,19 +1,32 @@
 #!/usr/bin/env python3
+"""Compare local data to the server.
+
+If difference, format it and show the user.
+"""
+
 import sys
 import time
 import logging
 from pathlib import Path
 
 from rosa.confs import *
-from rosa.lib import diffr, phones, finale, doit_urself, mini_ps, counter
+from rosa.lib import (
+    diffr, phones, finale, 
+    mini_ps, timer
+)
 
-"""
-Compare local data to server, report back.
-"""
+NOMIC = "[diff]"
 
-NOMIX = "[diff]"
+def ask_to_share(diff_data, force=False):
+    """Asks the user if they would like to see the details of the discrepancies found (specific files/directories).
 
-def ask_to_share(diff_data, force):
+    Args:
+        diff_data (list): Dictionaries containing the details, description, and title of the given files/directories, based on how they were found.
+        force (=False): If passed, the function skips the ask-to-show and just prints the count as well as the title for any changes found. Defualt is false.
+    
+    Returns:
+        None
+    """
     logger = logging.getLogger('rosa.log')
     logger.info('discrepancy[s] found between the server and local data:')
 
@@ -42,9 +55,19 @@ def ask_to_share(diff_data, force):
                 else:
                     logger.info('ok, freak')
 
-
 def main(args=None):
-    logger, force, prints, start = mini_ps(args, NOMIX)
+    """Runs the diff'ing engine and formats the data before asking to show the user whatever is found. 
+    
+    Function ran the most often.
+    Using --force (-f) skips the ask-to-show.
+    If no changes, it does not try to show.
+    """
+    logger, force, prints, start = mini_ps(args, NOMIC)
+
+    with phones() as conn:
+        timer(conn)
+        if conn and conn.is_connected():
+            conn.close()
     
     with phones() as conn:
         data, diff = diffr(conn)
@@ -64,24 +87,24 @@ def main(args=None):
             { # CHERUBS
                 "type": "remote_only_files", 
                 "details": remote_only_files,
-                "message": "file[s] that only exist in server", 
-                "key": "frp"
+                "message": "file[s] that only exist in server"
+                # "key": "frp"
             }
         )
         diff_data.append(
             { # SERPENTS
                 "type": "local_only_files", 
                 "details": local_only_files,
-                "message": "local-only file[s]", 
-                "key": "frp"
+                "message": "local-only file[s]"
+                # "key": "frp"
             }
         )
         diff_data.append(
             { # SOULS
                 "type": "altered_files", 
                 "details": altered_files,
-                "message": "file[s] with hash discrepancies", 
-                "key": "frp"
+                "message": "file[s] with hash discrepancies"
+                # "key": "frp"
             }
         )
 
@@ -89,16 +112,16 @@ def main(args=None):
             { # GATES
                 "type": "remote only directory[s]", 
                 "details": remote_only_directories,
-                "message": "directory[s] that only exist in the server", 
-                "key": "drp"
+                "message": "directory[s] that only exist in the server"
+                # "key": "drp"
             }
         )
         diff_data.append(
             { # CAVES
                 "type": "local_only_directory", 
                 "details": local_only_directories,
-                "message": "directory[s] that are local only", 
-                "key": "drp"
+                "message": "directory[s] that are local only"
+                # "key": "drp"
             }
         )
 
@@ -142,7 +165,7 @@ def main(args=None):
             else:
                 logger.info(f"{dratio:.4f} % of files are unaltered [verified by hash]")
 
-    finale(NOMIX, start, prints)
+    finale(NOMIC, start, prints)
 
 if __name__=="__main__":
     main()

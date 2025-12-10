@@ -1,3 +1,10 @@
+"""Initiate the logging and other.
+
+Format & add handlers for logger.
+Cleanup large logs and delete oldest.
+Timer, counter, wrap up for runtime info.
+"""
+
 import sys
 import time
 import logging
@@ -6,25 +13,23 @@ from pathlib import Path
 
 from rosa.confs import LOGGING_LEVEL
 
-"""
-Applies the logger configuration & does the initiation. 
-Also holds 'helper' fx's for the scripts [finaly, mini_ps, counter].
-
-[functions]
-init_logger(logging_level),
-doit_urself(),
-mini_ps(args, nomix),
-counter(start, nomix),
-finale(nomix, start, prints)
-"""
 
 logger = logging.getLogger('rosa.log')
 
 # INITIATE LOGGER & RECORDS MANAGER
 
-def init_logger(logging_level): # (operations)
-	"""
-	Logger initiation; sets the level, locations, formatting, etc., for logging and recording logging.
+def init_logger(logging_level):
+	"""Initiates the logger and configures the formatting.
+
+	Two loggers & three handlers; one logger for mysql.connector and the other for the file & console. 
+	One handler for the file, and two for the console, one for mysql & one for rosa's logging output.
+	Mysql & the rosa logger both get the file handler added to them so the file records everything.
+
+	Args:
+		logging_level (str): Logging level configured in the config.py file, unless changed by mini_ps due to a flag.
+	
+	Returns:
+		logger: Logging object.
 	"""
 	if logging_level:
 		file_ = Path(__file__)
@@ -84,9 +89,13 @@ def init_logger(logging_level): # (operations)
 		sys.exit(1)
 
 def doit_urself():
-	"""
-	If rosa.log is over 64 kb, it is moved to rosa_records. If rosa_records has 
-	more than 5 logs when rosa.log meets the threshold, the oldest record is deleted.
+	"""Moves rosa.log to record of old logs if the size limit is met and deletes oldest record if the file limit is reached.
+
+	Args:
+		None
+
+	Returns:
+		None
 	"""
 	cd = Path(__file__).resolve()
 	rosa = cd.parent.parent
@@ -138,9 +147,18 @@ def doit_urself():
 		logger.info('rosa.log: [ok]')
 
 def mini_ps(args, nomix): # (operations)
-	"""
-	Mini-parser for arguments/flags passed to the scripts. Starts timer & announces 
-	execution after initiating the logger based on arguments present.
+	"""Mini parser for arguments passed from the command line (argparse).
+
+	Args:
+		args (argparse): Holds the flags present at execution; must unpack them from this object & assess/adjust.
+		nomix (var): Name variable passed from each script for logging.
+	
+	Returns:
+		A 4-element tuple containing:
+			logger (logger): The logging object returned from init_logger (above).
+			force (bool): A value depending on if the flag -f (--force) was present.
+			prints (bool): A value depending on if the flag -v (--verbose) was present.
+			start (int): A time.perf_counter() value obtained before the script's main function runs to time it.
 	"""
 	force = False # no checks - force
 	prints = False # no prints - prints
@@ -167,7 +185,15 @@ def mini_ps(args, nomix): # (operations)
 	return logger, force, prints, start
 
 def counter(start, nomix):
-	"""Counts diff between end and start for timing functions."""
+	"""Counts diff between end and start for timing functions.
+	
+	Args:
+		start (int): A time.perf_counter() value obtained at the start of execution.
+		nomix (var): Name variable passed from each script for logging.
+	
+	Returns:
+		None
+	"""
 	if start:
 		end = time.perf_counter()
 		duration = end - start
@@ -178,7 +204,16 @@ def counter(start, nomix):
 			logger.info(f"time [in seconds] for rosa {nomix}: {duration:.3f}")
 
 def finale(nomix, start, prints):
-	"""Wraps up each files' execution & logging statements."""
+	"""Wraps up each files' execution & logging statements.
+	
+	Args:
+		nomix (var): Name variable passed from each script for logging.
+		start (int): A time.perf_counter value obtained at the start of execution.
+		prints (bool): Variable specifying whether or not to print (verbosity).
+	
+	Returns:
+		None
+	"""
 	logger = logging.getLogger('rosa.log')
 	doit_urself()
 

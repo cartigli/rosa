@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""Download and write everything from the server.
+
+Ask to delete if LOCAL_DIR already exists.
+"""
+
 import sys
 import time
 import shutil
@@ -6,17 +11,24 @@ import logging
 from pathlib import Path
 
 from rosa.confs import *
-from rosa.lib import phones, ping_rem, ping_cass, download_batches5, calc_batch, sfat_boy, save_people, mk_rrdir, mini_ps, counter, finale
-
-"""
-Scan local directory, collect data from server, and compare all contents. Download/make/write all files not present but seen in 
-server, download/write all hash discrepancies, and delete all files not found in the server. Make parent directories if needed & 
-delete old ones.
-"""
+from rosa.lib import (
+    phones, ping_rem, ping_cass, 
+    download_batches5, calc_batch, 
+    sfat_boy, mk_rrdir, mini_ps, finale
+)
 
 NOMIC = "[get][all]"
 
 def rm_origin(abs_path, force=False):
+    """Deletes the LOCAL_DIR if it exists AND EITHER A. The user confirms this or B. The command is run with --force (-f).
+
+    Args:
+        abs_path (Path): The LOCAL_DIR's full path.
+        force (=False): Force flag, if present, is passed and skips the user's confirmation step.
+    
+    Returns:
+        None
+    """
     logger = logging.getLogger('rosa.log')
 
     if force is True:
@@ -57,6 +69,12 @@ def rm_origin(abs_path, force=False):
 
 
 def main(args=None):
+    """Brute force downloads everything from the server.
+
+    Downloads every file and directory from the server 
+    and writes each one to the disk. Asks for user's
+    permission or quits if the Local_dir exists.
+    """
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     abs_path = Path( LOCAL_DIR ).resolve()

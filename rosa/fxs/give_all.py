@@ -1,22 +1,32 @@
 #!/usr/bin/env python3
+"""Upload everything to the server. 
+
+Abandon if the server already contains (any) data.
+"""
+
 import sys
 import time
 from pathlib import Path
 
 from rosa.confs import *
-from rosa.lib import phones, scope_rem, ping_cass, collect_info, collect_data, upload_dirs, upload_created, confirm, mini_ps, counter, finale, _collector_
-
-"""
-Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
-upload/update all files with hash discrepancies, and delete files not found locally but existing in server. Delete from the list
-of directories if not found locally, and add new ones.
-Doesn't use differ so nothing is ever given in dictionary format.
-Doesn't have or use cherubs, stags, souls, gates, or ledeux.
-"""
+from rosa.lib import (
+    phones, scope_rem, ping_cass, upload_dirs, 
+    confirm, mini_ps, counter, finale, collector
+)
 
 NOMIC = "[give][all]"
 
 def scraper():
+    """Modified scope_rem() to go straight to data collection instead of comparing to the server first.
+
+    Args:
+        None
+    
+    Returns:
+        serpents (list): Every file's full path.
+        caves (list): Single-item tuples containing every directory's relative path.
+        abs_path (Path): The LOCAL_DIR's full path.
+    """
     local_dir = LOCAL_DIR
 
     blk_list = ['.DS_Store', '.git', '.obsidian'] 
@@ -33,7 +43,7 @@ def scraper():
             if item.is_file():
                 frp = item.relative_to(abs_path).as_posix()
 
-                serpents.append((frp,))
+                serpents.append(frp)
 
             elif item.is_dir():
                 drp = item.relative_to(abs_path).as_posix()
@@ -42,8 +52,12 @@ def scraper():
     
     return serpents, caves, abs_path
 
-
 def main(args=None):
+    """Brute force upload of all the local data. 
+    
+    Uploads everything.
+    Quits if the server contains data, i.e., not empty.
+    """
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
@@ -67,7 +81,7 @@ def main(args=None):
                         key = "new_file"
                         logger.info('uploading local-only file[s]...')
 
-                        _collector_(conn, serpents, abs_path, key)
+                        collector(conn, serpents, abs_path, key)
 
                     counter(start, NOMIC)
 

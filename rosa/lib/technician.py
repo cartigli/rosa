@@ -1,3 +1,8 @@
+"""Handles editing data in the server.
+
+Uploads to, updates in, and deletes data from the server.
+"""
+
 import logging
 from pathlib import Path
 
@@ -8,26 +13,29 @@ import xxhash # can be replaced w.native hashlib
 
 from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET
 
-"""
-Counter-component to contractor: editing and uploading to the server. 
-Slightly more complicated than downloading, hence the name.
-
-[functions]
-rm_remdir(conn, gates),
-rm_rem_file(conn, cherubs),
-collect_info(dicts_, _abs_path),
-collect_data(dicts_, _abs_path),
-upload_dirs(conn, caves),
-upload_created(conn, serpent_data),
-upload_edited(conn, soul_data)
-"""
 
 logger = logging.getLogger('rosa.log')
 
 # EDIT SERVER
 
-def _collector_(conn, _list, abs_path, key):
+def collector(conn, _list, abs_path, key):
+	"""Manages the batched uploading to the server.
 
+	Sorts the batches with collect_info.
+	Passes each resulting set to collect_data, 
+	And the corresponding upload function.
+	Both queries %s with 3 values in the same order.
+	Uses tqdm for progress bar.
+
+	Args:
+		conn: Connection object.
+		_list (list): The files [local_only, deltas] for uploading.
+		abs_path (Path): Original path of the LOCAL_DIR.
+		key (var): String for specifying upload created() or edited().
+	
+	Returns:
+		None
+	"""
 	with tqdm_(loggers=[logger]):
 		with tqdm(collect_info(_list, abs_path)) as pbar:
 
@@ -41,12 +49,19 @@ def _collector_(conn, _list, abs_path, key):
 						upload_edited(conn, batch_data)
 
 
-def collect_info(dicts_, _abs_path): # give - a
-	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is passed to the upload functions as required. Both functions [upload_edited(), upload_created()] use the same three variables, 
-	so their batches can all be defined with this function. Order is irrelevant for the individual items if using the %(variable)s method 
-	with executemany(). For batched uploads, the queries the files' metadata for its disk size in bytes. Makes one big list for all the 
-	batches & files needed, and returns this single item. [give] calls this twice.
+def collect_info(dicts_, _abs_path):
+	"""Creates batches for uploading.
+
+	Adds items to the batch_items until the size limit is met.
+	Appends batch_items to all_batches and resets batch_items.
+	Repeats for all files in the list passed.
+
+	Args:
+		dicts_ (list): List of files' relative paths.
+		_abs_path (Path): Original path of LOCAL_DIR.
+
+	Returns:
+		all_batches (list): List of lists, each inner-list containing one batches' files for uploading.
 	"""
 	# logger.debug('...collecting info on file[s] sizes to upload...')
 	# cmpr = zstd.ZstdCompressor(level=3)
@@ -83,11 +98,18 @@ def collect_info(dicts_, _abs_path): # give - a
 	logger.debug('all batches collected')
 	return all_batches
 
-def collect_data(dicts_, _abs_path): # lol why would this need conn
-	"""For whatever lists of paths as dictionaries are passed to this fx, the output is given file's content, hash, and relative path.
-	This is pased to the upload functions as required. Both this fx and collect_info() use the same three variables for every file, so 
-	they can all be built with this function. Order is irrelevant for the individual items when using the %(variable)s method with 
-	executemany(). Works with the output of the collect_info function in terms of data type & format.
+def collect_data(dicts_, _abs_path):
+	"""Collects details about the batch passed to it.
+
+	For every file passed, it adds the content, hash, and relative path to a tuple.
+	Each one is appended to item_data and returned.
+
+	Args:
+		dicts_ (list): List of the batch's relative paths, created by collect_info() passed by collector().
+		_abs_path (Path): Original path of the LOCAL_DIR.
+
+	Returns:
+		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.
 	"""
 	# logger.debug('...collecting data on file[s] to upload...')
 	abs_path = Path(_abs_path)
@@ -115,10 +137,19 @@ def collect_data(dicts_, _abs_path): # lol why would this need conn
 # UPLOAD THE COLLECTED
 
 def rm_remdir(conn, gates):
-	"""Remove remote-only directories from the server."""
+	"""Removes directories from the server via DELETE.
+
+	DML so executemany().
+	
+	Args: 
+		conn: Connection object.
+		gates (list): Single-element tuples of remote-only directories' relative paths.
+	
+	Returns:
+		None
+	"""
 	logger.debug('...deleting remote-only drectory[s] from server...')
 	g = "DELETE FROM directories WHERE drp = %s;"
-	# g = "DELETE FROM directories WHERE drp = %(drp)s;"
 
 	with conn.cursor() as cursor:
 		try:
@@ -131,10 +162,19 @@ def rm_remdir(conn, gates):
 			logger.debug('removed remote-only directory[s] from server w.o exception')
 
 def rm_remfile(conn, cherubs):
-	"""Remove remote-only files from the server. Paths [cherubs] passed as a list of dictionaries for executemany()."""
+	"""Removes files from the server via DELETE.
+
+	DML so executemany().
+
+	Args:
+		conn: Connection object to query the server.
+		cherubs (list): Single-element tuple of the remote-only files' relative paths.
+	
+	Returns:
+		None
+	"""
 	logger.debug('...deleting remote-only file[s] from server...')
 	f = "DELETE FROM notes WHERE frp = %s;"
-	# f = "DELETE FROM notes WHERE frp = %(frp)s;"
 
 	with conn.cursor() as cursor:
 		try:
@@ -146,11 +186,21 @@ def rm_remfile(conn, cherubs):
 		else:
 			logger.debug('removed remote-only file[s] from server w.o exception')
 
-def upload_dirs(conn, caves): # give
-	"""Insert into the directories table any local-only directories found. DML so executemany()."""
+def upload_dirs(conn, caves):
+	"""Uploads directories to the server via INSERT.
+
+	DML so executemany().
+
+	Args:
+		conn: Connection object to query the server.
+		caves (list): Single-element tuples of remote-only directories' relative paths.
+
+	Returns:
+		None
+	"""
 	# logger.debug('...uploading local-only directory[s] to server...')
 	h = "INSERT INTO directories (drp) VALUES (%s);"
-	# h = "INSERT INTO directories (drp) VALUES (%(drp)s);"
+
 	with conn.cursor() as cursor:
 		try:
 			cursor.executemany(h, caves)
@@ -161,8 +211,18 @@ def upload_dirs(conn, caves): # give
 		# else:
 		#     logger.debug('local-only directory[s] written to server w.o exception')
 
-def upload_created(conn, serpent_data): # give
-	"""Insert into the notes table the new record for local-only files that do not exist in the server. DML again."""
+def upload_created(conn, serpent_data):
+	"""Uploads new files into the database via INSERT.
+
+	DML so executemany().
+
+	Args:
+		conn: Connection object to query the server.
+		serpent_data (list): 3-element tuples containing each new files' new content, new hash, and new relative path for every file in the batch.
+
+	Returns:
+		None
+	"""
 	# logger.debug('...writing new file[s] to server...')
 	i = "INSERT INTO notes (content, hash_id, frp) VALUES (%s, %s, %s);"
 
@@ -176,9 +236,17 @@ def upload_created(conn, serpent_data): # give
 	# else:
 	#     logger.debug('wrote new file[s] to server w.o exception')
 
-def upload_edited(conn, soul_data): # only give 3.0
-	"""Update the notes table to show the current content for a note that was altered, or whose hash did not show identical contents. *This function 
-	triggers the on_update_notes trigger which will record the previous version of the file's contents and the time of changing.
+def upload_edited(conn, soul_data):
+	"""Uploads altered files into the database via UPDATE.
+
+	DML so executemany().
+
+	Args:
+		conn: Connection object to query the server.
+		soul_data (list): 3-element tuples containing each altered files' new content, new hash, and relative path for every file in the batch.
+	
+	Returns:
+		None
 	"""
 	# logger.debug('...writing altered file[s] to server...')
 	j = "UPDATE notes SET content = %s, hash_id = %s WHERE frp = %s;"

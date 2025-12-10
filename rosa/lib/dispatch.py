@@ -1,3 +1,10 @@
+"""Manages the connection object.
+
+Context manager for the connection object.
+Initiaton of the connection object.
+Error handling, server rollback, committing.
+"""
+
 import sys
 import time
 import logging
@@ -7,16 +14,6 @@ import mysql.connector
 
 from rosa.confs import XCONFIG, ASSESS2, MAX_ALLOWED_PACKET, RED, RESET
 
-"""
-Manages the connection object be for connection initiation, closing, and error handling.
-
-[functions]
-(contextmanager) phones(), 
-init_conn(db_user, db_pswd, db_name, db_addr), 
-calc_batch(conn), 
-_safety(conn), 
-confirm(conn, force=False)
-"""
 
 logger = logging.getLogger('rosa.log')
 
@@ -24,7 +21,14 @@ logger = logging.getLogger('rosa.log')
 
 @contextlib.contextmanager
 def phones():
-	"""Context manager for the mysql.connector connection object."""
+	"""Context manager for the mysql.connector connection object.
+
+	Args:
+		None
+
+	Yields: 
+		conn: Connection object.
+	"""
 	conn = None
 	logger.debug('...phone call, connecting...')
 	try:
@@ -63,7 +67,17 @@ def phones():
 				logger.info('phones closed conn [finally]')
 
 def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
-	"""Initiate the connection to the server. If an error occurs, [freak out]."""
+	"""Initiate the connection to the server. If an error occurs, [freak out].
+
+	Args:
+		db_user: Database's user username
+		db_pswd: Username's password
+		db_name: Database's name
+		db_addr: IP address of the server [or machine running the server]
+	
+	Returns:
+		conn: Connection object.
+	"""
 	config = {
 		'unix_socket': '/tmp/mysql.sock',
 		# 'host': db_addr,
@@ -82,7 +96,18 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 	return conn # thinking direct is better
 
 def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
-	"""Get the average row size of the notes table to estimate optimal batch size for downloading. ASSESS2 is 1/100 the speed of ASSESS"""
+	"""Get the average row size of the notes table to estimate optimal batch size for downloading. 
+	
+	ASSESS2 is 1/100 the speed of ASSESS, especially with large datasets.
+
+	Args:
+		conn: Connection object.
+	
+	Returns:
+		A 2-element tuple containing:
+			batch_size (int): Calculated batch size from MAX_ALLOWED_PACKET & average_row_size of the table.
+			row_size (single-element tuple): Table's average row size; useful for getting batch size in bytes.
+	"""
 	batch_size = 5 # default
 	row_size = 10 # don't divide by 
 	with conn.cursor() as cursor:
@@ -107,7 +132,17 @@ def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
 				return batch_size, row_size
 
 def _safety(conn):
-	"""Handles rollback of the server on err from phone_duty."""
+	"""Handles rollback of the server on err from phone_duty.
+
+	If the connection object is connected, roll the incomplete upload back.
+	If not, return. Autocommit = False, so reconnecting for rollback is pointless.
+
+	Args:
+		conn: Conneciton object.
+	
+	Returns:
+		None
+	"""
 	logger.warning('_safety called to rollback server due to err')
 
 	if conn and conn.is_connected():
@@ -124,7 +159,17 @@ def _safety(conn):
 		return
 
 def confirm(conn, force=False): # to dispatch? or could be to opps?
-	"""Double checks that user wants to commit any changes made to the server. Asks for y/n response and rolls-back on any error or [n] no."""
+	"""Double checks that user wants to commit any changes made to the server. 
+	
+	Asks for y/n response and rolls-back on any error or [n] no.
+
+	Args:
+		conn: Connection object to query the server with.
+		force (=False): If True, does *not* ask for user confirmation before attempting to commit. Default is False.
+	
+	Returns:
+		None
+	"""
 	if force is True:
 		try:
 			logger.debug('forcing commit...')
