@@ -2,6 +2,9 @@
 """Download and write everything from the server.
 
 Ask to delete if LOCAL_DIR already exists.
+
+Should also do an erase/rebuild of the database, if present.
+This resets the local data so it will need a new starting point.
 """
 
 import sys

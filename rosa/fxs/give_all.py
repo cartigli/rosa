@@ -2,6 +2,8 @@
 """Upload everything to the server. 
 
 Abandon if the server already contains (any) data.
+This main() should initiate the local index after uploading & committing.
+If it exists, delete it. It will be useless as this only uploads *everything.
 """
 
 import sys

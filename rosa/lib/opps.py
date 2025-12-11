@@ -32,8 +32,8 @@ def init_logger(logging_level):
 		logger: Logging object.
 	"""
 	if logging_level:
-		file_ = Path(__file__)
-		log_dest = file_.parent.parent / "rosa.log"
+		file = Path(__file__)
+		log_dest = file.parent.parent / "rosa.log"
 		
 		# init loggers
 		logger = logging.getLogger('rosa.log')
@@ -62,9 +62,9 @@ def init_logger(logging_level):
 		# define formatting - file loggers share format
 		mysql_cons = "[%(levelname)s][%(name)s]: %(message)s"
 		console_ = "[%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
-		file_ = "[%(asctime)s][%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
+		file = "[%(asctime)s][%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
 
-		file_format = logging.Formatter(file_)
+		file_format = logging.Formatter(file)
 		console_format = logging.Formatter(console_)
 		mysql_console_format = logging.Formatter(mysql_cons)
 
@@ -117,9 +117,9 @@ def doit_urself():
 			elif rosa_records.is_dir():
 				npriors = 1 # start w.one because this is only occurring when the log is larger than 64 kb
 				previous = []
-				for file_ in sorted(rosa_records.glob('*')):
-					if file_.is_file():
-						previous.append(file_)
+				for file in sorted(rosa_records.glob('*')):
+					if file.is_file():
+						previous.append(file)
 						npriors += 1
 
 				if npriors > rosa_records_max:

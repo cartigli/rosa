@@ -5,6 +5,10 @@ Upload local-only files/directories,
 delete remote-only files/directories, 
 and update altered files. 
 Abandon if the server or local directory are empty.
+
+This main() should update the index to what was uploaded.
+Twin the server edits; delete, insert, and update from the index as you did to the server.
+Insert new files, delete deleted files, and update altered (diffs).
 """
 
 import sys
@@ -15,7 +19,8 @@ from rosa.confs import *
 from rosa.lib import (
     diffr, phones, upload_dirs, 
     rm_remfile, rm_remdir, confirm, 
-    mini_ps, counter, finale, collector
+    mini_ps, counter, finale, collector, #, init_index
+    query_index, scope_rem2, contrast2, hash_rel
 )
 
 NOMIC = "[give]"
@@ -28,6 +33,8 @@ def main(args=None):
     Quits if server or local directory is empty.
     """
     logger, force, prints, start = mini_ps(args, NOMIC)
+
+    init_index(key="UPDATE")
 
     with phones() as conn:
         data, diff = diffr(conn)

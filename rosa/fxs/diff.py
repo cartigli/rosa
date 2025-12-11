@@ -2,6 +2,7 @@
 """Compare local data to the server.
 
 If difference, format it and show the user.
+Should not effect local index or remote server.
 """
 
 import sys
@@ -12,7 +13,7 @@ from pathlib import Path
 from rosa.confs import *
 from rosa.lib import (
     diffr, phones, finale, 
-    mini_ps, timer
+    mini_ps, timer, query_index
 )
 
 NOMIC = "[diff]"
@@ -34,7 +35,6 @@ def ask_to_share(diff_data, force=False):
         title = i["type"]
         count = len(i["details"])
         descr = i["message"]
-        dict_key = i["key"]
 
         if count > 0:
             if force is True:
@@ -64,10 +64,7 @@ def main(args=None):
     """
     logger, force, prints, start = mini_ps(args, NOMIC)
 
-    with phones() as conn:
-        timer(conn)
-        if conn and conn.is_connected():
-            conn.close()
+    # new, deleted, diffs = query_index()
     
     with phones() as conn:
         data, diff = diffr(conn)
@@ -88,7 +85,6 @@ def main(args=None):
                 "type": "remote_only_files", 
                 "details": remote_only_files,
                 "message": "file[s] that only exist in server"
-                # "key": "frp"
             }
         )
         diff_data.append(
@@ -96,7 +92,6 @@ def main(args=None):
                 "type": "local_only_files", 
                 "details": local_only_files,
                 "message": "local-only file[s]"
-                # "key": "frp"
             }
         )
         diff_data.append(
@@ -104,7 +99,6 @@ def main(args=None):
                 "type": "altered_files", 
                 "details": altered_files,
                 "message": "file[s] with hash discrepancies"
-                # "key": "frp"
             }
         )
 
@@ -113,7 +107,6 @@ def main(args=None):
                 "type": "remote only directory[s]", 
                 "details": remote_only_directories,
                 "message": "directory[s] that only exist in the server"
-                # "key": "drp"
             }
         )
         diff_data.append(
@@ -121,7 +114,6 @@ def main(args=None):
                 "type": "local_only_directory", 
                 "details": local_only_directories,
                 "message": "directory[s] that are local only"
-                # "key": "drp"
             }
         )
 

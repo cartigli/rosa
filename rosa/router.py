@@ -41,6 +41,10 @@ def rm(args):
 	from rosa.xtra import rm3
 	rm3.main(args)
 
+def index(args):
+	from rosa.lib import index
+	index.main(args)
+
 rosa = {
 	'get': {
 		'func': get, 
@@ -81,7 +85,11 @@ rosa = {
 				'name': 'structure'
 			}
 		}
-	}, 
+	},
+	'.': {
+		'func': index,
+		'name': '.'
+	},
 	'init': {
 		'func': init, 
 		'name': 'init'

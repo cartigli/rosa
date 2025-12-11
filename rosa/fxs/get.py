@@ -5,6 +5,10 @@ Make remote-only files/directories,
 delete local-only files/directories, 
 and updated content for altered files. 
 Abandon if the server or local directory are empty.
+
+This main() should also update the index because it makes changes to the local data.
+Do the vice-versa of the give edits. Make deleted, delete new, and update altered.
+Insert deleted, delete created, and revert edits (diffs).
 """
 
 import sys

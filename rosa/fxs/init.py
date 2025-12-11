@@ -4,6 +4,10 @@
 Can create, truncate, or drop tables. 
 It can also create, drop, or replace triggers.
 Queries server for tables/triggers, asks user what to do.
+Can create and initiate the index? / 
+No, should wipe index if user wipes tables, 
+delete it if user drops tables, 
+and create it if they make tables.
 """
 
 import sys
@@ -129,7 +133,7 @@ def trigger_helper(conn, force=False):
                         cursor.execute(DELETE_TRIGGER) # make the delete trigger
                         logger.info('dropped & replaced triggers')
                 
-                elif decis2 in ('d', ' d', 'd ', 'drop')::
+                elif decis2 in ('d', ' d', 'd ', 'drop'):
                     try:
                         for x in trigs:
                             f = f"DROP TRIGGER {x[0]}" # same action here as replace but no second step

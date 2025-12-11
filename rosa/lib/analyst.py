@@ -34,7 +34,7 @@ def scope_loc(local_dir):
 			hells_dirs (list): Single-element tuple of every sub-directories' relative path within the local_dir.
 			abs_path (Path): The LOCAL_DIR's full path.
 	"""
-	# blk_list = ['.DS_Store', '.git', '.obsidian'] # should be imported from the config.py file
+	blk_list = ['.DS_Store', '.git', '.obsidian'] # should be imported from the config.py file
 	abs_path = Path(local_dir).resolve()
 
 	raw_paths = []
@@ -96,6 +96,35 @@ def hash_loc(raw_paths, abs_path):
 
 	return raw_hell
 
+def hash_rel(paths, abs_path):
+	"""For every file, hash it, and tuple it with the relative path.
+	
+	Args:
+		paths (list): Every files' full path (collected / passed from scope_loc().
+		abs_path (Path): LOCAL_DIR's full path as a Pathlib object.
+	
+	Returns:
+		raw_hell (list): Tupled (relative paths, hashes) for every file found in scope_loc().
+	"""
+	hasher = xxhash.xxh64()
+	raw_hell = []
+
+	logger.debug('...hashing...')
+
+	with tqdm_(loggers=[logger]):
+		with tqdm(paths, unit="hashes", leave=True) as pbar:
+			for item in pbar:
+				fp = abs_path / item
+				hasher.reset()
+				hasher.update(fp.read_bytes())
+
+				hash_id = hasher.digest()
+				# frp = item.relative_to(abs_path).as_posix()
+
+				raw_hell.append((item, hash_id))
+
+	return raw_hell
+
 def track_loc(raw_paths, abs_path):
 	"""For every file, hash it and tuple it with the files' st_mtime.
 	
@@ -152,6 +181,37 @@ def scope_rem(conn):
 			raise
 		else:
 			return raw_heaven
+
+def scope_rem2(conn, paths):
+	"""SELECTS every relative path and hash_id currently recorded in the table.
+
+	Args:
+		conn: Connection object.
+	
+	Returns:
+		heaven_ (list): Tupled (relative paths, hash_ids) for every file found in diffs in the table.
+	"""
+	heaven_ = []
+	# params = ', '.join(['%s']*len(paths))
+	q = "SELECT frp, hash_id FROM notes WHERE frp IN (%s);"
+
+	with conn.cursor() as cursor:
+		try:
+			logger.debug('...scoping remote files...')
+			for path in paths:
+				cursor.execute(q, path)
+				heaven_.append(cursor.fetchall())
+
+			if heaven_:
+				logger.debug("server returned data from query")
+			else:
+				logger.warning("server returned heaven_ as an empty set")
+
+		except (ConnectionError, TimeoutError, Exception) as c:
+			logger.error(f"{RED}err while getting data from server:{RESET} {c}.", exc_info=True)
+			raise
+		else:
+			return heaven_
 
 def ping_rem(conn):
 	"""SELECTS every relative path currently recorded in the table.
@@ -278,6 +338,44 @@ def contrast(remote_raw, local_raw):
 	logger.debug(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
 
 	return remote_only, deltas, nodiffs, local_only
+
+
+def contrast2(remote_raw, local_raw):
+	"""Compares files found with ctime or byte-size discrepancies.
+	
+	Uses sets for uniqueness & dictionaries for accuracy (paths as the keys because they are unique).
+
+	Args:
+		remote_raw (list): Tupled (relative file paths, hashes).
+		local_raw (list): Tupled (relative file paths, hashes).
+
+	Returns:
+		A 2-element tuple containing:
+			deltas (list): Files whose hash did not match.
+			nodiffs (list): Files whose hashes were equal.
+	"""
+	remote = {file_path: hash_id for file_path, hash_id in remote_raw} # map each file to its hash in a dictionary
+	local = {file_path: hash_id for file_path, hash_id in local_raw} # makes comparison easier
+
+	# remote_files = set(remote.keys()) # get a set of the keys() in the dictionaries
+	# local_files = set(local.keys()) # which are just both sets of files' relative paths
+	# remote_only = remote_files - local_files
+	# local_only = local_files - remote_files
+	# both = remote_files & local_files # those in both (people) # unchanged from original
+	# logger.debug(f"found {len(remote_only)} cherubs, {len(local_only)} serpents, and {len(both)} people. comparing each persons' hash now")
+
+	deltas = []
+	nodiffs = []
+
+	for rel_path in local.keys():
+		if local.get(rel_path) == remote.get(rel_path):
+			nodiffs.append(rel_path) # unchanged, hash verified
+		else:
+			deltas.append(rel_path)
+
+	logger.debug(f"found {len(deltas)} altered files [failed hash verification] and {len(nodiffs)} unchanged file[s] [hash verified]")
+
+	return deltas, nodiffs
 
 def compare(heaven_dirs, hell_dirs):
 	"""Take the lists of tupled-directories (relative_paths,) and compare their sets.
