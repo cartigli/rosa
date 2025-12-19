@@ -13,13 +13,12 @@ Insert deleted, delete created, and revert edits (diffs).
 
 import shutil
 import sqlite3
+from datetime import datetime
 
-from rosa.confs import LOCAL_DIR
+from rosa.confs import LOCAL_DIR, VERSIONS, VDIRECTORIES
 from rosa.lib import (
     phones, fat_boy, mk_rrdir, 
-    save_people, mini_ps, finale, 
-    query_index, _config, refresh_index, 
-    scrape_dindex
+    save_people, mini_ps, finale, query_index, _config, refresh_index
 )
 
 NOMIC = "[get]"
@@ -32,6 +31,10 @@ def originals(replace, tmpd):
     for rp in replace:
         fp = originals / rp
         bp = tmpd / rp
+        if not bp.exists():
+            print(bp, "DOESN'T EXIST [BP]")
+        if not fp.exists():
+            print(fp, "DOESN'T EXIST [FP]")
         (bp.parent).mkdir(parents=True, exist_ok=True)
 
         shutil.copy(fp, bp)
@@ -42,21 +45,56 @@ def main(args=None):
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
-        new, deleted, diffs, remaining, xdiff = query_index(conn)
+        with conn.cursor() as cursor:
+            cursor.execute(VERSIONS)
+            versions = cursor.fetchall()
     
-    # newd, deletedd, ledeux = query_dindex()
-    indexed_dirs = scrape_dindex()
+    fvers = []
+    vers = []
+    
+    for version, moment, message in versions:
+        date_obj = datetime.utcfromtimestamp(moment)
+        date = date_obj.strftime("%Y-%m-%d - %M:%H:%S")
+        if message:
+            fvers.append((version, date, message))
+        else:
+            fvers.append((version, date))
+    
+        vers.append(version)
+    
+    print('all the currently recorded commitments:')
+    for v in fvers:
+        print(v)
 
-    if xdiff is True:
-        logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
-        with fat_boy(LOCAL_DIR) as (tmp_, backup):
-            logger.info('copying directory tree...')
-            mk_rrdir(indexed_dirs, tmp_)
+    version = input(f"Enter the version you would like to receive ({vers}): ")
 
-            logger.info('hard linking unchanged files...')
-            save_people(remaining, backup, tmp_)
 
-            # ignore new files
+    # if xdiff is True:
+    if version:
+        logger.info(f"requested version recieved: v{version}")
+        dpath = Path(LOCAL_DIR).resolve()
+
+        tmpd = dpath.parent / f"rosa_v{version}"
+        tmpd.mkdir(parents=True)
+        with phones() as conn:
+            with conn.cursor() as cursor:
+
+                cursor.execute(VDIRECTORIES, (version,))
+                drps = cursor.fetchall()
+
+                cursor.execute(VD_DIRECTORIES, (version,))
+                ddrps = cursor.fetchall()
+                for d in ddrps:
+                    drps.append(d)
+
+                logger.info('copying directory tree...')
+                mk_rrdir(d, tmpd)
+
+                get
+
+            # logger.info('hard linking unchanged files...')
+            # save_people(remaining, backup, tmp_)
+            # # ignore new files
 
             for d in deleted:
                 diffs.append(d)

@@ -9,10 +9,10 @@ description = "versioning system with history tracking & hash verification"
 readme = "README.md"
 requires-python = ">=3.13.0"
 dependencies = [
-    "tqdm",
     "xxhash",
     "mysql-connector-python",
-    "zstandard"
+    "zstandard",
+    "diff_match_patch"
 ]
 
 [project.scripts]

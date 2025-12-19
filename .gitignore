@@ -5,6 +5,8 @@ __pycache__/
 .vscode/
 .git/
 
+rosa/index/originals
+rosa/index/
 rosa.egg-info/
 abilities/rosa_records/
 abilities/

@@ -7,6 +7,33 @@ import os
 
 # INITIATION/CONFIGURATION OF THE DATABASE
 
+INITIATION1 = os.getenv("""INITIATION1""","""
+CREATE TABLE IF NOT EXISTS records(
+	_id INT AUTO_INCREMENT NOT NULL,
+	moment TIMESTAMP DEFAULT TIMESTAMP,
+	message VARCHAR(256),
+	version VARCHAR(8) NOT NULL,
+PRIMARY KEY (_id)
+);
+
+CREATE TABLE IF NOT EXISTS files(
+	id INT AUTO_INCREMENT NOT NULL,
+	rp VARCHAR(512) NOt NULL,
+	content LONGBLOB NOT NULL,
+	hash BINARY(8) NOT NULL,
+	version VARCHAR(8) NOT NULL,
+PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS deltas(
+	d_id INT AUTO_INCREMENT NOT NULL,
+	path TINETEXT NOT NULL,
+	version VARCHAR(8) NOT NULL,
+PRIMARY KEY (d_id)
+);
+""") # no primary keys cause mysql trips too hard; rely on python logic management
+# this may be a terrible idea but it will make it faster
+
 INITIATION = os.getenv("""INITIATION""","""
 CREATE TABLE IF NOT EXISTS directories(
 	drp VARCHAR(512) NOT NULL

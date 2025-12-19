@@ -11,11 +11,11 @@ import logging
 import datetime
 from pathlib import Path
 
-import xxhash # can be replaced with hashlib
+import xxhash
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
 
-from rosa.confs import LOCAL_DIR, RED, RESET
+from rosa.confs import LOCAL_DIR, BLACKLIST, RED, RESET
 
 
 logger = logging.getLogger('rosa.log')
@@ -34,7 +34,7 @@ def scope_loc(local_dir):
 			hells_dirs (list): Single-element tuple of every sub-directories' relative path within the local_dir.
 			abs_path (Path): The LOCAL_DIR's full path.
 	"""
-	blk_list = ['.DS_Store', '.git', '.obsidian'] # should be imported from the config.py file
+	blk_list = ['.DS_Store', '.git', '.obsidian', 'index'] # should be imported from the config.py file
 	abs_path = Path(local_dir).resolve()
 
 	raw_paths = []

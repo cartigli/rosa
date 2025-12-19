@@ -10,6 +10,7 @@ import time
 import logging
 import subprocess
 from pathlib import Path
+import diff_match_patch as dp_
 
 from rosa.confs import LOGGING_LEVEL
 
@@ -89,7 +90,9 @@ def init_logger(logging_level):
 		sys.exit(1)
 
 def doit_urself():
-	"""Moves rosa.log to record of old logs if the size limit is met and deletes oldest record if the file limit is reached.
+	"""Moves rosa.log to record of old logs if the size limit is met.
+
+	Deletes oldest record if the file limit is reached.
 
 	Args:
 		None
@@ -110,11 +113,9 @@ def doit_urself():
 	rosakb = rosasz / 1024
 
 	rosa_records_max = 5 # if 5 files when rosa_log is moved, delete oldest record
-	if rosakb >= 64.0: # 64 kb, and then move it to records
+	if rosakb >= 64.0: # 32 kb, and then move it to records
 		if rosa_records.resolve().exists():
-			if rosa_records.is_file():
-				logger.error(f"there is a file named rosa_records where a logging record should be; abandoning")
-			elif rosa_records.is_dir():
+			if rosa_records.is_dir():
 				npriors = 1 # start w.one because this is only occurring when the log is larger than 64 kb
 				previous = []
 				for file in sorted(rosa_records.glob('*')):
@@ -136,15 +137,15 @@ def doit_urself():
 					ctime = f"{time.time():.2f}"
 					subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
 
-					logger.info('rosa_records: ok, backed up current log')
+					logger.debug('rosa_records: ok, backed up current log')
 		else:
 			rosa_records.mkdir(parents=True, exist_ok=True)
 			ctime = f"{time.time():.2f}"
 			subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
 
-			logger.info('backed up & replaced rosa.log')
+			logger.debug('backed up & replaced rosa.log')
 	else:
-		logger.info('rosa.log: [ok]')
+		logger.debug('rosa.log: [ok]')
 
 def mini_ps(args, nomix): # (operations)
 	"""Mini parser for arguments passed from the command line (argparse).
@@ -215,11 +216,49 @@ def finale(nomix, start, prints):
 		None
 	"""
 	logger = logging.getLogger('rosa.log')
-	doit_urself()
 
+	doit_urself()
 	counter(start, nomix)
 
 	logger.info(f"rosa {nomix} complete")
 
 	if prints is True:
 		print('All set.')
+
+
+def diff_gen(modified, home, curr):
+	originals = home / "originals"
+	cur_ = Path(curr)
+	patches = []
+
+	for rp in modified:
+		fp_original = originals / rp
+		with open(fp_original, 'r', encoding='utf-8', errors='replace') as f:
+			original = f.read()
+		# with open(fp_original, 'r') as f:
+		# 	original = f.read()
+		# original = fp_original.resolve().read()
+		# original = fp_original.read_bytes()
+
+		fp_modified = cur_ / rp
+		with open(fp_modified, 'r', encoding='utf-8', errors='replace') as m:
+			different = m.read()
+		# with open(fp_modified, 'r') as m:
+		# 	different = m.read()
+		# different = fp_modified.resolve().read()
+
+		# returned as text
+		patch = patcher(original, different)
+
+		patches.append((rp, patch))
+	
+	return patches, originals
+
+
+def patcher(old, new):
+	dmp = dp_.diff_match_patch()
+
+	patches = dmp.patch_make(new, old)
+	p_txt = dmp.patch_toText(patches)
+
+	return p_txt

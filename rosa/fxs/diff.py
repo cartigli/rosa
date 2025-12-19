@@ -5,15 +5,16 @@ If difference, format it and show the user.
 Should not effect local index or remote server.
 """
 
-import sys
-import time
+# import sys
+# import time
 import logging
-from pathlib import Path
+# from pathlib import Path
 
-from rosa.confs import *
+# from rosa.confs import *
 from rosa.lib import (
-    diffr, phones, finale, 
-    mini_ps, timer, query_index
+    phones, finale, 
+    mini_ps, query_index,
+    phones, query_dindex
 )
 
 NOMIC = "[diff]"
@@ -39,6 +40,7 @@ def ask_to_share(diff_data, force=False):
         if count > 0:
             if force is True:
                 logger.info(f"found: {count} {descr}")
+                return
             else:
                 decis0 = input(f"found {count} {descr}. do you want details? y/n: ").lower()
                 formatted = []
@@ -62,100 +64,66 @@ def main(args=None):
     Using --force (-f) skips the ask-to-show.
     If no changes, it does not try to show.
     """
+    xdiff = False
     logger, force, prints, start = mini_ps(args, NOMIC)
 
-    # new, deleted, diffs = query_index()
-    
+    newd, deletedd, ledeux = query_dindex()
+
     with phones() as conn:
-        data, diff = diffr(conn)
+        new, deleted, diffs, remaining, xdiff = query_index(conn)
 
-        if conn and conn.is_connected():
-            conn.close()
+    if prints is True:
+        logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
 
-    if diff is True:
-        file_data, dir_data = data
+    if xdiff is True:
+        logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
+        logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
 
-        remote_only_files, altered_files, unchanged_files, local_only_files = file_data
-        remote_only_directories, local_only_directories, unchanged_directories = dir_data
+        # if prints is True:
 
         diff_data = []
 
         diff_data.append(
             { # CHERUBS
-                "type": "remote_only_files", 
-                "details": remote_only_files,
+                "type": "deleted files", 
+                "details": deleted,
                 "message": "file[s] that only exist in server"
             }
         )
         diff_data.append(
             { # SERPENTS
-                "type": "local_only_files", 
-                "details": local_only_files,
+                "type": "new files", 
+                "details": new,
                 "message": "local-only file[s]"
             }
         )
         diff_data.append(
             { # SOULS
-                "type": "altered_files", 
-                "details": altered_files,
+                "type": "altered files", 
+                "details": diffs,
                 "message": "file[s] with hash discrepancies"
             }
         )
 
         diff_data.append(
-            { # GATES
-                "type": "remote only directory[s]", 
-                "details": remote_only_directories,
-                "message": "directory[s] that only exist in the server"
+            { # CAVES
+                "type": "new directories", 
+                "details": newd,
+                "message": "new directories"
             }
         )
         diff_data.append(
-            { # CAVES
-                "type": "local_only_directory", 
-                "details": local_only_directories,
-                "message": "directory[s] that are local only"
+            { # GATES
+                "type": "deleted directories", 
+                "details": deletedd,
+                "message": "deleted directories"
             }
         )
 
         ask_to_share(diff_data, force)
 
-        # files altered:total
-        tot = 0
-        t_deltas = 0
-        unchanged = 0
-        
-        t_deltas += len(remote_only_files) + len(local_only_files) + len(altered_files)
-        unchanged += len(unchanged_files)
-        tot += unchanged + t_deltas
-
-        fratio = (t_deltas / tot)*100
-
-        # directories altered:total
-        d_tot = 0
-        d_deltas = 0
-        unchangedd = 0
-        
-        d_deltas += len(remote_only_directories) + len(local_only_directories)
-        unchangedd += len(unchanged_directories)
-        d_tot += unchangedd + d_deltas
-
-        dratio = (d_deltas / d_tot)*100
-    
-        # ratio prints
-        if prints is True:
-            if fratio < 2:
-                logger.info(f"{RED}{(fratio):.4f} %{RESET} of files were altered [failed hash verification]")
-            elif fratio > 2:
-                logger.info(f"{(100 - fratio):.4f} % of files were altered [failed hash verification]")
-            else:
-                logger.info(f"{fratio:.4f} % of files are unaltered [verified by hash]")
-
-            if dratio < 2:
-                logger.info(f"{RED}{(dratio):.4f} %{RESET} of directories were altered [failed hash verification]")
-            elif dratio > 2:
-                logger.info(f"{(100 - dratio):.4f} % of files were altered [failed hash verification]")
-            else:
-                logger.info(f"{dratio:.4f} % of files are unaltered [verified by hash]")
+    else:
+        logger.info('no diff!')
 
     finale(NOMIC, start, prints)
 

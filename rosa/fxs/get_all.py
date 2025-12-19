@@ -13,7 +13,7 @@ import shutil
 import logging
 from pathlib import Path
 
-from rosa.confs import *
+# from rosa.confs import *
 from rosa.lib import (
     phones, ping_rem, ping_cass, 
     download_batches5, calc_batch, 

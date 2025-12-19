@@ -5,27 +5,59 @@ Uploads to, updates in, and deletes data from the server.
 
 import logging
 from pathlib import Path
+# from itertools import batched
+from datetime import datetime, UTC
 
-from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
 import mysql.connector # to connect with the mysql server
 import xxhash # can be replaced w.native hashlib
 
-from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET
+from rosa.confs import MAX_ALLOWED_PACKET, LOCAL_DIR, RED, RESET, INIT
 
 
 logger = logging.getLogger('rosa.log')
 
+# INITIATE SERVER
+
+def init_remote(conn, drps, frps):
+	message = "INITIAL"
+	version = 0
+
+	with conn.cursor() as cursor:
+		cursor.execute(INIT)
+
+		while cursor.nextset():
+			pass
+
+		collector(conn, frps, LOCAL_DIR, version, key="new_files")
+		remote_records(conn, version, message)
+		upload_dirs(conn, drps, version)
+
+def remote_records(conn, version, message):
+	moment = datetime.now(UTC).timestamp()
+
+	with conn.cursor() as cursor:
+		cursor.execute("INSERT INTO interior (moment, message, version) VALUES (%s, %s, %s);", (moment, message, version))
+
+def upload_patches(conn, patches, version):
+	query = "INSERT INTO deltas (rp, patch, version) VALUES (%s, %s, %s);"
+	pversion = version - 1 # patch *to get to* version [n-1]
+	values = []
+	for rp, patch in patches:
+		values.append((rp, patch, pversion))
+	
+	with conn.cursor(prepared=True) as cursor:
+		for val in values:
+			cursor.execute(query, val)
+
 # EDIT SERVER
 
-def collector(conn, _list, abs_path, key):
+def collector(conn, _list, abs_path, version, key=None):
 	"""Manages the batched uploading to the server.
 
 	Sorts the batches with collect_info.
 	Passes each resulting set to collect_data, 
 	And the corresponding upload function.
 	Both queries %s with 3 values in the same order.
-	Uses tqdm for progress bar.
 
 	Args:
 		conn: Connection object.
@@ -36,20 +68,18 @@ def collector(conn, _list, abs_path, key):
 	Returns:
 		None
 	"""
-	with tqdm_(loggers=[logger]):
-		with tqdm(collect_info(_list, abs_path)) as pbar:
+	for batch in collect_info(_list, abs_path):
 
-			for batch in pbar:
-				batch_data = collect_data(batch, abs_path)
-				if batch_data:
+		batch_data = collect_data(batch, abs_path, version)
+		if batch_data:
 
-					if key == "new_file":
-						upload_created(conn, batch_data)
-					elif key == "altered_file":
-						upload_edited(conn, batch_data)
+			if key == "new_files": # INSERT[S]
+				upload_created(conn, batch_data)
+			elif key == "altered_files": # UPDATE[S]
+				upload_edited(conn, batch_data)
 
 
-def collect_info(dicts_, _abs_path):
+def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faster & less I/O
 	"""Creates batches for uploading.
 
 	Adds items to the batch_items until the size limit is met.
@@ -98,7 +128,7 @@ def collect_info(dicts_, _abs_path):
 	logger.debug('all batches collected')
 	return all_batches
 
-def collect_data(dicts_, _abs_path):
+def collect_data(dicts_, _abs_path, version):
 	"""Collects details about the batch passed to it.
 
 	For every file passed, it adds the content, hash, and relative path to a tuple.
@@ -122,21 +152,21 @@ def collect_data(dicts_, _abs_path):
 	for tupled_batch in dicts_:
 		for path in tupled_batch:
 			item = ( abs_path / path ).resolve()
-			hasher.reset()
 
 			content = item.read_bytes()
 			# c_content = cmpr.compress(content)
 
+			hasher.reset()
 			hasher.update(content)
 			hash_id = hasher.digest()
 
-			item_data.append((content, hash_id, path))
+			item_data.append((content, hash_id, version, path))
 
 	return item_data
 
 # UPLOAD THE COLLECTED
 
-def rm_remdir(conn, gates):
+def rm_remdir(conn, gates, version):
 	"""Removes directories from the server via DELETE.
 
 	DML so executemany().
@@ -149,11 +179,17 @@ def rm_remdir(conn, gates):
 		None
 	"""
 	logger.debug('...deleting remote-only drectory[s] from server...')
-	g = "DELETE FROM directories WHERE drp = %s;"
+
+	query = "INSERT INTO depr_directories (rp, version) VALUES (%s, %s);"
+	values = [(gate[0], version) for gate in gates]
+
+	xquery = "DELETE FROM directories WHERE rp = %s;"
+	xvals = [(gate[0],) for gate in gates]
 
 	with conn.cursor() as cursor:
 		try:
-			cursor.executemany(g, gates)
+			cursor.executemany(query, values)
+			cursor.executemany(xquery, xvals)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}error encountered when trying to delete directory[s] from server:{RESET} {c}.", exc_info=True)
@@ -174,11 +210,13 @@ def rm_remfile(conn, cherubs):
 		None
 	"""
 	logger.debug('...deleting remote-only file[s] from server...')
-	f = "DELETE FROM notes WHERE frp = %s;"
+	f = "DELETE FROM files WHERE rp = %s;"
 
-	with conn.cursor() as cursor:
+	with conn.cursor(prepared=True) as cursor:
 		try:
-			cursor.executemany(f, cherubs)
+			for cherub in cherubs:
+				cursor.execute(f, (cherub,))
+			# cursor.executemany(f, cherubs)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}err encountered when trying to delete file[s] from server:{RESET} {c}", exc_info=True)
@@ -186,24 +224,25 @@ def rm_remfile(conn, cherubs):
 		else:
 			logger.debug('removed remote-only file[s] from server w.o exception')
 
-def upload_dirs(conn, caves):
+def upload_dirs(conn, drps, version):
 	"""Uploads directories to the server via INSERT.
 
 	DML so executemany().
 
 	Args:
 		conn: Connection object to query the server.
-		caves (list): Single-element tuples of remote-only directories' relative paths.
+		drps (list): Lists of remote-only directories' relative paths.
 
 	Returns:
 		None
 	"""
 	# logger.debug('...uploading local-only directory[s] to server...')
-	h = "INSERT INTO directories (drp) VALUES (%s);"
+	query = "INSERT INTO directories (rp, version) VALUES (%s, %s);"
+	values = [(rp, version) for rp in drps]
 
-	with conn.cursor() as cursor:
+	with conn.cursor(prepared=True) as cursor:
 		try:
-			cursor.executemany(h, caves)
+			cursor.executemany(query, values)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"err encountered while attempting to upload [new] directory[s] to server: {c}", exc_info=True)
@@ -224,7 +263,7 @@ def upload_created(conn, serpent_data):
 		None
 	"""
 	# logger.debug('...writing new file[s] to server...')
-	i = "INSERT INTO notes (content, hash_id, frp) VALUES (%s, %s, %s);"
+	i = "INSERT INTO files (content, hash, version, rp) VALUES (%s, %s, %s, %s);"
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
@@ -249,10 +288,11 @@ def upload_edited(conn, soul_data):
 		None
 	"""
 	# logger.debug('...writing altered file[s] to server...')
-	j = "UPDATE notes SET content = %s, hash_id = %s WHERE frp = %s;"
+	j = "UPDATE files SET content = %s, hash = %s, version = %s WHERE rp = %s;"
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
+		# with conn.cursor(prepared=True, buffered=False) as cursor:
 			cursor.executemany(j, soul_data)
 
 	except (mysql.connector.Error, ConnectionError, Exception) as c:

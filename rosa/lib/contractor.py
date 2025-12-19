@@ -16,8 +16,6 @@ import contextlib
 from pathlib import Path
 from itertools import batched
 
-from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm as tqdm_
 import mysql.connector # only for error codes in this file
 
 from rosa.confs import RED, RESET
@@ -28,7 +26,7 @@ logger = logging.getLogger('rosa.log')
 # SETUP EDITOR FOR LOCAL DISK
 
 @contextlib.contextmanager
-def fat_boy(_abs_path):
+def fat_boy(dir_):
 	"""Conext manager for the temporary directory and backup of original. 
 	
 	Takes over on error and ensures corrupted data is never kept.
@@ -43,7 +41,7 @@ def fat_boy(_abs_path):
 	tmpd = None # ORIGINAL
 	backup = None
 
-	abs_path = Path(_abs_path)
+	abs_path = Path(dir_)
 	try:
 
 		tmpd, backup = configure(abs_path)
@@ -264,19 +262,21 @@ def save_people(people, backup, tmpd):
 	Returns:
 		None
 	"""
-	with tqdm_(loggers=[logger]):
-		with tqdm(people, unit="hard-links", leave=True) as pbar:
-			for person in pbar:
-				try:
-					curr = Path( backup / person )
-					tmpd = Path( tmpd / person )
+	# with tqdm_(loggers=[logger]):
+	# 	with tqdm(people, unit="hard-links", leave=True) as pbar:
+	for person in people:
+		curr = Path( backup / person ).resolve()
+		tmp_ = Path( tmpd / person ).resolve()
+		tmp_.parent.mkdir(parents=True, exist_ok=True)
+		try:
 
-					tmpd.hardlink_to(curr)
+			tmp_.hardlink_to(curr)
+			# curr.hardlink_to(tmp_)
 
-				except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
-					raise
+		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
+			raise
 
-def download_batches5(souls, conn, batch_size, row_size, tmpd): # get_all ( aggressive )
+def download_batches5(souls, conn, batch_size, row_size, tmpd):
 	"""Manages the batched downloading and writing. 
 	
 	Used for [get] to download/write discrepancies, 
@@ -306,48 +306,48 @@ def download_batches5(souls, conn, batch_size, row_size, tmpd): # get_all ( aggr
 	bar = "{l_bar}{bar}| {n:.0f}/{total:.0f} [{rate_fmt}{postfix}]"
 
 	try:
-		with tqdm_(loggers=[logger]):
-			with tqdm(batched_list,
-			desc=f"Pulling {batch_count} batches", unit=" batches", unit_scale=True, 
-			unit_divisor=1024, bar_format = bar) as pbar:
-				for bunch in pbar:
-					actual = 0
+		# with tqdm_(loggers=[logger]):
+		# 	with tqdm(batched_list,
+		# 	desc=f"Pulling {batch_count} batches", unit=" batches", unit_scale=True, 
+		# 	unit_divisor=1024, bar_format = bar) as pbar:
+		for bunch in batched_list:
+			actual = 0
 
-					current_rate = pbar.format_dict['rate']
-					spd_str = "? mb/s"
+			current_rate = pbar.format_dict['rate']
+			spd_str = "? mb/s"
 
-					if current_rate:
-						actual = current_rate * batch_mbytes
-						spd_str = f"{actual:.2f}mb/s"
+			if current_rate:
+				actual = current_rate * batch_mbytes
+				spd_str = f"{actual:.2f}mb/s"
 
-					with conn.cursor() as cursor:
-						try:
-							inputs = ', '.join(['%s']*len(bunch))
-							query = f"SELECT frp, content FROM notes WHERE frp IN ({inputs});"
+			with conn.cursor() as cursor:
+				try:
+					inputs = ', '.join(['%s']*len(bunch))
+					query = f"SELECT frp, content FROM notes WHERE frp IN ({inputs});"
 
-							cursor.execute(query, bunch)
-							batch = cursor.fetchall()
+					cursor.execute(query, bunch)
+					batch = cursor.fetchall()
 
-							if batch:
-								wr_batches(batch, tmpd)
-								pbar.set_postfix_str(f"{spd_str}")
+					if batch:
+						wr_batches(batch, tmpd)
+						pbar.set_postfix_str(f"{spd_str}")
 
-						except KeyboardInterrupt as c:
-							logger.warning(f"{RED}boss killed it; deleting partial downlaod{RESET}")
-							try:
-								cursor.fetchall() # for UnreadResultError for mysql-connector
-								cursor.close()
-							except:
-								pass
-							raise
-						except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
-							logger.error(f"err while trying to downwrite data: {c}.", exc_info=True)
-							try:
-								cursor.fetchall()
-								cursor.close()
-							except:
-								pass
-							raise
+				except KeyboardInterrupt as c:
+					logger.warning(f"{RED}boss killed it; deleting partial downlaod{RESET}")
+					try:
+						cursor.fetchall() # for UnreadResultError
+						cursor.close()
+					except:
+						pass
+					raise
+				except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
+					logger.error(f"err while trying to downwrite data: {c}.", exc_info=True)
+					try:
+						cursor.fetchall()
+						cursor.close()
+					except:
+						pass
+					raise
 
 	except KeyboardInterrupt as c:
 		raise
@@ -368,45 +368,34 @@ def wr_batches(data, tmpd):
 	"""
 	# logger.debug('...writing batch to disk...')
 	# dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh
+
 	try:
 		for frp, content in data:
 			t_path = Path ( tmpd / frp ) #.resolve()
 			(t_path.parent).mkdir(parents=True, exist_ok=True)
 
 			# d_content = dcmpr.decompress(content)
-			with open(t_path, 'wb') as t:
+			with open(t_path, 'r', encoding='utf-8') as t:
 				t.write(content)
 
 	except KeyboardInterrupt as ki:
 		raise
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		raise
-	# else:
-		# logger.debug('wrote batch w.o exception')
 
-def mk_rrdir(raw_directories, tmpd):
+def mk_rrdir(drps, tmpd):
 	"""Writes remote directories to the disk.
 
 	Args:
-		raw_directories (list): Single-item tuples (relative paths,) passed immediately from ping_cass().
+		raw_directories (list): Single-item tuples (relative paths,).
 		tmpd (Path): Target directory to write the new directories to/in.
 	
 	Returns:
 		None
 	"""
-	logger.debug('...writing directory tree to disk...')
- 
-	with tqdm_(loggers=[logger]):
-		with tqdm(raw_directories, desc=f"Writing {len(raw_directories)} directories", unit="dirs") as pbar:
-			try:
-				for directory in pbar:
-					fdpath = Path(tmpd / directory[0] ).resolve() # directories remain in list of tuples
-					fdpath.mkdir(parents=True, exist_ok=True)
+	logger.debug('...correcting local directory tree...')
 
-			except (PermissionError, FileNotFoundError, Exception) as e:
-				pbar.leave = False
-				pbar.close()
-				logger.error(f"{RED}error when tried to make directories:{RESET} {e}.", exc_info=True)
-				raise
-			else:
-				logger.debug('created directory tree on disk w.o exception')
+	for rp in drps:
+		rx = rp[0]
+		fp = tmpd / rx
+		fp.mkdir(parents=True, exist_ok=True)

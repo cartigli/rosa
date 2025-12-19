@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from rosa.confs import *
+# from rosa.confs import *
 from rosa.lib import (
     phones, scope_rem, ping_cass, upload_dirs, 
     confirm, mini_ps, counter, finale, collector
@@ -54,7 +54,7 @@ def scraper():
     
     return serpents, caves, abs_path
 
-def main(args=None):
+def main(args=None): # this is where init_index should be called/activated
     """Brute force upload of all the local data. 
     
     Uploads everything.
@@ -67,7 +67,7 @@ def main(args=None):
         raw_heaven = scope_rem(conn) # raw remote files & hash_id's
         heaven_dirs = ping_cass(conn) # raw remote dirs' rpats
 
-        if not any((raw_heaven, heaven_dirs)):
+        if not any((raw_heaven, heaven_dirs)): # double check it is empty
             logger.info('heaven\'s empty; processing local data...')
 
             if Path(LOCAL_DIR).exists():

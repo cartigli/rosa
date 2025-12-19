@@ -42,8 +42,10 @@ def rm(args):
 	rm3.main(args)
 
 def index(args):
-	from rosa.lib import index
-	index.main(args)
+	# from rosa.lib import index
+	# index.main(args)
+	from rosa.fxs import init
+	init.main(args)
 
 rosa = {
 	'get': {

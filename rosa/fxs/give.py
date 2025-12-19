@@ -11,72 +11,98 @@ Twin the server edits; delete, insert, and update from the index as you did to t
 Insert new files, delete deleted files, and update altered (diffs).
 """
 
-import sys
-import time
-from pathlib import Path
-
-from rosa.confs import *
+from rosa.confs import LOCAL_DIR, RED, RESET
 from rosa.lib import (
-    diffr, phones, upload_dirs, 
-    rm_remfile, rm_remdir, confirm, 
-    mini_ps, counter, finale, collector, #, init_index
-    query_index, scope_rem2, contrast2, hash_rel
+    phones, rm_remfile, confirm, 
+    mini_ps, finale, collector,
+    query_index, version_check, 
+    diff_gen, remote_records, 
+    upload_patches, local_audit_,
+    historian, fat_boy, refresh_index,
+    xxdeleted, rm_remdir, local_daudit,
+    upload_dirs, query_dindex
 )
 
 NOMIC = "[give]"
 
 def main(args=None):
     """Forces the local state onto the server. 
-    
+
     Uploads new and altered files to the server. 
     Removes files/directories not found locally.
     Quits if server or local directory is empty.
     """
+    xdiff = False
     logger, force, prints, start = mini_ps(args, NOMIC)
 
-    init_index(key="UPDATE")
-
     with phones() as conn:
-        data, diff = diffr(conn)
+        new, deleted, diffs, remaining, xdiff = query_index(conn)
+    
+    newd, deletedd, ledeux = query_dindex()
 
-    if diff is True:
-        file_data, dir_data = data
-
-        cherubs, souls, stags, serpents = file_data
-        gates, caves, ledeux = dir_data
-
+    if xdiff is True:
+        logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
         with phones() as conn:
-            if gates:
-                logger.info('removing remote-only directory[s] from server...')
-                rm_remdir(conn, gates) # delete remote-only[s] from server
+            vok, v, home = version_check(conn)
+            if vok is True:
+                logger.info('versions: twinned')
+                cv = v + 1
 
-            if caves:
-                logger.info('uploading local-only directory[s] to server...')
-                upload_dirs(conn, caves) # upload local-only[s] to server
+                # if force is True:
+                    # message = f"upload v{version}"
+                # else:
+                message = input("attach a message to this version (or enter for None): ") or None
+                remote_records(conn, cv, message)
 
-            if cherubs: # now this file uses all lists for uploading files, no dictionaries
-                logger.info('removing remote-only file[s]...')
+                logger.info('uploading new files...')
+                collector(conn, new, LOCAL_DIR, cv, key="new_files")
 
-                cherub_params = [(cherub,) for cherub in cherubs]
-                rm_remfile(conn, cherub_params) # delete remote-only file[s]
+                logger.info('uploading altered files...')
+                collector(conn, diffs, LOCAL_DIR, cv, key="altered_files") 
 
-            if souls:
-                key = "altered_file"
-                # create lists of files to upload based on their size & the MAX_ALLOWED_PACKET
-                logger.info('uploading altered file[s] to the server...')
-                collector(conn, souls, LOCAL_DIR, key) # REVISED; OFFLOADED
+                logger.info('generating altered files\' patches')
+                patches, originals = diff_gen(diffs, home.parent, LOCAL_DIR)
 
-            if serpents:
-                key = "new_file"
-                # twin to souls upload block
-                logger.info('uploading serpents to the server...')
-                collector(conn, serpents, LOCAL_DIR, key)
+                logger.info('uploading altered files\' patches')
+                upload_patches(conn, patches, cv)
 
-            counter(start, NOMIC) # one before confirm so user input doesn't get timed
+                logger.info('removing deleted files from server')
+                # needs to find the deleted file's original version first
+                rm_remfile(conn, deleted)
 
-            confirm(conn, force)
+                logger.info('updating remote directories')
+                rm_remdir(conn, deletedd, cv)
+                upload_dirs(conn, newd, cv)
 
-    finale(NOMIC, start, prints) # and one after for the final assessment 
+                logger.info('updating local indexes')
+                with fat_boy(originals) as secure:
+                    local_audit_(new, diffs, remaining, cv, secure)
+                    local_daudit(newd, deletedd, cv)
+
+                    logger.info('backing up deleted files')
+                    xxdeleted(conn, deleted, cv, secure)
+
+                    logger.info('final confirmations')
+                    historian(cv, message) # should this & confirm() be indented??
+                    confirm(conn, force)
+
+            else:
+                logger.critical(f"{RED}versions did not align; pull most recent upload from server before committing{RESET}")
+                return
+
+        logger.info('phone hung up.')
+
+        updates = list(remaining)
+
+        for n in new:
+            updates.append(n) # new & remaining need to get updated
+        
+        refresh_index(updates)
+
+    else:
+        logger.info('no diff!')
+    
+    finale(NOMIC, start, prints)
 
 if __name__=="__main__":
     main()

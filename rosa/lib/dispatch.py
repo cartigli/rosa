@@ -6,13 +6,12 @@ Error handling, server rollback, committing.
 """
 
 import sys
-import time
 import logging
 import contextlib
 
 import mysql.connector
 
-from rosa.confs import XCONFIG, ASSESS2, MAX_ALLOWED_PACKET, RED, RESET
+from rosa.confs import XCONFIG, MAX_ALLOWED_PACKET, RED, RESET
 
 
 logger = logging.getLogger('rosa.log')
@@ -85,10 +84,7 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 		'password': db_pswd,
 		'database': db_name,
 		'autocommit': False,
-		# 'use_pure': False # 5.886, 5.902, 5.903 | not worth the lib
-		'use_pure': True # 5.122, 5.117, 5.113 | seems faster regardless
-		# 'use_unicode': False # 3.213 (after use_pure: 3.266)
-		# 'pool_size': 5
+		'use_pure': True
 	}
 
 	conn = mysql.connector.connect(**config)
@@ -109,11 +105,13 @@ def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
 			row_size (single-element tuple): Table's average row size; useful for getting batch size in bytes.
 	"""
 	batch_size = 5 # default
-	row_size = 10 # don't divide by 
+	row_size = 10 # don't divide by 0
+
 	with conn.cursor() as cursor:
 		try:
 			cursor.execute(ASSESS2)
 			row_size = cursor.fetchone()
+
 		except (ConnectionError, TimeoutError) as c:
 			logger.error(f"error encountered while attempting to find avg_row_size: {c}", exc_info=True)
 			raise
@@ -121,6 +119,7 @@ def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
 			if row_size and row_size[0]:
 				try:
 					batch_size = max(1, int((0.94*MAX_ALLOWED_PACKET) / row_size[0]))
+
 				except ZeroDivisionError:
 					logger.warning("returned row_size was 0, can't divide by 0! returning default batch_sz")
 					return batch_size, row_size
@@ -195,4 +194,4 @@ def confirm(conn, force=False): # to dispatch? or could be to opps?
 			_safety(conn)
 		else:
 			logger.error('unknown response; rolling server back')
-			raise
+			_safety(conn)
