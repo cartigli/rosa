@@ -106,7 +106,7 @@ def sfat_boy(_abs_path):
 		shutil_fx(tmpd)
 		sys.exit(1)
 	else:
-		logger.info('sfat_boy caught no exeptions while writing_all')
+		logger.debug('sfat_boy caught no exeptions while writing_all')
 
 def _lil_guy(abs_path, backup, tmpd):
 	"""Handles recovery if error occurs and is caught by fat_boy. 
@@ -262,8 +262,6 @@ def save_people(people, backup, tmpd):
 	Returns:
 		None
 	"""
-	# with tqdm_(loggers=[logger]):
-	# 	with tqdm(people, unit="hard-links", leave=True) as pbar:
 	for person in people:
 		curr = Path( backup / person ).resolve()
 		tmp_ = Path( tmpd / person ).resolve()
@@ -271,88 +269,9 @@ def save_people(people, backup, tmpd):
 		try:
 
 			tmp_.hardlink_to(curr)
-			# curr.hardlink_to(tmp_)
 
 		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
 			raise
-
-def download_batches5(souls, conn, batch_size, row_size, tmpd):
-	"""Manages the batched downloading and writing. 
-	
-	Used for [get] to download/write discrepancies, 
-	Used by [get][all] to download/write the entire directory.
-
-	Args:
-		souls (list): Relative paths found in the server.
-		conn: Connection object.
-		batch_size (int): A calculated value for the maximum size of a single batch.
-		row_size (single-element tuple): The server's average row_length (used to calculate batch's real size).
-		tmpd (Path): Target directory to write to.
-
-	Returns:
-		None
-	"""
-	batch_count = int(len(souls) / batch_size)
-	if len(souls) % batch_size:
-		batch_count += 1
-
-	batched_list = list(batched(souls, batch_size))
-
-	logger.debug(f"split list into {batch_count} batches")
-
-	batch_mbytes = (batch_size * row_size[0]) / (1024*1024)
-
-	# bar = "{l_bar}{bar}| {n:.3f}/{total:.3f} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
-	bar = "{l_bar}{bar}| {n:.0f}/{total:.0f} [{rate_fmt}{postfix}]"
-
-	try:
-		# with tqdm_(loggers=[logger]):
-		# 	with tqdm(batched_list,
-		# 	desc=f"Pulling {batch_count} batches", unit=" batches", unit_scale=True, 
-		# 	unit_divisor=1024, bar_format = bar) as pbar:
-		for bunch in batched_list:
-			actual = 0
-
-			current_rate = pbar.format_dict['rate']
-			spd_str = "? mb/s"
-
-			if current_rate:
-				actual = current_rate * batch_mbytes
-				spd_str = f"{actual:.2f}mb/s"
-
-			with conn.cursor() as cursor:
-				try:
-					inputs = ', '.join(['%s']*len(bunch))
-					query = f"SELECT frp, content FROM notes WHERE frp IN ({inputs});"
-
-					cursor.execute(query, bunch)
-					batch = cursor.fetchall()
-
-					if batch:
-						wr_batches(batch, tmpd)
-						pbar.set_postfix_str(f"{spd_str}")
-
-				except KeyboardInterrupt as c:
-					logger.warning(f"{RED}boss killed it; deleting partial downlaod{RESET}")
-					try:
-						cursor.fetchall() # for UnreadResultError
-						cursor.close()
-					except:
-						pass
-					raise
-				except (mysql.connector.Error, ConnectionError, TimeoutError, Exception) as c:
-					logger.error(f"err while trying to downwrite data: {c}.", exc_info=True)
-					try:
-						cursor.fetchall()
-						cursor.close()
-					except:
-						pass
-					raise
-
-	except KeyboardInterrupt as c:
-		raise
-	else:
-		logger.debug('atomic wr w.batched download completed w.o exception')
 
 def wr_batches(data, tmpd):
 	"""Writes each batch's data to the tmpd as they come. 
@@ -371,7 +290,7 @@ def wr_batches(data, tmpd):
 
 	try:
 		for frp, content in data:
-			t_path = Path ( tmpd / frp ) #.resolve()
+			t_path = Path ( tmpd / frp )
 			(t_path.parent).mkdir(parents=True, exist_ok=True)
 
 			# d_content = dcmpr.decompress(content)

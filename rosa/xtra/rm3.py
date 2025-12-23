@@ -57,12 +57,12 @@ def main(args=None):
                 # hash alter-er [1 in 777] & file delete-r [1 in 8]
                 if item.is_file():
                     item_no += 1
-                    if item_no % 107 == 0:
-                        with open(item, 'a', encoding='utf-8') as f:
-                            f.write("hello, world")
+                    # if item_no % 107 == 0:
+                    #     with open(item, 'a', encoding='utf-8') as f:
+                    #         f.write("hello, world")
 
                     # remover
-                    elif item_no % 101 == 0: 
+                    if item_no % 101 == 0: 
                         item.unlink()
                         print(f"{RED}deleted a file{RESET}")
                     # renamer

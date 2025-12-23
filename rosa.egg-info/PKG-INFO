@@ -4,40 +4,22 @@ Version: 0.1.0
 Summary: versioning system with history tracking & hash verification
 Requires-Python: >=3.13.0
 Description-Content-Type: text/markdown
-Requires-Dist: tqdm
 Requires-Dist: xxhash
 Requires-Dist: mysql-connector-python
 Requires-Dist: zstandard
+Requires-Dist: diff_match_patch
 
-This is the child of snql3 [check profile] built for more robust and demanding uploading, downloading, and versioning. Some significant changes between the two are batched uploads / downloads (snql3 is fundamentally limited by the size of the maximum network packet), atomic writes when downloading (all or nothing), and aggressive rollback on error when uploading. The hash generation was also delegated to xxhash instead of hashlib for speed, and checkpoints, like timing of uploads/downloads and the size before/after compression, were included (compression is also present before uploading, and decompression during downloading). *Compression is not currently being used as it decreased upload/download times.
-
-The improvements made around speed allowede the pc hosting the MySQL server to download and write 3 GB worth of files in under 10 seconds and upload the same in under a minute [current test downloaded 22 GB in ~50 seconds and uploaded in about 3 minutes]. An older generation laptop running Arch Linux ran the same download of the remote server in under 2 minutes and uploaded the same in 2.1 minutes.
-
-Other improvements/adjustments are the MAX_ALLOWED_PACKET variable in the config file; this determines or helps provide a base for the ideal packet size for uploading and downloading. The batch_sizes are calculated based off this variable and averages of the server's table. Determining the files' size based off of their counted content was replaced with os.path.getsize() which is multitudes faster than reading the file [duh].
-
-This program is built to be modular and imported as needed. Previously, the code below was placed before every relative import so execution could be done manually from anywhere (i.e., from outside the root directory) but was removed. It is not a huge benefit, and can be run manually with [python -m path.to.file] so no big benefit is lost. It can be added back in simply; just insert the block below above all the relative imports of any script you want to manually run outside of the root directory.
-```
-if __name__=="__main__":
-    cd = Path(__file__).resolve().parent.parent
-    if str(cd) not in sys.path:
-        sys.path.insert(0, str(cd))
-```
-
-As of right now, the script only compared hashes to find out if files have been modified. Comparing timestamps of file meta data is coming soon. Also, many junk functions and duplicate logics have been removed. Instead of one single library file, the logic has been split into 5 mini libraries where they have more specific functions. 
+Time-stamp and metadata based versioning is here. After checking for potentially modified files, only those flagged are hashed and verified. Diffing and comaprison is multitudes faster.
 The lib now includes:
-  - Analyst: handles the collection of files & their info, generates hashes, and identifies discrepancies
-  - Technician: handles uploading to the server and commiting changes, includes uplaoding & batching logic
-  - Contractor: handles the downloading and writing of data to the disk, including context managers & download logic
-  - Dispatch: manages the connection to the server: initiates, yields, and handles errors for the connection object
-  - Opps: handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
+  - [Index] (new) versioning, diffing, and tracking logic/manager. uses a local sqlite3 index for storage/retrieval
+  - [Technician] handles uploading to the server and commiting changes, includes uplaoding & batching logic
+  - [Contractor] handles the downloading and writing of data to the disk, including context managers & download logic
+  - [Dispatch] manages the connection to the server: initiates, yields, and handles errors for the connection object
+  - [Opps] handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
 
 The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following commands are the main functions of rosa [rosa...]:
   - [give] finds changes between the local and remote data, uploads new files/directories, removes old ones, and updates altered files
-  - [give][all] does not consider changes and brute forces upload of the entire local directory to the server (faster and simpler than [give])
-
-  - [get] finds the changes between the local and remote data, downloads new files/directories, removes old ones, and replaces outdated content
-  - [get][all] does not consider the changes and brute forces download of the entire server to the disk (faster and also simpler than [get])
-
+  - [get][current] does not consider the changes and brute forces download of the server's latest commit to the disk (simpler than [get])
   - [diff] finds changes between the two sources and simply presents them to the user; makes no changes to either of the sources
   - [init] checks the server for tables and triggers, asks the user how to proceed. Used for initiation of the server & truncating/deleting 
         * [rosa][diff] *can also be called with* [rosa][get][diff] *for convienance*
@@ -46,13 +28,55 @@ All scripts accept certain flags with their behavior outlined below:
     - [force] (-f), (--force) if the scripts asks for confirmation or input normally, it will skip and proceed with the default
     - [verbose] (-v), (--verbose) sets the logging_level to DEBUG for maximum logging output
     - [silent] (-s), (--silent) sets the logging_level to CRITICAL for minimum logging output
-        - *Neither the silent nor verbose flags affect the rosa.log file's contents; it logs at the DEBUG level regardless of flags used*
+        - *Neither the silent nor verbose flags affect the rosa.log's content; it logs at the DEBUG level regardless of flags passed at runtime.*
+
+[Versioning Logic]
+Works by tracking new and deleted files after a commit is made.
+
+Commits are recorded as versions 0-n where 0 is the first commit and consecutive versions are the 
+previous commit version + 1. If a file is made and uploaded in version n, it is uploaded/inserted 
+into files table as version n and left untouched until it is deleted (*or altered). If a file is 
+uploaded in commit/version n, but deleted in commit/version n + 1, the file is moved from the files 
+table to the deleted table with oversion (original_version) [n] and xversion (final version/commit 
+with delete) [n + 1], defining the time this file existed for (from version n to version n + 1).  
+
+To retrieve a specific version, you must request a version by specifying an integer within the range 
+of verified commitments (0 - n where n is the latest commit). For every file which existed at version n, 
+the program finds the current record of the file in the files table. If it exists and has a version less 
+than the requested version n, it is pulled. If it exists with a version greater than the requested n, 
+then the program continues to finding altered content (diff logic).
+
+The deleted table must also be queried for any/all files whose xversion is greater than (but not equal to) the requested n.
+
+[un-diff'ing logc]
+Every delta on the deltas table in which the xversion is greater than the requested n and up to the current 
+version are pulled. If there is a record in deleted with the consecutive version from the highest xversion 
+of the latest delta, this is pulled as the base. If this record still exists in the records table, this file 
+is the base. The decided base gets the highest patch applied to it, and the version of the patch is compared 
+to the requested n. If the modified base files' verison == the requested n, stop the loop and return the 
+modified base as the given file in version n. If not, continue the loop until the versions are equal, then 
+pass as the requested version n.
+
+[Basics]
+After configuring the config.py file in rosa/confs, add your mysql user's details & the server's ip address. 
+run 'rosa .' to initiate the program. rosa will create and populate both the remote database and the local 
+index. After rosa . is finished, you can run 'rosa diff' or 'rosa get diff' to see changes made to the local 
+directory. To commit these changes, running 'rosa give' will identify the same changes 'rosa .' found, and 
+adjust the server's database accordingly. The new files are uploaded, deleted files are moved to deleted, and 
+altered files are updated after their reverse patch is computed. if the versions do not match when this is run, 
+the program will exit and ask you to pull the most recent version. running 'rosa get' with uncommitted changes 
+will erase those changes and revert to the latest commit (using only local data). It will revert the directory 
+so that running 'rosa diff' will return 'no diff!'. **This will not pull the most recent version.** It only 
+pulls the most recent version *stored locally*, or the latest commit specifically ran on the given device. It 
+is a local rollback and does not effect or query the server (except for hash verification). Pulling the most 
+recent version & a specified previous version is coming soon.
+
 
 Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
 
-To install and run, navigate to the project directory and run 'pip install .', which will configure the needed packages and configure the path for rosa. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in the parent directory.
+To install and run, navigate to the project directory and run 'pip install .', which will configure the needed packages and configure the path for [rosa]. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in rosa's root directory.
 
 Required packages:
   - xxhash (unless using hashlib; xxhash is mad fast but less secure. Just swap the code with xxhash for the commented out hashlib functions)
   - mysql-connector-python
-  - ~~Zstandard~~
+  - diff_match_patch

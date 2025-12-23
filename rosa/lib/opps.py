@@ -57,29 +57,30 @@ def init_logger(logging_level):
 		console_handler = logging.StreamHandler()
 		console_handler.setLevel(logging_level.upper())
 
-		mysql_console_handler = logging.StreamHandler()
-		mysql_console_handler.setLevel(logging_level.upper())
+		# mysql_console_handler = logging.StreamHandler()
+		# mysql_console_handler.setLevel(logging_level.upper())
 
 		# define formatting - file loggers share format
-		mysql_cons = "[%(levelname)s][%(name)s]: %(message)s"
-		console_ = "[%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
+		# mysql_cons = "[%(levelname)s][%(name)s]: %(message)s"
+		console_ = "%(message)s"
+		# console_ = "[%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
 		file = "[%(asctime)s][%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
 
 		file_format = logging.Formatter(file)
 		console_format = logging.Formatter(console_)
-		mysql_console_format = logging.Formatter(mysql_cons)
+		# mysql_console_format = logging.Formatter(mysql_cons)
 
 		# apply formatting
 		file_handler.setFormatter(file_format)
 		console_handler.setFormatter(console_format)
-		mysql_console_handler.setFormatter(mysql_console_format)
+		# mysql_console_handler.setFormatter(mysql_console_format)
 
 		# add handlers to loggers
 		logger.addHandler(file_handler)
 		logger.addHandler(console_handler)
 
 		logger_mysql.addHandler(file_handler)
-		logger_mysql.addHandler(mysql_console_handler)
+		# logger_mysql.addHandler(mysql_console_handler)
 
 		logger.propagate = False
 		logger_mysql.propagate = False
@@ -200,9 +201,9 @@ def counter(start, nomix):
 		duration = end - start
 		if duration > 60:
 			duration_minutes = duration / 60
-			logger.info(f"time [in minutes] for rosa {nomix}: {duration_minutes:.3f}")
+			logger.debug(f"time [in minutes] for rosa {nomix}: {duration_minutes:.3f}")
 		else:
-			logger.info(f"time [in seconds] for rosa {nomix}: {duration:.3f}")
+			logger.debug(f"time [in seconds] for rosa {nomix}: {duration:.3f}")
 
 def finale(nomix, start, prints):
 	"""Wraps up each files' execution & logging statements.
@@ -220,13 +221,23 @@ def finale(nomix, start, prints):
 	doit_urself()
 	counter(start, nomix)
 
-	logger.info(f"rosa {nomix} complete")
+	logger.debug(f"rosa {nomix} complete")
 
 	if prints is True:
 		print('All set.')
 
-
 def diff_gen(modified, home, curr):
+	"""Generates reverse patches between two files.
+
+	Args:
+		modified (list): Relative paths of the modified files.
+		home (Path): Pathlib path to the index directory.
+		curr (str): The LOCAL_DIR.
+	
+	Returns:
+		patches (dmp patches): Generated patches as text.
+		originals (Path)): Pathlib path to the folder with the originals.
+	"""
 	originals = home / "originals"
 	cur_ = Path(curr)
 	patches = []
@@ -235,17 +246,10 @@ def diff_gen(modified, home, curr):
 		fp_original = originals / rp
 		with open(fp_original, 'r', encoding='utf-8', errors='replace') as f:
 			original = f.read()
-		# with open(fp_original, 'r') as f:
-		# 	original = f.read()
-		# original = fp_original.resolve().read()
-		# original = fp_original.read_bytes()
 
 		fp_modified = cur_ / rp
 		with open(fp_modified, 'r', encoding='utf-8', errors='replace') as m:
 			different = m.read()
-		# with open(fp_modified, 'r') as m:
-		# 	different = m.read()
-		# different = fp_modified.resolve().read()
 
 		# returned as text
 		patch = patcher(original, different)
@@ -254,8 +258,16 @@ def diff_gen(modified, home, curr):
 	
 	return patches, originals
 
-
 def patcher(old, new):
+	"""Computes the reverse patch.
+
+	Args:
+		old (str): The content of the original modded file.
+		new (str): The content of the edited file.
+	
+	Returns:
+		p_txt (str): The computed patch as text.
+	"""
 	dmp = dp_.diff_match_patch()
 
 	patches = dmp.patch_make(new, old)

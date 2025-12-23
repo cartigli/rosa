@@ -11,7 +11,7 @@ import contextlib
 
 import mysql.connector
 
-from rosa.confs import XCONFIG, MAX_ALLOWED_PACKET, RED, RESET
+from rosa.confs import XCONFIG, ASSESS2, MAX_ALLOWED_PACKET, RED, RESET
 
 
 logger = logging.getLogger('rosa.log')
@@ -34,22 +34,23 @@ def phones():
 		conn = init_conn(XCONFIG['user'], XCONFIG['pswd'], XCONFIG['name'], XCONFIG['addr'])
 
 		if conn.is_connected():
-			yield conn
-		else:
-			logger.warning('connection object lost')
-			try:
-				conn.ping(reconnect=True, attempts=3, delay=1)
-				if conn.is_connected():
-					logger.info('connection obj. recovered after failed connect')
-					yield conn
 
-				else:
-					logger.warning('reconnection failed; abandoning')
-					sys.exit(1)
-			except:
-				raise
-			else:
-				logger.info('connection obj. recovered w.o exception [after exception was caught]')
+			yield conn
+
+		# else:
+		# 	logger.warning('connection object lost')
+		# 	try:
+		# 		conn.ping(reconnect=True, attempts=3, delay=1)
+		# 		if conn.is_connected():
+		# 			logger.info('connection obj. recovered after failed connect')
+		# 			yield conn
+		# 		else:
+		# 			logger.warning('reconnection failed; abandoning')
+		# 			sys.exit(1)
+		# 	except:
+		# 		raise
+		# 	else:
+		# 		logger.info('connection obj. recovered w.o exception [after exception was caught]')
 
 	except KeyboardInterrupt as ko:
 		logger.error('boss killed it; wrap it up')
@@ -63,7 +64,11 @@ def phones():
 		if conn:
 			if conn.is_connected():
 				conn.close()
-				logger.info('phones closed conn [finally]')
+				logger.debug('phones closed conn [finally]')
+			else:
+				logging.debug('connection did not make it back to phones')
+		else:
+			logging.debug('connection did not make it back to phones')
 
 def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 	"""Initiate the connection to the server. If an error occurs, [freak out].
@@ -78,8 +83,8 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 		conn: Connection object.
 	"""
 	config = {
-		'unix_socket': '/tmp/mysql.sock',
-		# 'host': db_addr,
+		# 'unix_socket': '/tmp/mysql.sock',
+		'host': db_addr,
 		'user': db_user,
 		'password': db_pswd,
 		'database': db_name,
@@ -118,7 +123,7 @@ def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
 		else:
 			if row_size and row_size[0]:
 				try:
-					batch_size = max(1, int((0.94*MAX_ALLOWED_PACKET) / row_size[0]))
+					batch_size = max(1, int((MAX_ALLOWED_PACKET) / row_size[0]))
 
 				except ZeroDivisionError:
 					logger.warning("returned row_size was 0, can't divide by 0! returning default batch_sz")

@@ -5,13 +5,14 @@ Uploads to, updates in, and deletes data from the server.
 
 import logging
 from pathlib import Path
-# from itertools import batched
+from itertools import batched
 from datetime import datetime, UTC
 
 import mysql.connector # to connect with the mysql server
 import xxhash # can be replaced w.native hashlib
 
-from rosa.confs import MAX_ALLOWED_PACKET, LOCAL_DIR, RED, RESET, INIT
+# LOCAL_DIR used once (besides import)
+from rosa.confs import MAX_ALLOWED_PACKET, LOCAL_DIR, RED, RESET, INIT, INIT2
 
 
 logger = logging.getLogger('rosa.log')
@@ -19,31 +20,67 @@ logger = logging.getLogger('rosa.log')
 # INITIATE SERVER
 
 def init_remote(conn, drps, frps):
+	"""Initiates the first upload to and creation of the database.
+
+	Args:
+		conn (mysql): Connection obj.
+		drps (list): Relative paths of all the directories.
+		frps (list): Relative paths of all the files.
+	
+	Returns:
+		None
+	"""
+	_path = Path(LOCAL_DIR)
 	message = "INITIAL"
 	version = 0
 
 	with conn.cursor() as cursor:
-		cursor.execute(INIT)
+		# make all the tables first
+		cursor.execute(INIT2)
 
 		while cursor.nextset():
 			pass
 
-		collector(conn, frps, LOCAL_DIR, version, key="new_files")
-		remote_records(conn, version, message)
+		# start with the bulk file upload
+		collector(conn, frps, _path, version, key="new_files")
+		# then upload the directories
 		upload_dirs(conn, drps, version)
+		# upload the new version no & message last (lightest & least data rich)
+		remote_records(conn, version, message)
 
 def remote_records(conn, version, message):
+	"""Uploads the messave and new version.
+
+	Args:
+		conn (mysql): Connection obj.
+		version (int): Current version.
+		message (str): If any, it is the given message for the version.
+	
+	Returns:
+		None
+	"""
 	moment = datetime.now(UTC).timestamp()
 
 	with conn.cursor() as cursor:
 		cursor.execute("INSERT INTO interior (moment, message, version) VALUES (%s, %s, %s);", (moment, message, version))
 
-def upload_patches(conn, patches, version):
-	query = "INSERT INTO deltas (rp, patch, version) VALUES (%s, %s, %s);"
-	pversion = version - 1 # patch *to get to* version [n-1]
+def upload_patches(conn, patches, xversion, oversions):
+	"""Uploads the reverse patches generated for altered files.
+
+	Args:
+		conn (mysql): Connection obj.
+		patches (dmp): Reverse patches as text.
+		xversion (int): Previous version of the file.
+		oversion (int): Current version.
+	
+	Returns:
+		None
+	"""
+	query = "INSERT INTO deltas (rp, patch, xversion, oversion) VALUES (%s, %s, %s, %s);"
 	values = []
 	for rp, patch in patches:
-		values.append((rp, patch, pversion))
+		oversion = oversions[rp]
+		values.append((rp, patch, xversion, oversion))
 	
 	with conn.cursor(prepared=True) as cursor:
 		for val in values:
@@ -51,33 +88,44 @@ def upload_patches(conn, patches, version):
 
 # EDIT SERVER
 
+def avg(_list, abs_path):
+	"""Finds abatch size for the files passed.
+
+	Args:
+		_list (list): Relative paths of files.
+		abs_path (Path): Pathlib path of the LOCAL_DIR.
+	
+	Returns:
+		batch_count (int): Packet size divided by average file size.
+	"""
+	paths = Path(abs_path)
+	tsz = 0
+
+	for x in _list:
+		fp = paths / x
+		tsz += fp.stat().st_size
+	
+	batch_count = int(MAX_ALLOWED_PACKET / (tsz / len(_list)))
+	return batch_count
+
 def collector(conn, _list, abs_path, version, key=None):
 	"""Manages the batched uploading to the server.
 
-	Sorts the batches with collect_info.
-	Passes each resulting set to collect_data, 
-	And the corresponding upload function.
-	Both queries %s with 3 values in the same order.
-
 	Args:
-		conn: Connection object.
-		_list (list): The files [local_only, deltas] for uploading.
-		abs_path (Path): Original path of the LOCAL_DIR.
+		conn (mysql): Connection object.
+		_list (list): Relative paths, for uploading.
+		abs_path (Path): Pathlib path to the LOCAL_DIR.
+		version (int): Current version.
 		key (var): String for specifying upload created() or edited().
 	
 	Returns:
 		None
 	"""
-	for batch in collect_info(_list, abs_path):
+	batch_count = avg(_list[:17], abs_path)
+	batches = list(batched(_list, batch_count))
 
-		batch_data = collect_data(batch, abs_path, version)
-		if batch_data:
-
-			if key == "new_files": # INSERT[S]
-				upload_created(conn, batch_data)
-			elif key == "altered_files": # UPDATE[S]
-				upload_edited(conn, batch_data)
-
+	for _batch in batches:
+		collect_data(conn, _batch, abs_path, version, key)
 
 def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faster & less I/O
 	"""Creates batches for uploading.
@@ -128,15 +176,12 @@ def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faste
 	logger.debug('all batches collected')
 	return all_batches
 
-def collect_data(dicts_, _abs_path, version):
+def collect_data(conn, dicts_, _abs_path, version, key=None):
 	"""Collects details about the batch passed to it.
 
-	For every file passed, it adds the content, hash, and relative path to a tuple.
-	Each one is appended to item_data and returned.
-
 	Args:
-		dicts_ (list): List of the batch's relative paths, created by collect_info() passed by collector().
-		_abs_path (Path): Original path of the LOCAL_DIR.
+		dicts_ (list): Batch's relative paths.
+		_abs_path (Path): Pathlib path to the LOCAL_DIR.
 
 	Returns:
 		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.
@@ -149,24 +194,29 @@ def collect_data(dicts_, _abs_path, version):
 	# hasher = hashlib.sha256()
 	hasher = xxhash.xxh64()
 
-	for tupled_batch in dicts_:
-		for path in tupled_batch:
-			item = ( abs_path / path ).resolve()
+	for path in dicts_:
+		# for path in tupled_batch:
+		item = ( abs_path / path ).resolve()
 
-			content = item.read_bytes()
-			# c_content = cmpr.compress(content)
+		content = item.read_bytes()
+		# c_content = cmpr.compress(content)
 
-			hasher.reset()
-			hasher.update(content)
-			hash_id = hasher.digest()
+		hasher.reset()
+		hasher.update(content)
+		hash_id = hasher.digest()
 
-			item_data.append((content, hash_id, version, path))
+		item_data.append((content, hash_id, version, path))
 
-	return item_data
+	if key == "new_files":
+		upload_created(conn, item_data)
+	elif key == "altered_files":
+		upload_edited(conn, item_data)
+
+	# return item_data
 
 # UPLOAD THE COLLECTED
 
-def rm_remdir(conn, gates, version):
+def rm_remdir(conn, gates, xversion):
 	"""Removes directories from the server via DELETE.
 
 	DML so executemany().
@@ -180,15 +230,21 @@ def rm_remdir(conn, gates, version):
 	"""
 	logger.debug('...deleting remote-only drectory[s] from server...')
 
-	query = "INSERT INTO depr_directories (rp, version) VALUES (%s, %s);"
-	values = [(gate[0], version) for gate in gates]
+	query = "INSERT INTO depr_directories (rp, xversion, oversion) VALUES (%s, %s, %s);"
+	oquery = "SELECT version FROM directories WHERE rp = %s;"
 
 	xquery = "DELETE FROM directories WHERE rp = %s;"
 	xvals = [(gate[0],) for gate in gates]
 
 	with conn.cursor() as cursor:
 		try:
-			cursor.executemany(query, values)
+			for gate in gates:
+				cursor.execute(oquery, (gate,))
+				oversion = cursor.fetchone()
+
+				values = (gate[0], xversion, oversion[0])
+				cursor.execute(query, values)
+
 			cursor.executemany(xquery, xvals)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
@@ -210,19 +266,25 @@ def rm_remfile(conn, cherubs):
 		None
 	"""
 	logger.debug('...deleting remote-only file[s] from server...')
-	f = "DELETE FROM files WHERE rp = %s;"
+	ovquery = "SELECT version FROM files WHERE rp = %s;"
+	query = "DELETE FROM files WHERE rp = %s;"
+	doversions = {}
 
 	with conn.cursor(prepared=True) as cursor:
 		try:
 			for cherub in cherubs:
-				cursor.execute(f, (cherub,))
-			# cursor.executemany(f, cherubs)
+				cursor.execute(ovquery, (cherub,))
+				oversion = cursor.fetchone()
+				doversions[cherub] = oversion[0]
+
+				cursor.execute(query, (cherub,))
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}err encountered when trying to delete file[s] from server:{RESET} {c}", exc_info=True)
 			raise
 		else:
 			logger.debug('removed remote-only file[s] from server w.o exception')
+			return doversions
 
 def upload_dirs(conn, drps, version):
 	"""Uploads directories to the server via INSERT.

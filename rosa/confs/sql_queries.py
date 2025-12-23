@@ -35,8 +35,7 @@ CREATE TABLE IF NOT EXISTS deltas (
      d_id INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL,
      patch MEDIUMTEXT NOT NULL,
-     oversion INTEGER NOT NULL,
-     xversion INTEGER NOT NULL,
+     version INTEGER NOT NULL,
 PRIMARY KEY (d_id)
 );
 
@@ -44,22 +43,21 @@ CREATE TABLE IF NOT EXISTS deleted (
      idd INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL,
      content LONGBLOB NOT NULL,
-     oversion INTEGER NOT NULL,
-     xversion INTEGER NOT NULL,
+     version INTEGER NOT NULL,
 PRIMARY KEY (idd)
 );
 
 CREATE TABLE IF NOT EXISTS depr_directories (
      ddid INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(256) NOT NULL,
-     oversion INT NOT NULL,
-     xversion INT NOT NULL,
+     version INT NOT NULL,
 PRIMARY KEY (ddid)
 );
 """)
 
 # let's do this later; getting the desired version is more important
-INIT2 = os.getenv("""ONE""","""
+
+INIT2 = os.getenv("""INIT2""","""
 CREATE TABLE IF NOT EXISTS interior (
      _id INT AUTO_INCREMENT NOT NULL,
      moment INTEGER NOT NULL UNIQUE,
@@ -71,55 +69,57 @@ PRIMARY KEY (_id)
 CREATE TABLE IF NOT EXISTS files (
      id INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL UNIQUE,
+     content LONGBLOB NOT NULL,
      hash BINARY(8) NOT NULL,
      version INTEGER NOT NULL,
 PRIMARY KEY (id),
 INDEX rps (rp)
 );
 
-CREATE TABLE IF NOT EXISTS guts (
-     ig INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(256) NOT NULL UNIQUE,
-     content LONGBLOB NOT NULL,
-PRIMARY KEY (ig)
-);
-
 CREATE TABLE IF NOT EXISTS directories (
      did INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(256) NOT NULL,
      version INT NOT NULL,
-PRIMARY KEY (did)
+PRIMARY KEY (did),
+INDEX dps (rp)
 );
 
 CREATE TABLE IF NOT EXISTS deltas (
      d_id INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL,
      patch MEDIUMTEXT NOT NULL,
-     version INTEGER NOT NULL,
-PRIMARY KEY (d_id)
+     oversion INTEGER NOT NULL,
+     xversion INTEGER NOT NULL,
+PRIMARY KEY (d_id),
+INDEX mrps (rp)
 );
 
 CREATE TABLE IF NOT EXISTS deleted (
      idd INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL,
-     version INTEGER NOT NULL,
-PRIMARY KEY (idd)
-);
-
-CREATE TABLE IF NOT EXISTS deleted_guts (
-     dig INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(256) NOT NULL UNIQUE,
      content LONGBLOB NOT NULL,
-PRIMARY KEY (dig)
+     oversion INTEGER NOT NULL,
+     xversion INTEGER NOT NULL,
+PRIMARY KEY (idd),
+INDEX drps (rp)
 );
 
 CREATE TABLE IF NOT EXISTS depr_directories (
      ddid INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(256) NOT NULL,
-     version INT NOT NULL,
-PRIMARY KEY (ddid)
+     oversion INT NOT NULL,
+     xversion INT NOT NULL,
+PRIMARY KEY (ddid),
+INDEX ddps (rp)
 );
 """)
+
+"""
+modified ENUM('M') NULL DEFAULT NULL
+or
+original ENUM('O') NULL DEFAULT 'O'
+(^could be state)
+"""
 
 # SQLite tables 
 
@@ -175,7 +175,7 @@ ASSESS2 = os.getenv("""ASSESS2""","""
 SELECT AVG_ROW_LENGTH
 FROM information_schema.tables
 WHERE table_schema = 'notation'
-AND table_name = 'notes';
+AND table_name = 'files';
 """)
 
 CVERSION = os.getenv("""VERSION""","""

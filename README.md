@@ -1,14 +1,17 @@
 Time-stamp and metadata based versioning is here. After checking for potentially modified files, only those flagged are hashed and verified. Diffing and comaprison is multitudes faster.
 The lib now includes:
-  - Index: [new] versioning, diffing, and tracking logic/manager. uses a local sqlite3 index for storage/retrieval
-  - Technician: handles uploading to the server and commiting changes, includes uplaoding & batching logic
-  - Contractor: handles the downloading and writing of data to the disk, including context managers & download logic
-  - Dispatch: manages the connection to the server: initiates, yields, and handles errors for the connection object
-  - Opps: handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
+  - [Index] (new) versioning, diffing, and tracking logic/manager. uses a local sqlite3 index for storage/retrieval
+  - [Technician] handles uploading to the server and commiting changes, includes uplaoding & batching logic
+  - [Contractor] handles the downloading and writing of data to the disk, including context managers & download logic
+  - [Dispatch] manages the connection to the server: initiates, yields, and handles errors for the connection object
+  - [Opps] handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
 
-The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following commands are the main functions of rosa [rosa...]:
+The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib 
+directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from 
+rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following 
+commands are the main functions of rosa [rosa...]:
   - [give] finds changes between the local and remote data, uploads new files/directories, removes old ones, and updates altered files
-  - [get][all] does not consider the changes and brute forces download of the entire server to the disk (faster and also simpler than [get])
+  - [get][current] does not consider the changes and brute forces download of the server's latest commit to the disk (simpler than [get])
   - [diff] finds changes between the two sources and simply presents them to the user; makes no changes to either of the sources
   - [init] checks the server for tables and triggers, asks the user how to proceed. Used for initiation of the server & truncating/deleting 
         * [rosa][diff] *can also be called with* [rosa][get][diff] *for convienance*
@@ -19,7 +22,7 @@ All scripts accept certain flags with their behavior outlined below:
     - [silent] (-s), (--silent) sets the logging_level to CRITICAL for minimum logging output
         - *Neither the silent nor verbose flags affect the rosa.log's content; it logs at the DEBUG level regardless of flags passed at runtime.*
 
-Versioning Logic:
+[Versioning Logic]
 Works by tracking new and deleted files after a commit is made.
 
 Commits are recorded as versions 0-n where 0 is the first commit and consecutive versions are the 
@@ -37,24 +40,41 @@ then the program continues to finding altered content (diff logic).
 
 The deleted table must also be queried for any/all files whose xversion is greater than (but not equal to) the requested n.
 
-(diff logc)
-Every delta on the deltas table in which the xversion is greater than the requested n (up to the current 
-version) are pulled. If there is a record in deleted with the consecutive version from the highest xversion 
+[un-diff'ing logc]
+Every delta on the deltas table in which the xversion is greater than the requested n and up to the current 
+version are pulled. If there is a record in deleted with the consecutive version from the highest xversion 
 of the latest delta, this is pulled as the base. If this record still exists in the records table, this file 
 is the base. The decided base gets the highest patch applied to it, and the version of the patch is compared 
 to the requested n. If the modified base files' verison == the requested n, stop the loop and return the 
 modified base as the given file in version n. If not, continue the loop until the versions are equal, then 
 pass as the requested version n.
 
-Basic uses:
-After configuring the config.py file in rosa/confs, add your mysql user's details & the server's ip address. run 'rosa .' to initiate the program. rosa will create and populate both the remote database and the local index. After rosa . is finished, you can run 'rosa diff' or 'rosa get diff' to see changes made to the local directory. To commit these changes, running 'rosa give' will identify the same changes 'rosa .' found, and adjust the server's database accordingly. The new files are uploaded, deleted files are moved to deleted, and altered files are updated after their reverse patch is computed. if the versions do not match when this is run, the program will exit and ask you to pull the most recent version. running 'rosa get' with uncommitted changes will erase those changes and revert to the latest commit (using only local data). It will revert the directory so that running 'rosa diff' will return 'no diff!'. **This will not pull the most recent version.** It only pulls the most recent version *stored locally*, or the latest commit specifically ran on the given device. It is a local rollback and does not effect or query the server (except for hash verification). Pulling the most recent version & a specified previous version is coming soon.
+[Basics]
+After configuring the config.py file in rosa/confs, add your mysql user's details & the server's ip address. 
+run 'rosa .' to initiate the program. rosa will create and populate both the remote database and the local 
+index. After rosa . is finished, you can run 'rosa diff' or 'rosa get diff' to see changes made to the local 
+directory. To commit these changes, running 'rosa give' will identify the same changes 'rosa .' found, and 
+adjust the server's database accordingly. The new files are uploaded, deleted files are moved to deleted, and 
+altered files are updated after their reverse patch is computed. if the versions do not match when this is run, 
+the program will exit and ask you to pull the most recent version. running 'rosa get' with uncommitted changes 
+will erase those changes and revert to the latest commit (using only local data). It will revert the directory 
+so that running 'rosa diff' will return 'no diff!'. **This will not pull the most recent version.** It only 
+pulls the most recent version *stored locally*, or the latest commit specifically ran on the given device. It 
+is a local rollback and does not effect or query the server (except for hash verification). Pulling the most 
+recent version & a specified previous version is coming soon.
 
 
 Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
 
-To install and run, navigate to the project directory and run 'pip install .', which will configure the needed packages and configure the path for [rosa]. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in rosa's root directory.
+To install and run, navigate to the project directory and run "pip install ." which will configure the needed packages and configure the path for [rosa]. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in rosa's root directory.
 
 Required packages:
   - xxhash (unless using hashlib; xxhash is mad fast but less secure. Just swap the code with xxhash for the commented out hashlib functions)
   - mysql-connector-python
   - diff_match_patch
+
+
+*I am in the process of removing the 'hard-configuration' of the LOCAL_DIR. The initiation will be based off the Current Working Directory (cwd) the*
+*initiation command was ran in, unless specified otherwise with '-rd' or '--redirect'. This will also move the index to the project directory (duh) and*
+*forces dynamic index searching if commands are run from within the directory instead of root level.*
+*Also error handling for when the server doesn't yield or config is corrupt.*

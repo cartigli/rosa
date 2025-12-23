@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
-"""Write the server's state to the disk.
+"""Rolls local directory back to state of latest commit.
 
-Make remote-only files/directories, 
-delete local-only files/directories, 
-and updated content for altered files. 
-Abandon if the server or local directory are empty.
-
-This main() should also update the index because it makes changes to the local data.
-Do the vice-versa of the give edits. Make deleted, delete new, and update altered.
-Insert deleted, delete created, and revert edits (diffs).
+Does not query or connect to the server EXCEPT to verify the hashes.
+Hashes are only verified if the file's timestamp shows a discrepancy.
 """
 
 import shutil
 import sqlite3
 
+# LOCAL_DIR used once (besides import)
 from rosa.confs import LOCAL_DIR
 from rosa.lib import (
     phones, fat_boy, mk_rrdir, 
@@ -25,6 +20,7 @@ from rosa.lib import (
 NOMIC = "[get]"
 
 def originals(replace, tmpd):
+    """Copies the originals of deleted or altered files to replace edits."""
     home = _config()
     origin = home.parent
     originals = origin / "originals"
@@ -37,14 +33,13 @@ def originals(replace, tmpd):
         shutil.copy(fp, bp)
 
 def main(args=None):
-    """Reverts the local state to the most recent commit"""
+    """Reverts the local state to the most recent commit."""
     xdiff = False
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
         new, deleted, diffs, remaining, xdiff = query_index(conn)
     
-    # newd, deletedd, ledeux = query_dindex()
     indexed_dirs = scrape_dindex()
 
     if xdiff is True:
@@ -80,6 +75,8 @@ def main(args=None):
         logger.info('no diff!')
     
     finale(NOMIC, start, prints)
+
+    logger.info('All set.')
 
 if __name__=="__main__":
     main()

@@ -1,46 +1,33 @@
 #!/usr/bin/env python3
-"""Write the server's state to the disk.
+"""Pulls the directory's state from a chosen version.
 
-Make remote-only files/directories, 
-delete local-only files/directories, 
-and updated content for altered files. 
-Abandon if the server or local directory are empty.
-
-This main() should also update the index because it makes changes to the local data.
-Do the vice-versa of the give edits. Make deleted, delete new, and update altered.
-Insert deleted, delete created, and revert edits (diffs).
+Fetches and prints all currently recorded versions.
+Asks user to choose one and pulls that choice.
+Retrieves deleted files, applies reverse patches to
+generate altered files, and deletes new.
+Downloads to a directory named 'rosa_v[version]'
+next to the original, which remains untouched.
 """
 
 import shutil
 import sqlite3
+from pathlib import Path
 from datetime import datetime
+import diff_match_patch as dmp_
 
-from rosa.confs import LOCAL_DIR, VERSIONS, VDIRECTORIES
+# LOCAL_DIR used once (besides import)
+from rosa.confs import LOCAL_DIR, VERSIONS,
 from rosa.lib import (
-    phones, fat_boy, mk_rrdir, 
-    save_people, mini_ps, finale, query_index, _config, refresh_index
+    phones, fat_boy, mk_rrdir, calc_batch,
+    save_people, mini_ps, finale, 
+    query_index, refresh_index, sfat_boy
 )
 
-NOMIC = "[get]"
 
-def originals(replace, tmpd):
-    home = _config()
-    origin = home.parent
-    originals = origin / "originals"
-
-    for rp in replace:
-        fp = originals / rp
-        bp = tmpd / rp
-        if not bp.exists():
-            print(bp, "DOESN'T EXIST [BP]")
-        if not fp.exists():
-            print(fp, "DOESN'T EXIST [FP]")
-        (bp.parent).mkdir(parents=True, exist_ok=True)
-
-        shutil.copy(fp, bp)
+NOMIC = "[get][vers]"
 
 def main(args=None):
-    """Reverts the local state to the most recent commit"""
+    """Fetches all versions and downloads the user's choice."""
     xdiff = False
     logger, force, prints, start = mini_ps(args, NOMIC)
 
@@ -48,7 +35,7 @@ def main(args=None):
         with conn.cursor() as cursor:
             cursor.execute(VERSIONS)
             versions = cursor.fetchall()
-    
+
     fvers = []
     vers = []
     
@@ -59,65 +46,129 @@ def main(args=None):
             fvers.append((version, date, message))
         else:
             fvers.append((version, date))
-    
+
         vers.append(version)
-    
+
     print('all the currently recorded commitments:')
     for v in fvers:
         print(v)
 
     version = input(f"Enter the version you would like to receive ({vers}): ")
 
-
-    # if xdiff is True:
     if version:
         logger.info(f"requested version recieved: v{version}")
-        dpath = Path(LOCAL_DIR).resolve()
 
-        tmpd = dpath.parent / f"rosa_v{version}"
-        tmpd.mkdir(parents=True)
-        with phones() as conn:
-            with conn.cursor() as cursor:
+        tmpd = Path(LOCAL_DIR).parent / f"rosa_v{version}"
+        dmp = dmp_.diff_match_patch()
+        vers_ = {'vs': version}
 
-                cursor.execute(VDIRECTORIES, (version,))
-                drps = cursor.fetchall()
+        with sfat_boy(tmpd) as dirx:
+            with phones() as conn:
+                with conn.cursor() as cursor:
+                    batch_size, r_sz = calc_batch(conn)
 
-                cursor.execute(VD_DIRECTORIES, (version,))
-                ddrps = cursor.fetchall()
-                for d in ddrps:
-                    drps.append(d)
+                    # directories (modifications are not considered)
+                    logger.info('downloading directories...')
+                    VDIRECTORIES = "SELECT rp FROM directories WHERE version <= %s;"
+                    cursor.execute(VDIRECTORIES, (version,))
+                    drps = cursor.fetchall()
 
-                logger.info('copying directory tree...')
-                mk_rrdir(d, tmpd)
+                    VD_DIRECTORIES = "SELECT rp FROM depr_directories WHERE oversion <= %(vs)s AND %(vs)s < xversion;"
+                    cursor.execute(VD_DIRECTORIES, vers_)
+                    ddrps = cursor.fetchall()
+                    for d in ddrps:
+                        drps.append(d)
 
-                get
+                    logger.info('writing directory tree...')
+                    mk_rrdir(drps, dirx)
 
-            # logger.info('hard linking unchanged files...')
-            # save_people(remaining, backup, tmp_)
-            # # ignore new files
+                    # files (unmodified)
+                    logger.info('writing unchanged files...')
+                    VFILES = "SELECT rp, content FROM files WHERE version <= %s;"
+                    cursor.execute(VFILES, (version,))
+                    while True:
+                        fdata = cursor.fetchmany(batch_size)
 
-            for d in deleted:
-                diffs.append(d)
+                        if not fdata:
+                            break
 
-            logger.info('replacing files with deltas')
-            originals(diffs, tmp_)
+                        for rp, content in fdata:
+                            fp = dirx / rp
+                            fp.touch()
+                            with open(fp, 'wb') as f:
+                                f.write(content)
 
-            for r in remaining:
-                diffs.append(r)
+                    # modified files (reverse patching until the requested version is created)
+                    logger.info('downloading and writing modified files...')
+                    VM_FILES = "SELECT DISTINCT rp FROM deltas WHERE oversion <= %(vs)s AND %(vs)s < xversion;"
+                    cursor.execute(VM_FILES, vers_)
+                    rpsto_patch = cursor.fetchall()
 
-        refresh_index(diffs)
-        # refresh_index() # this is delicate and senstive, but not as much as 'give'. Since the new/deleted/altered files' content is not recorded, their new values are not 
-        # in the index, and the local copy of the directory is left at the state of the original, the index only needs to be updated for the files that actually get 
-        # touched during this procedure (local copy of directory remains untouched). The files who are touched (a.k.a. ctimes change) are the altered files, the deleted files,
-        # and the unchanged files. Altered files get overwritten, deleted files get replaced, and unchanged files get hard-linked, which alone doesn't doesn't change their ctimes,
-        # but upon deletion of the original path, the ctime does change (also meaning the index can't be updated until the original directory is deleted, a.k.a. when fat_boy closes.
-        # This means that the refresh_index won't break the system if it fails, but it will force it out of sync and need to be resynced. The local copy of the directory is untouched, 
-        # so we don't need a backup of the orginal like fat_boy uses, but it will require retry on failure (or perfect code, which is unlikely). This also means refresh_index should 
-        # get a list of modified, deleted, and unchanged files to update in the index. 
+                    for rp in rpsto_patch:
+                        VMDC_FILES = """SELECT content FROM files WHERE rp = %s 
+                                        UNION ALL
+                                        SELECT content FROM deleted WHERE rp = %s;"""
+
+                        cursor.execute(VMDC_FILES, (rp[0], rp[0]))
+                        bcontent = cursor.fetchone()
+
+                        content = bcontent[0].decode('utf-8')
+
+                        vals = (rp[0], version, version)
+
+                        VMP_FILES = "SELECT patch FROM deltas WHERE rp = %s AND oversion <= %s AND %s < xversion ORDER BY xversion DESC;"
+                        cursor.execute(VMP_FILES, vals)
+                        while True:
+                            cpatch = cursor.fetchmany(1)
+
+                            if not cpatch:
+                                fp = dirx / rp[0]
+                                with open(fp, 'w') as f:
+                                    f.write(content)
+                                break
+
+                            patch_astext = cpatch[0][0]
+                            patch = dmp.patch_fromText(patch_astext)
+
+                            original_ = dmp.patch_apply(patch, content)
+
+                            previous = original_[0]
+                            success = original_[1]
+
+                            if all(success):
+                                content = previous
+                            else:
+                                print(success)
+                                raise Exception ('error occured while applying patches')
+
+                    logger.info('downloading & writing deleted files...')
+                    VD_FILES = "SELECT content, rp FROM deleted WHERE oversion <= %(vs)s AND xversion > %(vs)s;"
+                    cursor.execute(VD_FILES, vers_)
+
+                    while True:
+                        fdata = cursor.fetchmany(batch_size)
+
+                        if not fdata:
+                            break
+
+                        for content, rp in fdata:
+                            fp = tmpd / rp
+                            if fp.exists() and fp.is_file():
+                                continue
+
+                            fp.touch()
+
+                            with open(fp, 'wb') as f:
+                                f.write(content)
+
+                    logger.info(f"rosa got v{version}")
+
     else:
-        logger.info('no diff!')
+        logger.info('no version given')
     
     finale(NOMIC, start, prints)
+
+    logger.info('All set.')
 
 if __name__=="__main__":
     main()

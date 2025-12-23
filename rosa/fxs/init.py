@@ -1,100 +1,193 @@
 #!/usr/bin/env python3
-"""Interacting with and initiating the database.
+"""Initation of versioning.
 
-Can create, truncate, or drop tables. 
-It can also create, drop, or replace triggers.
-Queries server for tables/triggers, asks user what to do.
-Can create and initiate the index? / 
-No, should wipe index if user wipes tables, 
-delete it if user drops tables, 
-and create it if they make tables.
+Needs to be run before anything else.
+This uploads the current files, indexes the 
+entire directory and makes the copies.
+
+Latest test was about 32 seconds for a 4.0 GB directory.
+Majority of the time is always uploading.
+Also not genuine network speeds, purely functionality tests.
 """
 
 import os
+import sys
+import time
 import shutil
 import logging
 from pathlib import Path
 
+# LOCAL_DIR used twice (besides import)
 from rosa.confs import LOCAL_DIR, BLACKLIST, TABLE_CHECK, _DROP
 from rosa.lib import (
-    phones, mini_ps, finale, _config,
-    init_remote, init_index, _r, confirm,
-    init_dindex
+	phones, mini_ps, finale, _config,
+	init_remote, init_index, _r, confirm,
+	init_dindex, _safety, shutil_fx
 )
+
+logger = logging.getLogger('rosa.log')
+
 
 NOMIC = "[init]"
 
+def _r2(xdir):
+	for obj in os.scandir(xdir):
+		if obj.is_dir():
+			yield obj
+			yield from _r2(obj.path)
+		else:
+			yield obj
+
+def r3(xdir):
+	for obj in os.scandir(xdir):
+		if obj.is_dir():
+			yield from r3(obj.path)
+		else:
+			yield obj.path
+
+def r4(xdir):
+	for obj in os.scandir(xdir):
+		if obj.is_dir():
+			yield obj.path
+			yield from r4(obj.path)
+
 def scraper(dir_):
-    logger = logging.getLogger('rosa.log')
-    pfx = len(dir_) + 1
-    dirx = Path(dir_)
-    frps = []
-    drps = []
+	"""'Scrapes' the given directory for every file and directory's relative paths.
+	
+	Args:
+		dir_ (str): Path to the LOCAL_DIR as a string.
+	
+	Returns:
+		drps (list): Relative paths of every directory.
+		frps (list): Relative paths of every file.
 
-    if dirx.exists():
-        logger.debug('scoping local directory...')
-        for item in dirx.rglob('*'):
-            path_str = item.as_posix()
-            if any(blocked in path_str for blocked in BLACKLIST):
-                continue # skip item if blkd item in its path
-            elif item.is_file():
-                p = item.as_posix()
-                rp = p[pfx:]
+	"""
+	pfx = len(dir_) + 1
+	dirx = Path(dir_)
+	frps = []
+	drps = []
 
-            elif item.is_dir():
-                dp = item.as_posix()
-                drp = dp[pfx:]
-                drps.append(drp)
+	if dirx.exists():
+		# # 33.479, no real diff but i suppose it should stay. Plus no dir/file checking.
+		# for fp in r3(dir_):
+		#     rp = fp[pfx:]
+		#     frps.append(rp)
+		
+		# for fp in r4(dir_):
+		#     rp = fp[pfx:]
+		#     drps.append(rp)
 
-    else:
-        logger.warning('local directory does not exist')
-        sys.exit(1)
-    
-    return drps, frps
+		# 34.477 seconds (4.0 GB)
+		for obj in _r2(dir_):
+			if obj.is_file():
+				rp = obj.path[pfx:]
+				frps.append(rp)
+			
+			elif obj.is_dir():
+				rp = obj.path[pfx:]
+				drps.append(rp)
+
+	else:
+		logger.warning('local directory does not exist')
+		sys.exit(1)
+	
+	return drps, frps
 
 def main(args=None):
-    """Initiating the local & remote databases. 
-    """
-    logger, force, prints, start = mini_ps(args, NOMIC)
+	"""Initiating the local index & remote database."""
+	logger, force, prints, start = mini_ps(args, NOMIC)
 
-    with phones() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(TABLE_CHECK)
-            rez = cursor.fetchall()
-    
-    res = [rex[0] for rex in rez]
+	with phones() as conn:
+		with conn.cursor() as cursor:
+			cursor.execute(TABLE_CHECK)
+			rez = cursor.fetchall()
 
-    if any(res):
-        logger.info(f"found these tables in the server {res}.")
+	res = [rex[0] for rex in rez]
 
-        dec = input("initiation appears to be complete; [w] wipe everything? [or Return to pass] ").lower()
-        if dec in ('w', 'wipe'):
-            with phones() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(_DROP)
+	curr = Path(__file__).resolve()
+	dhome = curr.parent.parent / "index"
 
-                    while cursor.nextset():
-                        pass
+	if any(res):
+		logger.info(f"found these tables in the server {res}.")
 
-                confirm(conn, force)
+		if dhome.exists():
+			logger.info(f"local index's folder also exists: {dhome}")
 
-            home = _config()
-            shutil.rmtree(home.parent)
+			dec = input("initiation appears to have been run already; do you want to [w] wipe everything? [Return to quit] ").lower()
+			if dec in ('w', 'wipe'):
+				start = time.perf_counter()
+				home = _config()
+				try:
+					with phones() as conn:
+						with conn.cursor() as cursor:
+							cursor.execute(_DROP)
 
-    else:
-        dec = input("nothing has been configured; [i] intiate local & remote? [or Return to pass] ").lower()
+							while cursor.nextset():
+								pass
+				except:
+					logger.error('error occured while erasing db', exc_info=True)
+				else:
+					shutil_fx(dhome)
+					if dhome.exists():
+						logger.warning('shutil failed; retrying after 1 second')
+						time.sleep(1)
+						shutil_fx(dhome)
+		else:
+			logger.info('the server has tables but the local index does not exist; the server needs to be erased.')
+			dec = input('wipe now [w]? [Return to quit]: ').lower()
+			
+			if dec in('w', 'wipe', ' w', 'w '):
+				try:
+					with conn.cursor() as cursor:
+						cursor.execute(_DROP)
 
-        if dec in('i', 'init', 'initiate'):
-            drps, frps = scraper(LOCAL_DIR)
+						while cursor.nextset():
+							pass
+				except:
+					logger.info('failed to erase server due to error', exc_info=True)
+	
+	elif dhome.exists():
+		logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
+		dec = input('delete [d] the index now? [Return to quit]: ').lower()
 
-            with phones() as conn:
-                init_remote(conn, drps, frps)
-                init_dindex(drps)
-                init_index()
+		if dec in('d', 'delete', 'd ', ' d'):
+			shutil_fx(dhome)
+			if dhome.exists():
+				logger.warning('shutil failed; retrying after 1 second')
+				time.sleep(1)
+				shutil_fx(dhome)
 
-                conn.commit()
+	else:
+		dec = input("[i] intiate? [Return to quit] ").lower()
 
-    finale(NOMIC, start, prints)
+		if dec in('i', 'init', 'initiate'):
+			start = time.perf_counter()
+			with phones() as conn:
+				try:
+					drps, frps = scraper(LOCAL_DIR)
+					init_remote(conn, drps, frps)
+					init_dindex(drps)
+					init_index()
+
+				except:
+					logger.info(f"initiation failed due to error", exc_info=True)
+					with conn.cursor() as cursor:
+						cursor.execute(_DROP)
+
+						while cursor.nextset():
+							pass
+
+					shutil_fx(dhome)
+					if dhome.exists():
+						logger.warning('shutil failed; retrying after 1 second')
+						time.sleep(1)
+						shutil_fx(dhome)
+				else:
+					conn.commit()
+
+	finale(NOMIC, start, prints)
+
+	logger.info('All set.')
 
 if __name__=="__main__":
-    main()
+	main()
