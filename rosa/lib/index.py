@@ -10,20 +10,43 @@ from pathlib import Path
 from datetime import datetime, UTC
 
 # LOCAL_DIR used 5 times (besides import)
-from rosa.confs import LOCAL_DIR, BLACKLIST, RECORDS, RECORDS_INDEX, INTERIOR, DIRECTORIES, DIRECTORIES_INDEX, CVERSION, _TRUNCATE, _DROP
+from rosa.confs import LOCAL_DIR, BLACKLIST, RECORDS, INTERIOR, DIRECTORIES, DIRECTORIES_INDEX, CVERSION
 
 logger = logging.getLogger('rosa.log')
 
 def _config():
-	curr = Path(__file__).resolve()
-	dhome = curr.parent.parent / "index"
+	"""Makes the directory for the index & path for SQLite db connection.
 
+	Args:
+		None
+
+	Returns:
+		home (Path): Pathlib path to the SQLite's database file.
+	"""
+	# curr = Path(__file__).resolve()
+	# dhome = curr.parent.parent / "index"
+
+	# dhome.mkdir(parents=True, exist_ok=True)
+	# home = dhome / "indeces.db"
+
+	curr = Path.cwd()
+
+	dhome = curr / ".index"
 	dhome.mkdir(parents=True, exist_ok=True)
+
 	home = dhome / "indeces.db"
 
 	return home
 
 def construct(home):
+	"""Makes the SQLite tables inside the database.
+
+	Args:
+		home (Path): Pathlib path to the SQLite's database file.
+
+	Returns:
+		None
+	"""
 	with sqlite3.connect(home) as conn:
 		cursor = conn.cursor()
 
@@ -34,18 +57,47 @@ def construct(home):
 
 		conn.commit()
 
-def copier(abs_path): # git does this on 'add' instead of on 'init'
-	b = Path(__file__).resolve().parent.parent / "index"
+def copier(abs_path, home): # git does this on 'add' instead of on 'init'
+	"""Backs up the current directory to the index with the 'cp -r' unix command.
 
-	backup_lo = b / "originals"
-	if abs_path.exists():
-		if backup_lo.exists():
-			shutil.rmtree(backup_lo)
-			time.sleep(1)
+	Args:
+		abs_path (Path): Pathlib path to a chosen directory.
 
-		subprocess.run(["cp", "-r", f"{abs_path}", f"{backup_lo}"])
+	Returns:
+		None
+	"""
+	backup_lo = home / "originals"
+	backup_lo.mkdir(parents=True, exist_ok=True)
+
+	# original_ = backup_lo / f"{abs_path.name}"
+	# original_.mkdir(parents=True, exist_ok=True)
+
+	for xobj in abs_path.glob('*'):
+
+		if any(blocked in xobj.as_posix() for blocked in BLACKLIST):
+			pass
+		else:
+			destination = backup_lo / xobj.name
+
+			if xobj.is_dir():
+				shutil.copytree(xobj, destination)
+				# subprocess.run(["cp", "-r", f"{xdir}", f"{backup_lo}"])
+				# shutil.copy(xdir, original_)
+
+			elif xobj.is_file():
+				shutil.copy2(xobj, destination)
+
+	# subprocess.run(["cp", "-r", f"{abs_path}", f"{backup_lo}"])
 
 def _r(dir_):
+	"""Recursive function which is faster than rglob('*').
+
+	Args:
+		dir_ (Path): Pathlib path to a directory to recursively find files from.
+
+	Yields:
+		obj (Path): Pathlib path containing a file found in the given directory.
+	"""
 	for obj in os.scandir(dir_):
 		if obj.is_dir():
 			yield from _r(obj.path)
@@ -53,7 +105,14 @@ def _r(dir_):
 			yield obj
 
 def _surveyor(dir_):
-	"""Collects metadata for initial indexing."""
+	"""Collects metadata for initial indexing.
+
+	Args:
+	dir (Path): Pathlib path pointing to the requested directory.
+
+	Returns:
+		inventory (list): Tupled relative paths, st_ctimes, and st_sizes for every file found.
+	"""
 	prefix = len(dir_.as_posix()) + 1
 
 	inventory = []
@@ -74,12 +133,19 @@ def _surveyor(dir_):
 	return inventory
 
 def _survey(dir_, version):
-	"""Collects metadata for initial indexing."""
+	"""Collects metadata for initial indexing but includes versions for the index.
+	
+	Args:
+		dir_ (Path): Pathlib path to the requested directory.
+		version (int): Current version for the index.
+	
+	Returns:
+		inventory (list): Tupled relative pats, versions, st_ctimes and st_sizes for all the files found.
+	"""
 	inventory = []
 	inter = []
 
 	prefix = len(dir_.as_posix()) + 1
-	# blk_list = ['.DS_Store', '.git', '.obsidian', 'index']
 
 	for file in _r(dir_):
 		if any(blocked in file.path for blocked in BLACKLIST):
@@ -96,32 +162,97 @@ def _survey(dir_, version):
 	return inventory
 
 def _dsurvey(dir_):
+	"""Collects the subdirectories within the requested directory.
+
+	Args:
+		dir_ (Path): Pathlib path to the requested directory.
+
+	Returns:
+		ldrps (list): Relative paths of every directory found.
+	"""
 	pfx = len(dir_.as_posix()) + 1
 	ldrps = []
 
 	for dirx in dir_.rglob('*'):
-		if dirx.is_dir():
+		# if dirx.as_posix() in BLACKLIST:
+		if any(blocked in dirx.as_posix() for blocked in BLACKLIST):
+			continue
+
+		elif dirx.is_dir():
 			fp = dirx.as_posix()
 			rp = fp[pfx:]
+
 			ldrps.append(rp)
 
 	return ldrps
 
 def _surveyorx(dir_, rps):
+	"""Collects the new metadata for altered files from a list of files.
+
+	Args:
+		dir_ (Path): Pathlib path to the requested directory.
+		rps (list): Relative paths of all the altered files.
+
+	Returns:
+		inventory (list): Tupled st_ctimes, st_sizes and relative paths of revery file path in rps.
+	"""
 	inventory = []
 
+	# for rps in rpsl:
 	for rp in rps:
 		fp = dir_ / rp
 		stats = fp.stat()
+
 		ctime = stats.st_ctime
 		size = stats.st_size *(10**7)
 
 		inventory.append((ctime, size, rp))
-		# inventory.append((rp, ctime, size))
 	
 	return inventory
 
+def is_ignored(path_str):
+	if any(blocked in path_str for blocked in BLACKLIST):
+		strx = None
+	else:
+		strx = path_str
+
+	return strx
+
+def historian(version, message, index):
+	"""Records the version & message, if present, in the index.
+
+	Args:
+		version (int): Current version of the update or initiation.
+		message (str): Message, if present, to be recorded.
+		index (Path): The current index's path.
+
+	Returns:
+		None
+	"""
+	moment = datetime.now(UTC).timestamp()*(10**7) # integer
+
+	if index.parent.exists() and index.exists():
+		x = "INSERT INTO interior (moment, message, version) VALUES (?, ?, ?);"
+		values = (moment, message, version)
+
+		with sqlite3.connect(index) as conn:
+			cursor = conn.cursor()
+
+			cursor.execute(x, values)
+			conn.commit()
+	else:
+		logger.info('there is no index; initiate or repair the config')
+		sys.exit(4)
+
 def _formatter(dir_):
+	"""Builds a dictionary of indexed st_ctimes and st_sizes for every file found.
+
+	Args:
+		dir_ (Path): Pathlib path to the requested directory.
+
+	Returns:
+		rollcall (dictionary): Every file's relative path keyed to its st_ctime and st_size.
+	"""
 	rollcall = {}
 	inventory = _surveyor(dir_)
 
@@ -130,26 +261,15 @@ def _formatter(dir_):
 
 	return rollcall # dictionary of local files for comparison against index
 
-def historian(version, message):
-	moment = datetime.now(UTC).timestamp()*(10**7) # integer
-	# home = _config()
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
-
-	if home.parent.exists() and home.exists():
-		x = "INSERT INTO interior (moment, message, version) VALUES (?, ?, ?);"
-		values = (moment, message, version)
-
-		with sqlite3.connect(home) as conn:
-			cursor = conn.cursor()
-			cursor.execute(x, values)
-
-			conn.commit()
-	else:
-		logger.info('there is no index; initiate or repair the config')
-		sys.exit(4)
-
 def get_records(home):
+	"""Builds a dictionary of indexed st_ctimes and st_sizes for every file indexed.
+
+	Args:
+		dir_ (Path): Pathlib path to the requested directory.
+
+	Returns:
+		rollcall (dictionary): Every file's relative path keyed to its st_ctime and st_size.
+	"""
 	index_records = {}
 
 	with sqlite3.connect(home) as conn:
@@ -162,31 +282,22 @@ def get_records(home):
 
 	return index_records
 
-def get_dirs():
-	query = "SELECT rp FROM directories;"
-	# home = _config()
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
-	
-	if home.parent.exists() and home.exists():
-		with sqlite3.connect(home) as conn:
-			cursor = conn.cursor()
-			cursor.execute(query)
-			idrps = cursor.fetchall()
-		
-		return idrps
-	else:
-		logger.info('there is no index; initiate or repair the config')
-		sys.exit(4)
-
 def init_index():
+	"""Initiates a new index.
+
+	Args:
+		None
+
+	Returns:
+		None
+	"""
 	message = "INITIAL"
 	version = 0
 
 	home = _config()
 	abs_path = Path(LOCAL_DIR)
 
-	copier(abs_path) # backup created first
+	copier(abs_path, home.parent) # backup created first
 	inventory = _survey(abs_path, version) # collect current files' metadata
 
 	with sqlite3.connect(home) as conn:
@@ -198,9 +309,17 @@ def init_index():
 
 		conn.commit()
 
-	historian(version, message) # load the version into the local records table
+	historian(version, message, home) # load the version into the local records table
 
 def init_dindex(drps):
+	"""Initiates the table for the directories with version 0 data.
+
+	Args:
+		drps (list): All the subdirectories found at execution.
+
+	Returns:
+		None
+	"""
 	version = 0
 	home = _config()
 
@@ -211,10 +330,23 @@ def init_dindex(drps):
 
 	with sqlite3.connect(home) as conn:
 		cursor = conn.cursor()
+
 		cursor.executemany(query, values)
 		conn.commit()
 
 def qfdiffr(index_records, real_stats):
+	"""Compares the indexed vs actual files & their metadata.
+
+	Args:
+		index_records (dictionary): Relative paths key paired to the respective file's st ctime & size.
+		real_stats (dictionary): Relative paths key paired to the respective file's st ctime & size.
+
+	Returns:
+		new (set): Files created since the last commitment.
+		deleted (set): Files deleted since the last commitment.
+		diffs (list): Files whose metadata differs.
+		unchanged (set): Unaltered files.
+	"""
 	all_indexes = set(index_records.keys())
 	all_files = set(real_stats.keys())
 
@@ -236,20 +368,41 @@ def qfdiffr(index_records, real_stats):
 
 	return new, deleted, diffs, unchanged
 
-def query_index(conn):
-	diff = False
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
+def query_index(conn, index):
+	"""Finds file discrepancies between indexed and actual files.
 
-	if home.parent.exists() and home.exists():
+	Args:
+		conn (mysql): Connection object.
+		index (Path): The current index's path.
+
+	Returns:
+		new (set): Files created since the last commitment.
+		deleted (set): Files deleted since the last commitment.
+		failed (list): Files whose recorded and actual hashes differ.
+		remaining (list): Unaltered files.
+		diff (bool): Whether differences are present or not.
+	"""
+	diff = False
+	remaining = []
+
+	if index.parent.exists() and index.exists():
 		abs_path = Path(LOCAL_DIR)
 
 		real_stats = _formatter(abs_path)
-		index_records = get_records(home)
+		index_records = get_records(index)
 
-		new, deleted, diffs, remaining = qfdiffr(index_records, real_stats)
+		new, deleted, diffs, remaining_ = qfdiffr(index_records, real_stats)
 
-		failed = verification(conn, diffs, abs_path)
+		failed, succeeded = verification(conn, diffs, abs_path)
+
+		# remaining = list(remaining_)
+		for x in remaining_:
+			remaining.append(x)
+		
+		for y in succeeded:
+			remaining.append(y)
+
+		# remaining.append(succeeded)
 
 		if any(failed) or any(new) or any(deleted):
 			diff = True
@@ -260,7 +413,19 @@ def query_index(conn):
 		sys.exit(4)
 
 def verification(conn, diffs, dir_):
+	"""Checks actual vs. recorded hash for files with metadata discrepancies.
+
+	Args:
+		conn (mysql): Connection object.
+		diffs (list): Files with metadata discrepancies.
+		dir_ (Path): The directory to search.
+
+	Returns:
+		failed (list): Files whose hash did not match.
+		succeeded (list): Files whose hash matched.
+	"""
 	failed = []
+	succeeded = []
 	local_ids = {}
 	remote_ids = {}
 
@@ -280,8 +445,8 @@ def verification(conn, diffs, dir_):
 
 	query = "SELECT hash FROM files WHERE rp = %s;"
 
-	for diff in diffs:
-		with conn.cursor() as cursor:
+	with conn.cursor() as cursor:
+		for diff in diffs:
 			cursor.execute(query, (diff,))
 			rhash = cursor.fetchone()
 
@@ -290,19 +455,27 @@ def verification(conn, diffs, dir_):
 	for diff in diffs:
 		if remote_ids[diff] != local_ids[diff]:
 			failed.append(diff)
+		else:
+			succeeded.append(diff)
 	
-	return failed
+	return failed, succeeded
 
-def query_dindex():
-	# home = _config()
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
+def query_dindex(index):
+	"""Checks the actual directories against recorded.
 
-	if home.parent.exists() and home.exists():
+	Args:
+		index (Path): The current index's path.
+
+	Returns:
+		newd (set): Directories created since the last recorded commitment.
+		deletedd (set): Directories deleted since the last recorded commit.
+		ledeux (set): Directories in both.
+	"""
+	if index.parent.exists() and index.exists():
 		abs_path = Path(LOCAL_DIR)
 		query = "SELECT rp FROM directories;"
 
-		with sqlite3.connect(home) as conn:
+		with sqlite3.connect(index) as conn:
 			cursor = conn.cursor()
 			cursor.execute(query)
 
@@ -325,35 +498,57 @@ def query_dindex():
 		logger.warning('there is no index; either initiate or correct the config')
 		sys.exit(4)
 
-def version_check(conn):
-	# home = _config()
-	vok = False
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
+def version_check(conn, index):
+	"""Queries local and remote databases to compare the latest recorded version.
 
-	if home.parent.exists() and home.exists():
+	Args:
+		conn (mysql): Connection object.
+		index (Path): The current index's path.
+
+	Returns:
+		vok (bool): Whether versions match (True) or not (False).
+		lc_version[0] (int): The current version, if verified.
+	"""
+	vok = False
+
+	if index.parent.exists() and index.exists():
 		with conn.cursor() as cursor:
 			cursor.execute(CVERSION)
 			rc_version = cursor.fetchone()
 		
-		with sqlite3.connect(home) as conn:
+		with sqlite3.connect(index) as conn:
 			cursor = conn.cursor()
+
 			cursor.execute(CVERSION)
 			lc_version = cursor.fetchone()
 		
 		if rc_version and lc_version:
 			if rc_version[0] != lc_version[0]:
+				print(f"versions misaligned: remote: {rc_version} | local: {lc_version}")
 				vok = False
-				print(f"versions misaligned: remote: {rc_version} - local: {lc_version}")
+
 			elif rc_version[0] == lc_version[0]:
 				vok = True
 
-		return vok, lc_version[0], home
+		return vok, lc_version[0]
 	else:
 		logger.warning('there is no index; either initiate or correct the config')
 		sys.exit(4)
 
-def local_audit_(new, diffs, remaining, version, secure):
+def local_audit_(new, diffs, remaining, version, secure, index):
+	"""Reverts the current directory back to the latest locally recorded commit.
+
+	Args:
+		new (set): Files created since the last commitment.
+		failed (list): Files whose recorded and actual hashes differ.
+		remaining (set): Unaltered files.
+		version (int): Current version.
+		secure (Tuple): Contains the two paths to tmp & backup directories.
+		index (Path): The current index's path.
+
+	Returns:
+		None
+	"""
 	logger.debug('auditing the local index')
 	abs_path = Path(LOCAL_DIR) # nothing
 
@@ -366,7 +561,9 @@ def local_audit_(new, diffs, remaining, version, secure):
 	prefix = len(backup.as_posix()) + 1
 
 	for dirs in backup.rglob('*'):
-		if dirs.is_dir():
+		if any(blocked in dirs.as_posix() for blocked in BLACKLIST):
+			continue
+		elif dirs.is_dir():
 			rp = dirs.as_posix()[prefix:]
 			ndir = Path(tmpd / rp).resolve()
 
@@ -378,6 +575,9 @@ def local_audit_(new, diffs, remaining, version, secure):
 			origin = (backup / rem).resolve()
 			destin = (tmpd / rem).resolve()
 
+			origin.parent.mkdir(parents=True, exist_ok=True)
+			destin.parent.mkdir(parents=True, exist_ok=True)
+
 			destin.hardlink_to(origin)
 
 	if new:
@@ -385,9 +585,20 @@ def local_audit_(new, diffs, remaining, version, secure):
 	if diffs:
 		idiffs = xxdiff(diffs, abs_path, version, tmpd)
 
-	index_audit(inew, idiffs)
+	index_audit(inew, idiffs, index)
 
 def xxnew(new, abs_path, version, tmpd):
+	"""Backs up new files to the 'originals' directory.
+
+	Args:
+		new (set): Files created since the last commitment.
+		abs_path (Path): The given directory.
+		version (int): Current version.
+		tmpd (Path): The new directory.
+
+	Returns:
+		inew (list): Tuples containing relative path, 1, 1, version for every new file.
+	"""
 	logger.debug('copying new files over...')
 	inew = []
 
@@ -403,6 +614,17 @@ def xxnew(new, abs_path, version, tmpd):
 	return inew
 
 def xxdiff(diffs, abs_path, version, tmpd):
+	"""Updates modified files' copies in the 'originals' directory.
+
+	Args:
+		diffs (slist): Files whose contents were altered since the last commit.
+		abs_path (Path): The given directory.
+		version (int): Current version.
+		tmpd (Path): The new directory.
+
+	Returns:
+		idiffs (list): Tuples containing the ctime, size, version and relative path of each altered file.
+	"""
 	logger.debug('writing over dated files...')
 	idiff = []
 
@@ -427,13 +649,19 @@ def xxdiff(diffs, abs_path, version, tmpd):
 
 	return idiff
 
-def index_audit(new, diffs):
-	# home = _config() # versions are current in the local index; can get them here instead of remote :)
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
+def index_audit(new, diffs, index):
+	"""Updates the current index to show metadata from recent changes.
 
-	if home.parent.exists() and home.exists():
-		with sqlite3.connect(home) as conn:
+	Args:
+		new (list): Tuples containing relative path, 1, 1, version for every new file.
+		diffs (list): Tuples containing the ctime, size, version and relative path of each altered file.
+		index (Path): The current index's path.
+
+	Returns:
+		None
+	"""
+	if index.parent.exists() and index.exists():
+		with sqlite3.connect(index) as conn:
 			cursor = conn.cursor()
 
 			if new:
@@ -451,18 +679,24 @@ def index_audit(new, diffs):
 		logger.warning('there is no index; either initiate or correct the config')
 		sys.exit(4)
 
+def xxdeleted(conn, deleted, xversion, doversions, secure, index): # deleted should be its own logic
+	"""Backs up deleted files to the server; deletes them from the index.
 
-def xxdeleted(conn, deleted, xversion, doversions, secure): # deleted should be its own logic
+	Args:
+		conn (mysql): Connection object.
+		deleted (set): Deleted files' relative paths.
+		xversion (int): Version in wich the given file was deleted.
+		doversion (int): Original (prior) version of the deleted file.
+		secure (tuple): Temporary and backup directory's paths.
+		index (Path): The current index's path.
+
+	Returns:
+		None
+	"""
 	logger.debug('archiving deleted files...')
 	tmpd, backup = secure
-	# home = _config()
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
 
-	if home.parent.exists() and home.exists():
-
-		ideleted = []
-
+	if index.parent.exists() and index.exists():
 		query = "INSERT INTO deleted (rp, xversion, oversion, content) VALUES (%s, %s, %s, %s);"
 		xquery = "DELETE FROM records WHERE rp = ?;"
 
@@ -472,16 +706,13 @@ def xxdeleted(conn, deleted, xversion, doversions, secure): # deleted should be 
 			with open(fp, 'rb') as d:
 				dcontent = d.read()
 			
-			# oversion = doversions.get(rp)
 			oversion = doversions[rp]
-
-			# deletedx = (rp, version, dcontent)
 
 			with conn.cursor(prepared=True) as cursor:
 				deletedx = (rp, xversion, oversion, dcontent)
 				cursor.execute(query, deletedx)
 
-			with sqlite3.connect(home) as sconn: # becuase this conn is initiated here, commit has to happen here. 
+			with sqlite3.connect(index) as sconn: # becuase this conn is initiated here, commit has to happen here. 
 				# I could initiate out of the func, but that doesn't fit sqlite strats. 
 				# Although index audit does this. Yeesh. Might be huge design flaw. Will come back to this.
 				cursor = sconn.cursor()
@@ -492,39 +723,57 @@ def xxdeleted(conn, deleted, xversion, doversions, secure): # deleted should be 
 		logger.warning('there is no index; either initiate or correct the config')
 		sys.exit(4)
 
-def local_daudit(newd, deletedd, version):
+def local_daudit(newd, deletedd, version, index):
+	"""Refreshes the indexed directories to reflect the current contents.
+
+	Args:
+		newd (set): Directories made since the latest commitment.
+		deletedd (set): Directories deleted since the latest commitment.
+		version (int): Current version.
+		index (Path): The current index's path.
+
+	Returns:
+		None
+	"""
 	# this is also current with last change's version, so get oversion from here instead of remote
 	nquery = "INSERT INTO directories (rp, version) VALUES (?, ?);"
 	dquery = "DELETE FROM directories WHERE rp = ?;"
-	# home = _config()
-	curr = Path(__file__).resolve()
-	home = curr.parent.parent / "index" / "indeces.db"
-	if home.parent.exists() and home.exists():
+
+	if index.parent.exists() and index.exists():
 
 		if newd:
 			nvals = [(rp, version) for rp in newd]
-			with sqlite3.connect(home) as conn:
-				cursor = conn.cursor()
-				cursor.executemany(nquery, nvals)
 
+			with sqlite3.connect(index) as conn:
+				cursor = conn.cursor()
+
+				cursor.executemany(nquery, nvals)
 				conn.commit()
 
 		if deletedd:
 			dvals = [(d,) for d in deletedd]
-			with sqlite3.connect(home) as conn:
-				cursor = conn.cursor()
-				cursor.executemany(dquery, dvals)
 
+			with sqlite3.connect(index) as conn:
+				cursor = conn.cursor()
+
+				cursor.executemany(dquery, dvals)
 				conn.commit()
 	else:
 		logger.warning('there is no index; either initiate or correct the config')
 		sys.exit(4)
 
-def scrape_dindex():
-	query = "SELECT rp FROM directories;"
-	home = _config()
+def scrape_dindex(index):
+	"""Gathers all directories from the directories' index.
 
-	with sqlite3.connect(home) as conn:
+	Args:
+		index (Path): The current index's path.
+
+	Returns:
+		drps (list): Every directory currently indexed.
+	"""
+	query = "SELECT rp FROM directories;"
+
+	with sqlite3.connect(index) as conn:
 		cursor = conn.cursor()
 		cursor.execute(query)
 
@@ -532,13 +781,21 @@ def scrape_dindex():
 	
 	return drps
 
-def refresh_index(diffs):
+def refresh_index(diffs, index):
+	"""Refreshes the index to show currently accurate metadata of the files.
+
+	Args:
+		diffs (set): Relative paths of altered files.
+		index (Path): The current index's path.
+
+	Returns:
+		None
+	"""
 	abs_path = Path(LOCAL_DIR)
-	home = _config()
 
 	inventory = _surveyorx(abs_path, diffs)
 
-	with sqlite3.connect(home) as conn:
+	with sqlite3.connect(index) as conn:
 		cursor = conn.cursor()
 		query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
 
@@ -546,9 +803,3 @@ def refresh_index(diffs):
 			cursor.execute(query, inv)
 
 		conn.commit()
-
-# def main(args=None):
-#      start = time.perf_counter()
-#      init_index()
-#      end = time.perf_counter()
-#      print(f"init took {(end - start):.4f} seconds.")

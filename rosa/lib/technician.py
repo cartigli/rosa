@@ -11,8 +11,7 @@ from datetime import datetime, UTC
 import mysql.connector # to connect with the mysql server
 import xxhash # can be replaced w.native hashlib
 
-# LOCAL_DIR used once (besides import)
-from rosa.confs import MAX_ALLOWED_PACKET, LOCAL_DIR, RED, RESET, INIT, INIT2
+from rosa.confs import MAX_ALLOWED_PACKET, LOCAL_DIR, RED, RESET, INIT2
 
 
 logger = logging.getLogger('rosa.log')
@@ -141,7 +140,6 @@ def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faste
 	Returns:
 		all_batches (list): List of lists, each inner-list containing one batches' files for uploading.
 	"""
-	# logger.debug('...collecting info on file[s] sizes to upload...')
 	# cmpr = zstd.ZstdCompressor(level=3)
 	curr_batch = 0
 
@@ -161,7 +159,6 @@ def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faste
 			raise
 
 		elif (curr_batch + size) > MAX_ALLOWED_PACKET:
-			# logger.debug("collected one batch's items")
 			all_batches.append((batch_items,))
 
 			batch_items = [i]
@@ -186,7 +183,6 @@ def collect_data(conn, dicts_, _abs_path, version, key=None):
 	Returns:
 		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.
 	"""
-	# logger.debug('...collecting data on file[s] to upload...')
 	abs_path = Path(_abs_path)
 	item_data = []
 
@@ -195,7 +191,6 @@ def collect_data(conn, dicts_, _abs_path, version, key=None):
 	hasher = xxhash.xxh64()
 
 	for path in dicts_:
-		# for path in tupled_batch:
 		item = ( abs_path / path ).resolve()
 
 		content = item.read_bytes()
@@ -211,8 +206,6 @@ def collect_data(conn, dicts_, _abs_path, version, key=None):
 		upload_created(conn, item_data)
 	elif key == "altered_files":
 		upload_edited(conn, item_data)
-
-	# return item_data
 
 # UPLOAD THE COLLECTED
 
@@ -298,7 +291,6 @@ def upload_dirs(conn, drps, version):
 	Returns:
 		None
 	"""
-	# logger.debug('...uploading local-only directory[s] to server...')
 	query = "INSERT INTO directories (rp, version) VALUES (%s, %s);"
 	values = [(rp, version) for rp in drps]
 
@@ -309,8 +301,6 @@ def upload_dirs(conn, drps, version):
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"err encountered while attempting to upload [new] directory[s] to server: {c}", exc_info=True)
 			raise
-		# else:
-		#     logger.debug('local-only directory[s] written to server w.o exception')
 
 def upload_created(conn, serpent_data):
 	"""Uploads new files into the database via INSERT.
@@ -324,7 +314,6 @@ def upload_created(conn, serpent_data):
 	Returns:
 		None
 	"""
-	# logger.debug('...writing new file[s] to server...')
 	i = "INSERT INTO files (content, hash, version, rp) VALUES (%s, %s, %s, %s);"
 
 	try:
@@ -334,8 +323,7 @@ def upload_created(conn, serpent_data):
 	except (mysql.connector.Error, ConnectionError, Exception) as c:
 		logger.error(f"{RED}err encountered while attempting to upload [new] file[s] to server:{RESET} {c}", exc_info=True)
 		raise
-	# else:
-	#     logger.debug('wrote new file[s] to server w.o exception')
+
 
 def upload_edited(conn, soul_data):
 	"""Uploads altered files into the database via UPDATE.
@@ -349,16 +337,12 @@ def upload_edited(conn, soul_data):
 	Returns:
 		None
 	"""
-	# logger.debug('...writing altered file[s] to server...')
 	j = "UPDATE files SET content = %s, hash = %s, version = %s WHERE rp = %s;"
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
-		# with conn.cursor(prepared=True, buffered=False) as cursor:
 			cursor.executemany(j, soul_data)
 
 	except (mysql.connector.Error, ConnectionError, Exception) as c:
 		logger.error(f"err encountered while attempting to upload altered file to server:{RESET} {c}", exc_info=True)
 		raise
-	# 	logger.debug("wrote altered file[s]'s contents & new hashes to server w,o exception")
-	# else:

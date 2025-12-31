@@ -16,13 +16,11 @@ from datetime import datetime
 import diff_match_patch as dmp_
 
 # LOCAL_DIR used once (besides import)
-from rosa.confs import LOCAL_DIR, VERSIONS,
+from rosa.confs import LOCAL_DIR, VERSIONS
 from rosa.lib import (
-    phones, fat_boy, mk_rrdir, calc_batch,
-    save_people, mini_ps, finale, 
-    query_index, refresh_index, sfat_boy
+    phones, fat_boy, mk_rrdir, calc_batch, mini_ps, finale, 
+    query_index, refresh_index, sfat_boy, find_index
 )
-
 
 NOMIC = "[get][vers]"
 
@@ -31,6 +29,8 @@ def main(args=None):
     xdiff = False
     logger, force, prints, start = mini_ps(args, NOMIC)
 
+    index = find_index()
+
     with phones() as conn:
         with conn.cursor() as cursor:
             cursor.execute(VERSIONS)
@@ -38,10 +38,11 @@ def main(args=None):
 
     fvers = []
     vers = []
-    
+
     for version, moment, message in versions:
         date_obj = datetime.utcfromtimestamp(moment)
         date = date_obj.strftime("%Y-%m-%d - %M:%H:%S")
+
         if message:
             fvers.append((version, date, message))
         else:
@@ -70,11 +71,13 @@ def main(args=None):
                     # directories (modifications are not considered)
                     logger.info('downloading directories...')
                     VDIRECTORIES = "SELECT rp FROM directories WHERE version <= %s;"
+
                     cursor.execute(VDIRECTORIES, (version,))
                     drps = cursor.fetchall()
 
                     VD_DIRECTORIES = "SELECT rp FROM depr_directories WHERE oversion <= %(vs)s AND %(vs)s < xversion;"
                     cursor.execute(VD_DIRECTORIES, vers_)
+
                     ddrps = cursor.fetchall()
                     for d in ddrps:
                         drps.append(d)
@@ -83,9 +86,11 @@ def main(args=None):
                     mk_rrdir(drps, dirx)
 
                     # files (unmodified)
-                    logger.info('writing unchanged files...')
+                    logger.info('writing files...')
+
                     VFILES = "SELECT rp, content FROM files WHERE version <= %s;"
                     cursor.execute(VFILES, (version,))
+
                     while True:
                         fdata = cursor.fetchmany(batch_size)
 
@@ -95,12 +100,14 @@ def main(args=None):
                         for rp, content in fdata:
                             fp = dirx / rp
                             fp.touch()
+
                             with open(fp, 'wb') as f:
                                 f.write(content)
 
                     # modified files (reverse patching until the requested version is created)
-                    logger.info('downloading and writing modified files...')
+                    logger.info('downloading and writing patched files...')
                     VM_FILES = "SELECT DISTINCT rp FROM deltas WHERE oversion <= %(vs)s AND %(vs)s < xversion;"
+
                     cursor.execute(VM_FILES, vers_)
                     rpsto_patch = cursor.fetchall()
 
@@ -118,11 +125,13 @@ def main(args=None):
 
                         VMP_FILES = "SELECT patch FROM deltas WHERE rp = %s AND oversion <= %s AND %s < xversion ORDER BY xversion DESC;"
                         cursor.execute(VMP_FILES, vals)
+
                         while True:
                             cpatch = cursor.fetchmany(1)
 
                             if not cpatch:
                                 fp = dirx / rp[0]
+
                                 with open(fp, 'w') as f:
                                     f.write(content)
                                 break
@@ -143,6 +152,7 @@ def main(args=None):
 
                     logger.info('downloading & writing deleted files...')
                     VD_FILES = "SELECT content, rp FROM deleted WHERE oversion <= %(vs)s AND xversion > %(vs)s;"
+
                     cursor.execute(VD_FILES, vers_)
 
                     while True:
@@ -153,6 +163,7 @@ def main(args=None):
 
                         for content, rp in fdata:
                             fp = tmpd / rp
+
                             if fp.exists() and fp.is_file():
                                 continue
 

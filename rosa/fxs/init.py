@@ -7,7 +7,7 @@ entire directory and makes the copies.
 
 Latest test was about 32 seconds for a 4.0 GB directory.
 Majority of the time is always uploading.
-Also not genuine network speeds, purely functionality tests.
+Also, these are not genuine network speeds; purely functionality tests.
 """
 
 import os
@@ -17,12 +17,11 @@ import shutil
 import logging
 from pathlib import Path
 
-# LOCAL_DIR used twice (besides import)
 from rosa.confs import LOCAL_DIR, BLACKLIST, TABLE_CHECK, _DROP
 from rosa.lib import (
 	phones, mini_ps, finale, _config,
 	init_remote, init_index, _r, confirm,
-	init_dindex, _safety, shutil_fx
+	init_dindex, _safety, shutil_fx, find_index
 )
 
 logger = logging.getLogger('rosa.log')
@@ -68,18 +67,10 @@ def scraper(dir_):
 	drps = []
 
 	if dirx.exists():
-		# # 33.479, no real diff but i suppose it should stay. Plus no dir/file checking.
-		# for fp in r3(dir_):
-		#     rp = fp[pfx:]
-		#     frps.append(rp)
-		
-		# for fp in r4(dir_):
-		#     rp = fp[pfx:]
-		#     drps.append(rp)
-
-		# 34.477 seconds (4.0 GB)
 		for obj in _r2(dir_):
-			if obj.is_file():
+			if any(blocked in obj.path for blocked in BLACKLIST):
+				continue
+			elif obj.is_file():
 				rp = obj.path[pfx:]
 				frps.append(rp)
 			
@@ -104,58 +95,69 @@ def main(args=None):
 
 	res = [rex[0] for rex in rez]
 
-	curr = Path(__file__).resolve()
-	dhome = curr.parent.parent / "index"
-
+	index = find_index()
+	# if index:
+	# 	logger.warning('This is already an indexed directory; erase current or run give/get. Abandoning.')
+	# 	sys.exit(1)
+	# else:
 	if any(res):
 		logger.info(f"found these tables in the server {res}.")
 
-		if dhome.exists():
-			logger.info(f"local index's folder also exists: {dhome}")
+		# if index.exists():
+		# 	logger.info(f"local index's folder also exists: {index}")
 
-			dec = input("initiation appears to have been run already; do you want to [w] wipe everything? [Return to quit] ").lower()
-			if dec in ('w', 'wipe'):
-				start = time.perf_counter()
-				home = _config()
-				try:
-					with phones() as conn:
-						with conn.cursor() as cursor:
-							cursor.execute(_DROP)
+		# 	dec = input("initiation appears to have been run already; do you want to [w] wipe everything? [Return to quit] ").lower()
+		# 	if dec in ('w', 'wipe'):
+		# 		start = time.perf_counter()
+		# 		try:
+		# 			with phones() as conn:
+		# 				with conn.cursor() as cursor:
+		# 					cursor.execute(_DROP)
 
-							while cursor.nextset():
-								pass
-				except:
-					logger.error('error occured while erasing db', exc_info=True)
-				else:
-					shutil_fx(dhome)
-					if dhome.exists():
-						logger.warning('shutil failed; retrying after 1 second')
-						time.sleep(1)
-						shutil_fx(dhome)
-		else:
-			logger.info('the server has tables but the local index does not exist; the server needs to be erased.')
-			dec = input('wipe now [w]? [Return to quit]: ').lower()
-			
-			if dec in('w', 'wipe', ' w', 'w '):
-				try:
+		# 					while cursor.nextset():
+		# 						pass
+		# 		except:
+		# 			logger.error('error occured while erasing db', exc_info=True)
+		# 		else:
+		# 			shutil_fx(index)
+		# 			if index.exists():
+		# 				logger.warning('shutil failed; retrying after 1 second')
+		# 				time.sleep(1)
+		# 				shutil_fx(index)
+		# else:
+		logger.info('the server has tables but the local index does not exist; the server needs to be erased.')
+		dec = input('wipe now [w]? [Return to quit]: ').lower()
+		
+		if dec in('w', 'wipe', ' w', 'w '):
+			try:
+				with phones() as conn:
 					with conn.cursor() as cursor:
 						cursor.execute(_DROP)
 
 						while cursor.nextset():
 							pass
-				except:
-					logger.info('failed to erase server due to error', exc_info=True)
-	
-	elif dhome.exists():
-		logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
-		dec = input('delete [d] the index now? [Return to quit]: ').lower()
+					if index:
 
-		if dec in('d', 'delete', 'd ', ' d'):
-			shutil_fx(dhome)
-			if dhome.exists():
-				logger.warning('shutil failed; retrying after 1 second')
-				time.sleep(1)
-				shutil_fx(dhome)
+						shutil_fx(index.parent)
+						if index.exists():
+							logger.warning('shutil failed; retrying after 1 second')
+							time.sleep(1)
+							shutil_fx(index.parent)
+
+			except Exception as e:
+				logger.info(f"failed to erase server due to: {e}", exc_info=True)
+	
+	elif index:
+		if index.exists():
+			logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
+			dec = input('delete [d] the index now? [Return to quit]: ').lower()
+
+			if dec in('d', 'delete', 'd ', ' d'):
+				shutil_fx(index.parent)
+				if index.exists():
+					logger.warning('shutil failed; retrying after 1 second')
+					time.sleep(1)
+					shutil_fx(index.parent)
 
 	else:
 		dec = input("[i] intiate? [Return to quit] ").lower()
@@ -177,17 +179,16 @@ def main(args=None):
 						while cursor.nextset():
 							pass
 
-					shutil_fx(dhome)
-					if dhome.exists():
+					shutil_fx(index.parent)
+					if index.exists():
 						logger.warning('shutil failed; retrying after 1 second')
 						time.sleep(1)
-						shutil_fx(dhome)
+						shutil_fx(index.parent)
 				else:
 					conn.commit()
 
 	finale(NOMIC, start, prints)
-
-	logger.info('All set.')
+	# logger.info('All set.')
 
 if __name__=="__main__":
 	main()

@@ -20,17 +20,13 @@ logger = logging.getLogger('rosa.log')
 # INITIATE LOGGER & RECORDS MANAGER
 
 def init_logger(logging_level):
-	"""Initiates the logger and configures the formatting.
-
-	Two loggers & three handlers; one logger for mysql.connector and the other for the file & console. 
-	One handler for the file, and two for the console, one for mysql & one for rosa's logging output.
-	Mysql & the rosa logger both get the file handler added to them so the file records everything.
+	"""Initiates the logger and configures their formatting.
 
 	Args:
-		logging_level (str): Logging level configured in the config.py file, unless changed by mini_ps due to a flag.
+		logging_level (str): Logging level from the config file.
 	
 	Returns:
-		logger: Logging object.
+		logger (Logging): Logger.
 	"""
 	if logging_level:
 		file = Path(__file__)
@@ -57,30 +53,22 @@ def init_logger(logging_level):
 		console_handler = logging.StreamHandler()
 		console_handler.setLevel(logging_level.upper())
 
-		# mysql_console_handler = logging.StreamHandler()
-		# mysql_console_handler.setLevel(logging_level.upper())
-
-		# define formatting - file loggers share format
-		# mysql_cons = "[%(levelname)s][%(name)s]: %(message)s"
+		# define formatting
 		console_ = "%(message)s"
-		# console_ = "[%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
 		file = "[%(asctime)s][%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
 
 		file_format = logging.Formatter(file)
 		console_format = logging.Formatter(console_)
-		# mysql_console_format = logging.Formatter(mysql_cons)
 
 		# apply formatting
 		file_handler.setFormatter(file_format)
 		console_handler.setFormatter(console_format)
-		# mysql_console_handler.setFormatter(mysql_console_format)
 
 		# add handlers to loggers
 		logger.addHandler(file_handler)
 		logger.addHandler(console_handler)
 
 		logger_mysql.addHandler(file_handler)
-		# logger_mysql.addHandler(mysql_console_handler)
 
 		logger.propagate = False
 		logger_mysql.propagate = False
@@ -93,7 +81,7 @@ def init_logger(logging_level):
 def doit_urself():
 	"""Moves rosa.log to record of old logs if the size limit is met.
 
-	Deletes oldest record if the file limit is reached.
+	Deletes oldest record if the file count reaches the limit (5).
 
 	Args:
 		None
@@ -160,7 +148,7 @@ def mini_ps(args, nomix): # (operations)
 			logger (logger): The logging object returned from init_logger (above).
 			force (bool): A value depending on if the flag -f (--force) was present.
 			prints (bool): A value depending on if the flag -v (--verbose) was present.
-			start (int): A time.perf_counter() value obtained before the script's main function runs to time it.
+			start (float): A time.perf_counter() value obtained before the script's main function runs to time it.
 	"""
 	force = False # no checks - force
 	prints = False # no prints - prints
@@ -210,14 +198,12 @@ def finale(nomix, start, prints):
 	
 	Args:
 		nomix (var): Name variable passed from each script for logging.
-		start (int): A time.perf_counter value obtained at the start of execution.
+		start (float): A time.perf_counter value obtained at the start of execution.
 		prints (bool): Variable specifying whether or not to print (verbosity).
 	
 	Returns:
 		None
 	"""
-	logger = logging.getLogger('rosa.log')
-
 	doit_urself()
 	counter(start, nomix)
 
@@ -226,7 +212,7 @@ def finale(nomix, start, prints):
 	if prints is True:
 		print('All set.')
 
-def diff_gen(modified, home, curr):
+def diff_gen(modified, cellar, curr):
 	"""Generates reverse patches between two files.
 
 	Args:
@@ -238,7 +224,7 @@ def diff_gen(modified, home, curr):
 		patches (dmp patches): Generated patches as text.
 		originals (Path)): Pathlib path to the folder with the originals.
 	"""
-	originals = home / "originals"
+	originals = cellar / "originals"
 	cur_ = Path(curr)
 	patches = []
 
@@ -274,3 +260,39 @@ def patcher(old, new):
 	p_txt = dmp.patch_toText(patches)
 
 	return p_txt
+
+def find_index():
+	"""Finds the index of the cwd from execution.
+
+	Args:
+		None
+
+	Returns:
+		index (Path): Pathlib path to the index, if found.
+	"""
+	cd = Path.cwd()
+	logger.debug(f"Current working directory: {cd}")
+	nf = True
+
+	while nf is True:
+		for dir_ in cd.glob('*'):
+			if dir_.name == ".index":
+				indexp = dir_
+				index = indexp / "indeces.db"
+
+				logger.debug(f"Found the index: {index}")
+
+				nf = False
+				break
+
+			elif dir_.name == "Volumes":
+				logger.debug("Not an indexed directory.")
+				index = None
+
+				nf = False
+				break
+
+		cd = cd.parent
+	
+
+	return index

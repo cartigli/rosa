@@ -6,7 +6,7 @@ If the server and local index are on different versions, this will not tell you.
 It will only identify the changes you made since the latest indexing.
 """
 
-
+import sys
 import logging
 
 from rosa.confs import RED, RESET
@@ -14,7 +14,7 @@ from rosa.lib import (
 	phones, finale, 
 	mini_ps, query_index,
 	phones, query_dindex,
-	version_check
+	version_check, find_index
 )
 
 NOMIC = "[diff]"
@@ -75,17 +75,25 @@ def main(args=None):
 	if args:
 		if args.remote:
 			r = True
+	
+	index = find_index()
+	if not index:
+		logger.info('not an indexed directory')
+		finale(NOMIC, start, prints)
+		sys.exit(1)
+		# logger.info(f"found the index: {index}")
+	# else:
 
 	with phones() as conn:
-		new, deleted, diffs, remaining, xdiff = query_index(conn)
+		new, deleted, diffs, remaining, xdiff = query_index(conn, index)
 		if r:
-			vok, v, h = version_check(conn)
+			vok, vers = version_check(conn, index)
 			if vok is True:
 				logger.info('versions: twinned')
 			elif vok is False:
 				logger.info(f"versions: {RED}twisted{RESET}")
 
-	newd, deletedd, ledeux = query_dindex()
+	newd, deletedd, ledeux = query_dindex(index)
 
 	if prints is True:
 		logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
@@ -93,8 +101,6 @@ def main(args=None):
 	if xdiff is True:
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 		logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
-
-		# if prints is True:
 
 		diff_data = []
 

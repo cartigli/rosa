@@ -5,6 +5,10 @@ Used to sync before another version can be uploaded.
 If the local and remote versions do not match, i.e.,
 there has been an update from another machine since you pulled,
 you cannot give. Sync before trying to give.
+
+Why pull everything w.out checking for diffs??
+Did I mean for this to be only if the directory doesn't exist? Good lord.
+So clarity is needed on the scripts function, fo sho.
 """
 
 import sys
@@ -22,67 +26,20 @@ from rosa.lib import (
 
 NOMIC = "[get][current]"
 
-def rm_origin(abs_path, force=False):
-    """Deletes the LOCAL_DIR if it exists AND EITHER A. The user confirms this or B. The command is run with --force (-f).
-
-    Args:
-        abs_path (Path): The LOCAL_DIR's full path.
-        force (=False): Force flag, if present, is passed and skips the user's confirmation step.
-    
-    Returns:
-        None
-    """
-    logger = logging.getLogger('rosa.log')
-
-    if force is True:
-        logger.info(f"staying silent & deleting {abs_path}.")
-        if abs_path.is_dir():
-            shutil.rmtree(abs_path)
-            if abs_path.exists():
-                logger.info('shutil failed; retrying in 5 seconds')
-                time.sleep(5)
-                shutil.rmtree(abs_path)
-                if abs_path.exists():
-                    logger.warning(f"{RED}could not delete {abs_path}.{RESET}")
-                    sys.exit(1)
-            else:
-                logger.info(f"deleted {abs_path} silenetly.")
-        if abs_path.is_file():
-            abs_path.unlink()
-            if abs_path.exists():
-                logger.warning(f"couldn't delete {abs_path}.")
-                sys.exit(1)
-    else:
-        if abs_path.is_dir():
-            dwarn = input(f"A folder already exists @{abs_path}. Unless specified now with 'n', it will be written over. Return to continue. decision: ").lower()
-            if dwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
-                logger.warning('abandoning rosa [get] [all]')
-                sys.exit(0)
-            else:
-                shutil.rmtree(abs_path)
-                logger.warning(f"{abs_path} was deleted from your disk.")
-        else:
-            fwarn = input(f"a file already exists @{abs_path}; unless specified now with 'n', it will be written over. Return to continue. Decision: ").lower()
-            if fwarn in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
-                logger.warning('abandoning rosa [get] [all]')
-                sys.exit(0)
-            else:
-                abs_path.unlink()
-                logger.warning(f"{abs_path} was deleted from your disk.")
-
-
 def main(args=None):
     """Syncs directory to latest version.""" # has no actual logging; need to add that
     logger, force, prints, start = mini_ps(args, NOMIC)
 
-    abs_path = Path( LOCAL_DIR ).resolve()
+    abs_path = Path(LOCAL_DIR).resolve()
 
     if not abs_path.exists():
         abs_path.mkdir()
 
     with phones() as conn:
         with sfat_boy(abs_path) as tmpd: # sfat_boy inside phones ensures sfat_boy catches errors before phones
-            # wait, why the fuck am I using sfat_boy instead of fat_boy? This function needs to restore the given directory on failure.
+            # wait, why the f*ck am I using sfat_boy instead of fat_boy? This function needs to restore the given directory on failure.
+            # It feels dumb as hell to retrace my own steps like this, but this is further 
+            # evidence that I meant this to be a single execution comprehensive pull.
             dquery = "SELECT rp FROM directories;"
             with conn.cursor(buffered=False) as cursor:
                 cursor.execute(dquery)
@@ -104,6 +61,7 @@ def main(args=None):
 
                     for rp, content in fdata:
                         fp = tmpd / rp
+
                         with open(fp, 'wb') as f:
                             f.write(content)
 

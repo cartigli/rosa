@@ -77,7 +77,9 @@ def fat_boy(dir_):
 
 @contextlib.contextmanager
 def sfat_boy(_abs_path):
-	"""Simplified context manager for rosa [get][all] because there is no original to backup.
+	"""Simplified context manager for rosa [get][all] because there is no original to backup. 
+
+	[third piece of evidence]
 
 	Args:
 		abs_path (Path): Full path of the LOCAL_DIR from config.py
@@ -152,38 +154,39 @@ def shutil_fx(dirx):
 	Returns:
 		None
 	"""
-	if dirx.exists() and dirx.is_dir():
-		try:
-			shutil.rmtree(dirx)
-		except:
-			logger.warning('err for shutil fx, letting her relax and retrying')
-			time.sleep(5)
-			if dirx.exists():
-				try:
-					shutil.rmtree(dirx)
-				except:
-					logger.warning(f"failed to delete {dirx} twice, calling it")
-					raise
+	if dirx:
+		if dirx.exists() and dirx.is_dir():
+			try:
+				shutil.rmtree(dirx)
+			except:
+				logger.warning('err for shutil fx, letting her relax and retrying')
+				time.sleep(5)
+				if dirx.exists():
+					try:
+						shutil.rmtree(dirx)
+					except:
+						logger.warning(f"failed to delete {dirx} twice, calling it")
+						raise
+				else:
+					logger.debug(f"shutil_fx removed {dirx} on retry")
+					return
 			else:
-				logger.debug(f"shutil_fx removed {dirx} on retry")
-				return
+				if dirx.exists():
+					try:
+						shutil.rmtree(dirx)
+					except:
+						logger.warning('failed twice, calling it')
+						raise
+				else:
+					logger.debug(f"shutil_fx deleted {dirx}")
+					return
 		else:
-			if dirx.exists():
-				try:
-					shutil.rmtree(dirx)
-				except:
-					logger.warning('failed twice, calling it')
-					raise
-			else:
-				logger.debug(f"shutil_fx deleted {dirx}")
-				return
-	else:
-		logger.warning('shutil_fx passed something that was not a directory')
-	
-	if dirx.exists():
-		logger.warning(f"shutil_fx could not delete {dirx}")
-	else:
-		logger.debug(f"shutil_fx deleted {dirx}")
+			logger.warning('shutil_fx passed something that was not a directory')
+		
+		if dirx.exists():
+			logger.warning(f"shutil_fx could not delete {dirx}")
+		else:
+			logger.debug(f"shutil_fx deleted {dirx}")
 
 def configure(abs_path):
 	"""Configures the backup and creates the tmpd.
@@ -262,6 +265,7 @@ def save_people(people, backup, tmpd):
 	Returns:
 		None
 	"""
+	# for people in population:
 	for person in people:
 		curr = Path( backup / person ).resolve()
 		tmp_ = Path( tmpd / person ).resolve()
@@ -285,7 +289,6 @@ def wr_batches(data, tmpd):
 	Returns:
 		None
 	"""
-	# logger.debug('...writing batch to disk...')
 	# dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh
 
 	try:
