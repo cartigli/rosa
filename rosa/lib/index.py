@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, UTC
 
 # LOCAL_DIR used 5 times (besides import)
-from rosa.confs import LOCAL_DIR, BLACKLIST, RECORDS, INTERIOR, DIRECTORIES, DIRECTORIES_INDEX, CVERSION
+from rosa.confs import LOCAL_DIR, RECORDS, INTERIOR, DIRECTORIES, DIRECTORIES_INDEX, CVERSION
 
 logger = logging.getLogger('rosa.log')
 
@@ -38,7 +38,17 @@ def _config():
 
 	return home
 
-def construct(home):
+def is_ignored(path_str):
+	blacklist = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
+	return any(blckd in str_ for blckd in blacklist)
+
+	# if any(blocked in path_str for blocked in BLACKLIST):
+	# 	strx = None
+	# else:
+	# 	strx = path_str
+	# return strx
+
+def construct(index):
 	"""Makes the SQLite tables inside the database.
 
 	Args:
@@ -47,7 +57,7 @@ def construct(home):
 	Returns:
 		None
 	"""
-	with sqlite3.connect(home) as conn:
+	with sqlite3.connect(index) as conn:
 		cursor = conn.cursor()
 
 		cursor.execute(RECORDS)
@@ -73,9 +83,10 @@ def copier(abs_path, home): # git does this on 'add' instead of on 'init'
 	# original_.mkdir(parents=True, exist_ok=True)
 
 	for xobj in abs_path.glob('*'):
-
-		if any(blocked in xobj.as_posix() for blocked in BLACKLIST):
-			pass
+		# if any(blocked in xobj.as_posix() for blocked in BLACKLIST):
+		# 	pass
+		if is_ignored(xobj.as_posix()):
+			continue
 		else:
 			destination = backup_lo / xobj.name
 
@@ -119,7 +130,9 @@ def _surveyor(dir_):
 	inter = []
 
 	for file in _r(dir_):
-		if any(blocked in file.path for blocked in BLACKLIST):
+		# if any(blocked in file.path for blocked in BLACKLIST):
+		# 	continue
+		if is_ignored(file.path):
 			continue
 		else:
 			rp = file.path[prefix:]
@@ -148,7 +161,9 @@ def _survey(dir_, version):
 	prefix = len(dir_.as_posix()) + 1
 
 	for file in _r(dir_):
-		if any(blocked in file.path for blocked in BLACKLIST):
+		# if any(blocked in file.path for blocked in BLACKLIST):
+		# 	continue
+		if is_ignored(file.path):
 			continue
 		else:
 			rp = file.path[prefix:]
@@ -175,7 +190,9 @@ def _dsurvey(dir_):
 
 	for dirx in dir_.rglob('*'):
 		# if dirx.as_posix() in BLACKLIST:
-		if any(blocked in dirx.as_posix() for blocked in BLACKLIST):
+		# if any(blocked in dirx.as_posix() for blocked in BLACKLIST):
+		# 	continue
+		if is_ignored(dirx.as_posix()):
 			continue
 
 		elif dirx.is_dir():
@@ -209,14 +226,6 @@ def _surveyorx(dir_, rps):
 		inventory.append((ctime, size, rp))
 	
 	return inventory
-
-def is_ignored(path_str):
-	if any(blocked in path_str for blocked in BLACKLIST):
-		strx = None
-	else:
-		strx = path_str
-
-	return strx
 
 def historian(version, message, index):
 	"""Records the version & message, if present, in the index.
@@ -261,7 +270,7 @@ def _formatter(dir_):
 
 	return rollcall # dictionary of local files for comparison against index
 
-def get_records(home):
+def get_records(index):
 	"""Builds a dictionary of indexed st_ctimes and st_sizes for every file indexed.
 
 	Args:
@@ -272,7 +281,7 @@ def get_records(home):
 	"""
 	index_records = {}
 
-	with sqlite3.connect(home) as conn:
+	with sqlite3.connect(index) as conn:
 		cursor = conn.cursor()
 		cursor.execute("SELECT rp, ctime, bytes FROM records;")
 		records = cursor.fetchall()
@@ -294,13 +303,13 @@ def init_index():
 	message = "INITIAL"
 	version = 0
 
-	home = _config()
+	index = _config()
 	abs_path = Path(LOCAL_DIR)
 
-	copier(abs_path, home.parent) # backup created first
+	copier(abs_path, index.parent) # backup created first
 	inventory = _survey(abs_path, version) # collect current files' metadata
 
-	with sqlite3.connect(home) as conn:
+	with sqlite3.connect(index) as conn:
 		cursor = conn.cursor()
 		query = "INSERT INTO records (rp, version, ctime, bytes) VALUES (?, ?, ?, ?);"
 
@@ -309,7 +318,7 @@ def init_index():
 
 		conn.commit()
 
-	historian(version, message, home) # load the version into the local records table
+	historian(version, message, index) # load the version into the local records table
 
 def init_dindex(drps):
 	"""Initiates the table for the directories with version 0 data.
@@ -321,14 +330,14 @@ def init_dindex(drps):
 		None
 	"""
 	version = 0
-	home = _config()
+	index = _config()
 
 	query = "INSERT INTO directories (rp, version) VALUES (?, ?);"
 	values = [(rp, version) for rp in drps]
 
-	construct(home)
+	construct(index)
 
-	with sqlite3.connect(home) as conn:
+	with sqlite3.connect(index) as conn:
 		cursor = conn.cursor()
 
 		cursor.executemany(query, values)
@@ -561,7 +570,9 @@ def local_audit_(new, diffs, remaining, version, secure, index):
 	prefix = len(backup.as_posix()) + 1
 
 	for dirs in backup.rglob('*'):
-		if any(blocked in dirs.as_posix() for blocked in BLACKLIST):
+		# if any(blocked in dirs.as_posix() for blocked in BLACKLIST):
+		# 	continue
+		if is_ignored(dirs.as_posix()):
 			continue
 		elif dirs.is_dir():
 			rp = dirs.as_posix()[prefix:]
