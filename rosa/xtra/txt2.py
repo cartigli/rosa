@@ -11,7 +11,7 @@ import time
 import string
 from collections import defaultdict
 
-TARGET_TOTAL_SIZE_GB = 4.0
+TARGET_TOTAL_SIZE_GB = 6.0
 BASE_DIR = "/Volumes/HomeXx/compuir/texts"
 WIKI_URL = "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2"
 

@@ -17,7 +17,10 @@ The lib now includes:
   - [Dispatch] manages the connection to the server: initiates, yields, and handles errors for the connection object
   - [Opps] handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
 
-The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following commands are the main functions of rosa [rosa...]:
+The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib 
+directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from 
+rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following 
+commands are the main functions of rosa [rosa...]:
   - [give] finds changes between the local and remote data, uploads new files/directories, removes old ones, and updates altered files
   - [get][current] does not consider the changes and brute forces download of the server's latest commit to the disk (simpler than [get])
   - [diff] finds changes between the two sources and simply presents them to the user; makes no changes to either of the sources
@@ -74,9 +77,15 @@ recent version & a specified previous version is coming soon.
 
 Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
 
-To install and run, navigate to the project directory and run 'pip install .', which will configure the needed packages and configure the path for [rosa]. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in rosa's root directory.
+To install and run, navigate to the project directory and run "pip install ." which will configure the needed packages and configure the path for [rosa]. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in rosa's root directory.
 
 Required packages:
   - xxhash (unless using hashlib; xxhash is mad fast but less secure. Just swap the code with xxhash for the commented out hashlib functions)
   - mysql-connector-python
   - diff_match_patch
+
+
+*I am in the process of removing the 'hard-configuration' of the LOCAL_DIR. The initiation will be based off the Current Working Directory (cwd) the*
+*initiation command was ran in, unless specified otherwise with '-rd' or '--redirect'. This will also move the index to the project directory (duh) and*
+*forces dynamic index searching if commands are run from within the directory instead of root level.*
+*Also error handling for when the server doesn't yield or config is corrupt.*

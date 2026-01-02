@@ -7,6 +7,7 @@ Retrieves deleted files, applies reverse patches to
 generate altered files, and deletes new.
 Downloads to a directory named 'rosa_v[version]'
 next to the original, which remains untouched.
+^ This is why the index is not needed & shouldn't be looked for.
 """
 
 import shutil
@@ -18,8 +19,8 @@ import diff_match_patch as dmp_
 # LOCAL_DIR used once (besides import)
 from rosa.confs import LOCAL_DIR, VERSIONS
 from rosa.lib import (
-    phones, fat_boy, mk_rrdir, calc_batch, mini_ps, finale, 
-    query_index, refresh_index, sfat_boy, find_index
+    phones, fat_boy, mk_rrdir, calc_batch, 
+    mini_ps, finale, sfat_boy
 )
 
 NOMIC = "[get][vers]"
@@ -28,8 +29,6 @@ def main(args=None):
     """Fetches all versions and downloads the user's choice."""
     xdiff = False
     logger, force, prints, start = mini_ps(args, NOMIC)
-
-    index = find_index()
 
     with phones() as conn:
         with conn.cursor() as cursor:
@@ -178,8 +177,6 @@ def main(args=None):
         logger.info('no version given')
     
     finale(NOMIC, start, prints)
-
-    logger.info('All set.')
 
 if __name__=="__main__":
     main()

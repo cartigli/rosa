@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Identify and present changes made since the latest commit.
+"""Identify and present changes made since the latest commitment.
 
-This only tracks differences from the latest commit *you made* on *this* machine.
+This only tracks differences from the latest commitment made on *this* machine.
 If the server and local index are on different versions, this will not tell you.
 It will only identify the changes you made since the latest indexing.
 """
@@ -14,7 +14,8 @@ from rosa.lib import (
 	phones, finale, 
 	mini_ps, query_index,
 	phones, query_dindex,
-	version_check, find_index
+	version_check, find_index,
+	landline
 )
 
 NOMIC = "[diff]"
@@ -77,23 +78,24 @@ def main(args=None):
 			r = True
 	
 	index = find_index()
+
 	if not index:
 		logger.info('not an indexed directory')
 		finale(NOMIC, start, prints)
-		sys.exit(1)
-		# logger.info(f"found the index: {index}")
-	# else:
+		sys.exit(2)
 
 	with phones() as conn:
-		new, deleted, diffs, remaining, xdiff = query_index(conn, index)
-		if r:
-			vok, vers = version_check(conn, index)
-			if vok is True:
-				logger.info('versions: twinned')
-			elif vok is False:
-				logger.info(f"versions: {RED}twisted{RESET}")
+		with landline(index) as sconn:
+			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn)
+			newd, deletedd, ledeux = query_dindex(sconn)
 
-	newd, deletedd, ledeux = query_dindex(index)
+			if r:
+				vok, vers = version_check(conn, sconn)
+				if vok is True:
+					logger.info('versions: twinned')
+				elif vok is False:
+					logger.info(f"versions: {RED}twisted{RESET}")
+
 
 	if prints is True:
 		logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")

@@ -293,6 +293,5 @@ def find_index():
 				break
 
 		cd = cd.parent
-	
 
 	return index

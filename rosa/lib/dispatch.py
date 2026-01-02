@@ -9,7 +9,9 @@ import sys
 import logging
 import contextlib
 
+import sqlite3
 import mysql.connector
+from mysql.connector import errorcode
 
 from rosa.confs import XCONFIG, ASSESS2, MAX_ALLOWED_PACKET, RED, RESET
 
@@ -33,33 +35,51 @@ def phones():
 	try:
 		conn = init_conn(XCONFIG['user'], XCONFIG['pswd'], XCONFIG['name'], XCONFIG['addr'])
 
-		if conn.is_connected():
-
-			yield conn
-
-		# else:
-		# 	logger.warning('connection object lost')
-		# 	try:
-		# 		conn.ping(reconnect=True, attempts=3, delay=1)
-		# 		if conn.is_connected():
-		# 			logger.info('connection obj. recovered after failed connect')
-		# 			yield conn
-		# 		else:
-		# 			logger.warning('reconnection failed; abandoning')
-		# 			sys.exit(1)
-		# 	except:
-		# 		raise
-		# 	else:
-		# 		logger.info('connection obj. recovered w.o exception [after exception was caught]')
+		if conn:
+			if conn.is_connected():
+				yield conn
+			else:
+				logger.warning('connection object is not connected')
+		else:
+			logger.warning('no connection object was returned')
 
 	except KeyboardInterrupt as ko:
 		logger.error('boss killed it; wrap it up')
 		_safety(conn)
+	except mysql.connector.Error as mse:
+		if mse.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+			logger.error('connection failed: invalid username/password')
+			# sys.exit(7)
+			raise
+		elif mse.errno == errorcode.ER_BAD_DB_ERROR:
+			logger.error('database does not exist; run [init] or repair the config')
+			# sys.exit(7)
+			raise
+		elif mse.errno == errorcode.CR_CONN_HOST_ERROR:
+			logger.error('connection failed; is the server running?')
+			# sys.exit(7)
+			raise
+		# elif mse.errno == errorcode.CR_UNKOWN_HOST:
+		# 	logger.error('unkown host; is the IP accurate?')
+		# 	sys.exit(7) # this one doesn't get triggered as far as I can tell;
+		# 	# changing the config's IP just results in a CR_CONN_HOST_ERROR
+		# 	# also mysql.connector doesn't know it, so bin it
+		else:
+			logger.error(f"unknown error caught by mysql: {mse}")
+			raise
+
 	except (ConnectionRefusedError, TimeoutError, Exception) as e:
 		logger.error(f"error encountered while connecting to the server:{RESET} {e}.", exc_info=True)
 		_safety(conn)
 	else:
 		logger.debug('phones executed w.o exception')
+		if conn:
+			if conn.is_connected():
+				conn.commit()
+			else:
+				logger.error('connection object is not conncted; cannot commit')
+		else:
+			logger.error('connection object lost; cannot commit')
 	finally:
 		if conn:
 			if conn.is_connected():
@@ -95,6 +115,49 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 	conn = mysql.connector.connect(**config)
 
 	return conn # thinking direct is better
+
+@contextlib.contextmanager
+def landline(local):
+	sconn = None
+
+	logger.debug('...landline, connecting...')
+	try:
+
+		with sqlite3.connect(local) as sconn:
+			if sconn:
+				yield sconn
+			else:
+				logger.error('no connection object returned')
+
+	except KeyboardInterrupt as ki:
+		logger.warning('Boss killed it; wrap it up')
+		_emerg(sconn)
+		raise
+	except sqlite3.OperationalError as oe:
+		if "unable to open database file" in str(oe):
+			logger.error('unable to find the sqlite\'s database file')
+			# sys.exit(7)
+			raise
+		else:
+			logger.error('unknown error caught by landline')
+			_emerg(sconn)
+			# sys.exit(7)
+			raise
+	else:
+		logger.debug('landline caught no exceptions; commiting...')
+		sconn.commit()
+	finally:
+		sconn.close()
+		logger.debug('landline hung up [finally]')
+
+
+def _emerg(sconn):
+	if sconn:
+		logger.debug('rolling the local db back')
+		sconn.rollback()
+	else:
+		logger.error('no sconn to rollback with')
+
 
 def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
 	"""Get the average row size of the notes table to estimate optimal batch size for downloading. 

@@ -24,9 +24,14 @@ def main(dirx):
 
 if __name__=="__main__":
      rps = 0
-     rps += main(dir_1)
-     rps += main(dir_2)
-     rps += main(dir_3)
+     directories = [dir_1, dir_2, dir_3]
+
+     for dirx in directories:
+          rps += main(dirx)
+
+     # rps += main(dir_1)
+     # rps += main(dir_2)
+     # rps += main(dir_3)
 
      print(rps)
      

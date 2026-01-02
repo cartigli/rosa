@@ -33,9 +33,9 @@ rosa/xtra/sqlite.py
 rosa/xtra/txt2.py
 rosa/xtra/dead/analyst.py
 rosa/xtra/dead/contrast2.py
+rosa/xtra/dead/give.py
 rosa/xtra/dead/give_all.py
+rosa/xtra/dead/index.py
 rosa/xtra/dead/queries.py
 rosa/xtra/dead/rosa_get_moment.py
-rosa/xtra/dead/xgive.py
-rosa/xtra/dead/xindex.py
 rosa/xtra/dead/xlib.py
