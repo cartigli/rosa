@@ -76,7 +76,7 @@ def fat_boy(dir_):
 			logger.debug("fat boy finished w.o exception")
 
 @contextlib.contextmanager
-def sfat_boy(_abs_path):
+def sfat_boy(abs_path):
 	"""Simplified context manager for rosa [get][all] because there is no original to backup. 
 
 	[third piece of evidence]
@@ -87,7 +87,7 @@ def sfat_boy(_abs_path):
 	Yields: 
 		tmpd: The temporary directory the new data is being downloaded and written to. Deleted on error.
 	"""
-	tmpd = Path(_abs_path)
+	tmpd = Path(abs_path)
 
 	try:
 		if tmpd:

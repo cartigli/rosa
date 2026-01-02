@@ -158,6 +158,33 @@ DIRECTORIES_INDEX = os.getenv("""DIRECTORIES_INDEX""","""
 CREATE INDEX IF NOT EXISTS drps ON directories (rp);
 """)
 
+SINIT = os.getenv("""SINIT""","""
+CREATE TABLE IF NOT EXISTS records (
+     id INTEGER PRIMARY KEY,
+     rp TEXT NOT NULL,
+     version INTEGER NOT NULL,
+     ctime INTEGER NOT NULL,
+     bytes INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS interior (
+     id INTEGER PRIMARY KEY,
+     moment TIMESTAMP NOT NULL,
+     message TEXT,
+     version INT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS directories (
+     did INT PRIMARY KEY,
+     rp VARCHAR(256) NOT NULL,
+     version INT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS rps ON records(rp);
+
+CREATE INDEX IF NOT EXISTS drps ON directories (rp);
+""")
+
 # additional queries
 
 T_CHECK = os.getenv("""T_CHECK""","""

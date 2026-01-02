@@ -11,7 +11,7 @@ from datetime import datetime, UTC
 
 # LOCAL_DIR used 5 times (besides import)
 # last step is pass connection obj. & import landline to every script that uses it
-from rosa.confs import LOCAL_DIR, RECORDS, INTERIOR, DIRECTORIES, DIRECTORIES_INDEX, CVERSION
+from rosa.confs import LOCAL_DIR, SINIT, CVERSION
 
 logger = logging.getLogger('rosa.log')
 
@@ -46,15 +46,8 @@ def construct(sconn):
 	Returns:
 		None
 	"""
-	# with sqlite3.connect(index) as sconn:
-	cursor = sconn.cursor()
+	sconn.executescript(SINIT)
 
-	cursor.execute(RECORDS)
-	cursor.execute(INTERIOR)
-	cursor.execute(DIRECTORIES)
-	cursor.execute(DIRECTORIES_INDEX)
-
-	sconn.commit()
 
 def copier(abs_path, ihome): # git does this on 'add' instead of on 'init'
 	"""Backs up the current directory to the index with the 'cp -r' unix command.
@@ -212,18 +205,13 @@ def historian(version, message, sconn):
 	"""
 	moment = datetime.now(UTC).timestamp()*(10**7) # integer
 
-	# if index.parent.exists() and index.exists():
 	x = "INSERT INTO interior (moment, message, version) VALUES (?, ?, ?);"
 	values = (moment, message, version)
 
-	# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
+	# cursor = sconn.cursor()
+	# cursor.execute(x, values)
 
-	cursor.execute(x, values)
-	# sconn.commit() # moved to context manager
-	# else:
-	# 	logger.info('there is no index; initiate or repair the config')
-	# 	sys.exit(4)
+	sconn.execute(x, values)
 
 def _formatter(dir_):
 	"""Builds a dictionary of indexed st_ctimes and st_sizes for every file found.
@@ -234,11 +222,14 @@ def _formatter(dir_):
 	Returns:
 		rollcall (dictionary): Every file's relative path keyed to its st_ctime and st_size.
 	"""
-	rollcall = {}
+	# rollcall = {}
+
 	inventory = _surveyor(dir_)
 
-	for rp, ctime, size in inventory:
-		rollcall[rp] = (ctime, size)
+	# for rp, ctime, size in inventory:
+	# 	rollcall[rp] = (ctime, size)
+
+	rollcall = {rp:(ctime, size) for rp, ctime, size in inventory}
 
 	return rollcall
 
@@ -251,23 +242,29 @@ def get_records(sconn):
 	Returns:
 		rollcall (dictionary): Every file's relative path keyed to its st_ctime and st_size.
 	"""
-	index_records = {}
+	# index_records = {}
+	query = "SELECT rp, ctime, bytes FROM records;"
 
-	# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
-	cursor.execute("SELECT rp, ctime, bytes FROM records;")
-	records = cursor.fetchall()
+	# cursor = sconn.cursor()
+	# cursor.execute("SELECT rp, ctime, bytes FROM records;")
+	# records = cursor.fetchall()
 
-	for record in records:
-		index_records[record[0]] = (record[1], record[2])
+	records = sconn.execute(query).fetchall()
+
+	# for record in records:
+	# 	index_records[record[0]] = (record[1], record[2])
+
+	index_records = {rp:(ctime, size) for rp, ctime, size in records}
+	# index_records = {record[0]:(record[1], record[2]) for record in records}
 
 	return index_records
 
-def init_index(sconn, ihome): # this should recieve sconn; and init.py should use _config to find the index instead of inside this function
+def init_index(sconn, ihome):
 	"""Initiates a new index.
 
 	Args:
-		None
+		sconn (sqlite3): Index's connection object.
+		ihome (Path): The index's parent directory.
 
 	Returns:
 		None
@@ -275,20 +272,16 @@ def init_index(sconn, ihome): # this should recieve sconn; and init.py should us
 	message = "INITIAL"
 	version = 0
 
-	# index = _config()
 	abs_path = Path(LOCAL_DIR)
 
 	copier(abs_path, ihome) # backup created first
 	inventory = _survey(abs_path, version) # collect current files' metadata
 
-	# with sqlite3.connect(index) as sconn:
-	cursor = sconn.cursor()
+	# cursor = sconn.cursor()
 	query = "INSERT INTO records (rp, version, ctime, bytes) VALUES (?, ?, ?, ?);"
 
-	for item in inventory:
-		cursor.execute(query, item)
-
-	# conn.commit()
+	# for item in inventory:
+	sconn.executemany(query, inventory)
 
 	historian(version, message, sconn) # load the version into the local records table
 
@@ -302,18 +295,14 @@ def init_dindex(drps, sconn):
 		None
 	"""
 	version = 0
-	# index = _config()
 
 	query = "INSERT INTO directories (rp, version) VALUES (?, ?);"
 	values = [(rp, version) for rp in drps]
 
-	# construct(index)
+	# cursor = sconn.cursor()
+	# cursor.executemany(query, values)
 
-	# with sqlite3.connect(index) as sconn:
-	cursor = sconn.cursor()
-
-	cursor.executemany(query, values)
-	# sconn.commit() # moved to context manager
+	sconn.executemany(query, values)
 
 def qfdiffr(index_records, real_stats):
 	"""Compares the indexed vs actual files & their metadata.
@@ -366,7 +355,6 @@ def query_index(conn, sconn):
 	diff = False
 	remaining = []
 
-	# if index.parent.exists() and index.exists():
 	abs_path = Path(LOCAL_DIR)
 
 	real_stats = _formatter(abs_path)
@@ -386,9 +374,6 @@ def query_index(conn, sconn):
 		diff = True
 
 	return new, deleted, failed, remaining, diff
-	# else:
-	# 	logger.warning('there is no index; initiate or repair the config')
-	# 	sys.exit(4)
 
 def verification(conn, diffs, dir_):
 	"""Checks actual vs. recorded hash for files with metadata discrepancies.
@@ -417,9 +402,9 @@ def verification(conn, diffs, dir_):
 			content = f.read()
 
 		hasher.update(content)
-		chash = hasher.digest()
+		_hash = hasher.digest()
 
-		local_ids[diff] = chash
+		local_ids[diff] = _hash
 
 	query = "SELECT hash FROM files WHERE rp = %s;"
 
@@ -449,14 +434,14 @@ def query_dindex(sconn):
 		deletedd (set): Directories deleted since the last recorded commit.
 		ledeux (set): Directories in both.
 	"""
-	# if index.parent.exists() and index.exists():
 	abs_path = Path(LOCAL_DIR)
 	query = "SELECT rp FROM directories;"
 
-	# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
-	cursor.execute(query)
-	idrps = cursor.fetchall()
+	# cursor = sconn.cursor()
+	# cursor.execute(query)
+	# idrps = cursor.fetchall()
+
+	idrps = sconn.execute(query).fetchall()
 	
 	ldrps = _dsurvey(abs_path)
 
@@ -471,9 +456,6 @@ def query_dindex(sconn):
 	ledeux = index_dirs & real_dirs
 
 	return newd, deletedd, ledeux
-	# else:
-	# 	logger.warning('there is no index; either initiate or correct the config')
-	# 	sys.exit(4)
 
 def version_check(conn, sconn):
 	"""Queries local and remote databases to compare the latest recorded version.
@@ -488,12 +470,12 @@ def version_check(conn, sconn):
 	"""
 	vok = False
 
-	# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
-	cursor.execute(CVERSION)
-	lc_version = cursor.fetchone()
+	# cursor = sconn.cursor()
+	# cursor.execute(CVERSION)
+	# lc_version = cursor.fetchone()
 
-	# if index.parent.exists() and index.exists():
+	lc_version = sconn.execute(CVERSION).fetchone()
+
 	with conn.cursor() as cursor:
 		cursor.execute(CVERSION)
 		rc_version = cursor.fetchone()
@@ -507,9 +489,6 @@ def version_check(conn, sconn):
 			vok = True
 
 	return vok, lc_version[0]
-	# else:
-	# 	logger.warning('there is no index; either initiate or correct the config')
-	# 	sys.exit(4)
 
 def local_audit_(new, diffs, remaining, version, secure, sconn):
 	"""Reverts the current directory back to the latest locally recorded commit.
@@ -636,24 +615,21 @@ def index_audit(new, diffs, sconn):
 	Returns:
 		None
 	"""
-	# if index.parent.exists() and index.exists():
-		# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
+	# cursor = sconn.cursor()
 
 	if new:
-		q = "INSERT INTO records (rp, ctime, bytes, version) VALUES (?, ?, ?, ?);"
-		for n in new:
-			cursor.execute(q, n)
+		query = "INSERT INTO records (rp, ctime, bytes, version) VALUES (?, ?, ?, ?);"
+		# for n in new:
+			# cursor.execute(q, n)
+
+		sconn.executemany(query, new)
 
 	if diffs:
-		q = "UPDATE records SET ctime = ?, bytes = ?, version = ? WHERE rp = ?;"
-		for a in diffs:
-			cursor.execute(q, a)
+		query = "UPDATE records SET ctime = ?, bytes = ?, version = ? WHERE rp = ?;"
+		# for a in diffs:
+			# cursor.execute(q, a)
 
-	# conn.commit() # now in context manager
-	# else:
-	# 	logger.warning('there is no index; either initiate or correct the config')
-	# 	sys.exit(4)
+		sconn.executemany(query, diffs)
 
 def xxdeleted(conn, deleted, xversion, doversions, secure, sconn): # deleted should be its own logic
 	"""Backs up deleted files to the server; deletes them from the index.
@@ -672,7 +648,6 @@ def xxdeleted(conn, deleted, xversion, doversions, secure, sconn): # deleted sho
 	logger.debug('archiving deleted files...')
 	tmpd, backup = secure
 
-	# if index.parent.exists() and index.exists():
 	query = "INSERT INTO deleted (rp, xversion, oversion, content) VALUES (%s, %s, %s, %s);"
 	xquery = "DELETE FROM records WHERE rp = ?;"
 
@@ -688,16 +663,14 @@ def xxdeleted(conn, deleted, xversion, doversions, secure, sconn): # deleted sho
 			deletedx = (rp, xversion, oversion, dcontent)
 			cursor.execute(query, deletedx)
 
-		# with sqlite3.connect(index) as sconn: # becuase this conn is initiated here, commit has to happen here. 
-		# I could initiate out of the func, but that doesn't fit sqlite strats. 
-		# Although index audit does this. Yeesh. Might be huge design flaw. Will come back to this.
-		cursor = sconn.cursor()
-		cursor.execute(xquery, (rp,))
+		# cursor = sconn.cursor()
+		# cursor.execute(xquery, (rp,))
 
-		# sconn.commit()
-	# else:
-	# 	logger.warning('there is no index; either initiate or correct the config')
-	# 	sys.exit(4)
+		# sconn.execute(xquery, (rp,))
+
+	data = [(rp,) for rp in deleted] # might need
+
+	sconn.executemany(xquery, data)
 
 def local_daudit(newd, deletedd, version, sconn):
 	"""Refreshes the indexed directories to reflect the current contents.
@@ -715,28 +688,19 @@ def local_daudit(newd, deletedd, version, sconn):
 	nquery = "INSERT INTO directories (rp, version) VALUES (?, ?);"
 	dquery = "DELETE FROM directories WHERE rp = ?;"
 
-	# if index.parent.exists() and index.exists():
-
 	if newd:
 		nvals = [(rp, version) for rp in newd]
 
-		# with sqlite3.connect(index) as conn:
-		cursor = sconn.cursor()
-
-		cursor.executemany(nquery, nvals)
-		# conn.commit() # moved to context manager
+		# cursor = sconn.cursor()
+		# cursor.executemany(nquery, nvals)
+		sconn.executemany(nquery, nvals)
 
 	if deletedd:
 		dvals = [(d,) for d in deletedd]
 
-		# with sqlite3.connect(index) as conn:
-		cursor = sconn.cursor()
-
-		cursor.executemany(dquery, dvals)
-		# sconn.commit() # moved to context manager
-	# else:
-	# 	logger.warning('there is no index; either initiate or correct the config')
-	# 	sys.exit(4)
+		# cursor = sconn.cursor()
+		# cursor.executemany(dquery, dvals)
+		sconn.executemany(dquery, dvals)
 
 def scrape_dindex(sconn):
 	"""Gathers all directories from the directories' index.
@@ -749,12 +713,12 @@ def scrape_dindex(sconn):
 	"""
 	query = "SELECT rp FROM directories;"
 
-	# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
-	cursor.execute(query)
+	# cursor = sconn.cursor()
+	# cursor.execute(query)
+	# drps = cursor.fetchall()
 
-	drps = cursor.fetchall()
-	
+	drps = sconn.execute(query).fetchall()
+
 	return drps
 
 def refresh_index(diffs, sconn):
@@ -771,11 +735,11 @@ def refresh_index(diffs, sconn):
 
 	inventory = _surveyorx(abs_path, diffs)
 
-	# with sqlite3.connect(index) as conn:
-	cursor = sconn.cursor()
+	# cursor = sconn.cursor()
+
 	query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
 
-	for inv in inventory:
-		cursor.execute(query, inv)
+	# for inv in inventory:
+		# cursor.execute(query, inv)
 
-	# sconn.commit() # moved to context manager
+	sconn.executemany(query, inventory)
