@@ -11,7 +11,9 @@ from pathlib import Path
 import xxhash
 # import datetime
 
-from rosa.confs.config import *
+from rosa.confs.config import LOCAL_DIR, RED, RESET
+
+BLACKLIST = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -25,7 +27,6 @@ def main(args=None):
     local_dir = LOCAL_DIR
 
     print(f"{RED}[rm3] executed{RESET}")
-    blk_list = ['.DS_Store', '.git', '.obsidian'] 
     abs_path = Path(local_dir).resolve()
     hasher = xxhash.xxh64()
 
@@ -67,8 +68,8 @@ def main(args=None):
                     # remover
                     if item_no % 101 == 0: 
                         item.unlink()
-                        print(item.as_posix())
-                        print(f"{RED}deleted a file{RESET}")
+                        # print(item.as_posix())
+                        # print(f"{RED}deleted a file{RESET}")
                     # renamer
                     elif item_no % 103 == 0:
                         # item.rename("pandas")

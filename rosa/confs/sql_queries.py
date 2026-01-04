@@ -5,58 +5,6 @@ import os
 
 # MySQL tables
 
-INIT = os.getenv("""ONE""","""
-CREATE TABLE IF NOT EXISTS interior (
-     _id INT AUTO_INCREMENT NOT NULL,
-     moment INTEGER NOT NULL UNIQUE,
-     version INTEGER NOT NULL UNIQUE,
-     message VARCHAR(256),
-PRIMARY KEY (_id)
-);
-
-CREATE TABLE IF NOT EXISTS files (
-     id INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(512) NOT NULL UNIQUE,
-     content LONGBLOB NOT NULL,
-     hash BINARY(8) NOT NULL,
-     version INTEGER NOT NULL,
-PRIMARY KEY (id),
-INDEX rps (rp)
-);
-
-CREATE TABLE IF NOT EXISTS directories (
-     did INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(256) NOT NULL,
-     version INT NOT NULL,
-PRIMARY KEY (did)
-);
-
-CREATE TABLE IF NOT EXISTS deltas (
-     d_id INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(512) NOT NULL,
-     patch MEDIUMTEXT NOT NULL,
-     version INTEGER NOT NULL,
-PRIMARY KEY (d_id)
-);
-
-CREATE TABLE IF NOT EXISTS deleted (
-     idd INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(512) NOT NULL,
-     content LONGBLOB NOT NULL,
-     version INTEGER NOT NULL,
-PRIMARY KEY (idd)
-);
-
-CREATE TABLE IF NOT EXISTS depr_directories (
-     ddid INT AUTO_INCREMENT NOT NULL,
-     rp VARCHAR(256) NOT NULL,
-     version INT NOT NULL,
-PRIMARY KEY (ddid)
-);
-""")
-
-# let's do this later; getting the desired version is more important
-
 INIT2 = os.getenv("""INIT2""","""
 CREATE TABLE IF NOT EXISTS interior (
      _id INT AUTO_INCREMENT NOT NULL,
@@ -122,41 +70,6 @@ original ENUM('O') NULL DEFAULT 'O'
 """
 
 # SQLite tables 
-
-RECORDS = os.getenv("""RECORDS""","""
-CREATE TABLE IF NOT EXISTS records (
-     id INTEGER PRIMARY KEY,
-     rp TEXT NOT NULL,
-     version INTEGER NOT NULL,
-     ctime INTEGER NOT NULL,
-     bytes INTEGER NOT NULL
-);
-""")
-
-INTERIOR = os.getenv("""INTERIOR""","""
-CREATE TABLE IF NOT EXISTS interior (
-     id INTEGER PRIMARY KEY,
-     moment TIMESTAMP NOT NULL,
-     message TEXT,
-     version INT NOT NULL
-);
-""")
-
-DIRECTORIES = os.getenv("""DIRECTORIES""","""
-CREATE TABLE IF NOT EXISTS directories (
-     did INT PRIMARY KEY,
-     rp VARCHAR(256) NOT NULL,
-     version INT NOT NULL
-);
-""")
-
-RECORDS_INDEX = os.getenv("""RECORDS_INDEX""","""
-CREATE INDEX IF NOT EXISTS rps ON records(rp);
-""")
-
-DIRECTORIES_INDEX = os.getenv("""DIRECTORIES_INDEX""","""
-CREATE INDEX IF NOT EXISTS drps ON directories (rp);
-""")
 
 SINIT = os.getenv("""SINIT""","""
 CREATE TABLE IF NOT EXISTS records (

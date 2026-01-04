@@ -11,7 +11,7 @@ from datetime import datetime, UTC
 
 # LOCAL_DIR used 5 times (besides import)
 # last step is pass connection obj. & import landline to every script that uses it
-from rosa.confs import LOCAL_DIR, SINIT, CVERSION
+from rosa.confs import LOCAL_DIR, SINIT, CVERSION, BLACKLIST
 
 logger = logging.getLogger('rosa.log')
 
@@ -34,8 +34,8 @@ def _config():
 	return index
 
 def is_ignored(_str):
-	blacklist = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
-	return any(blckd in _str for blckd in blacklist)
+	# blacklist = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
+	return any(blckd in _str for blckd in BLACKLIST)
 
 def construct(sconn):
 	"""Makes the SQLite tables inside the database.
@@ -49,7 +49,7 @@ def construct(sconn):
 	sconn.executescript(SINIT)
 
 
-def copier(abs_path, ihome): # git does this on 'add' instead of on 'init'
+def copier(abs_path, originals): # git does this on 'add' instead of on 'init'
 	"""Backs up the current directory to the index with the 'cp -r' unix command.
 
 	Args:
@@ -58,14 +58,14 @@ def copier(abs_path, ihome): # git does this on 'add' instead of on 'init'
 	Returns:
 		None
 	"""
-	backup_lo = ihome / "originals"
-	backup_lo.mkdir(parents=True, exist_ok=True)
+	origin = originals / "originals"
+	origin.mkdir(parents=True, exist_ok=True)
 
 	for xobj in abs_path.glob('*'):
 		if is_ignored(xobj.as_posix()):
 			continue
 		else:
-			destination = backup_lo / xobj.name
+			destination = origin / xobj.name
 
 			if xobj.is_dir(): # root level directories
 				shutil.copytree(xobj, destination)
@@ -259,7 +259,7 @@ def get_records(sconn):
 
 	return index_records
 
-def init_index(sconn, ihome):
+def init_index(sconn, originals):
 	"""Initiates a new index.
 
 	Args:
@@ -274,7 +274,7 @@ def init_index(sconn, ihome):
 
 	abs_path = Path(LOCAL_DIR)
 
-	copier(abs_path, ihome) # backup created first
+	copier(abs_path, originals) # backup created first
 	inventory = _survey(abs_path, version) # collect current files' metadata
 
 	# cursor = sconn.cursor()

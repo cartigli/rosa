@@ -19,7 +19,7 @@ from rosa.lib import (
 	historian, fat_boy, refresh_index,
 	xxdeleted, rm_remdir, local_daudit,
 	upload_dirs, query_dindex, find_index,
-	landline
+	landline, Heart
 )
 
 NOMIC = "[give]"
@@ -33,15 +33,17 @@ def main(args=None):
 	xdiff = False
 	logger, force, prints, start = mini_ps(args, NOMIC)
 
-	index = find_index()
+	# index = find_index()
 
-	if not index:
-		logger.info('not an indexed directory')
-		finale(NOMIC, start, prints)
-		sys.exit(2)
+	# if not index:
+	# 	logger.info('not an indexed directory')
+	# 	finale(NOMIC, start, prints)
+	# 	sys.exit(2)
+
+	local = Heart()
 
 	with phones() as conn:
-		with landline(index) as sconn:
+		with landline(local.index) as sconn:
 			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn)
 			newd, deletedd, ledeux = query_dindex(sconn)
 
@@ -55,7 +57,7 @@ def main(args=None):
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 
 		with phones() as conn:
-			with landline(index) as sconn:
+			with landline(local.index) as sconn:
 				vok, version = version_check(conn, sconn)
 
 				if vok is True:
@@ -89,7 +91,7 @@ def main(args=None):
 						collector(conn, diffs, LOCAL_DIR, cv, key="altered_files") # updates altered
 
 						logger.info('generating altered files\' patches')
-						patches, originals = diff_gen(diffs, index.parent, LOCAL_DIR) # computes & returns patches
+						patches, originals = diff_gen(diffs, local.originals, LOCAL_DIR) # computes & returns patches
 
 						logger.info('uploading altered files\' patches')
 						upload_patches(conn, patches, cv, oversions) # uploads the patches to deltas
@@ -128,7 +130,7 @@ def main(args=None):
 		for n in new:
 			updates.append(n) # new & remaining need to get updated
 
-		with landline(index) as sconn:
+		with landline(local.index) as sconn:
 			refresh_index(updates, sconn) # here
 
 	else:

@@ -15,7 +15,7 @@ from rosa.lib import (
 	mini_ps, query_index,
 	phones, query_dindex,
 	version_check, find_index,
-	landline
+	landline, Heart
 )
 
 NOMIC = "[diff]"
@@ -77,15 +77,17 @@ def main(args=None):
 		if args.remote:
 			r = True
 	
-	index = find_index()
+	# index = find_index()
 
-	if not index:
-		logger.info('not an indexed directory')
-		finale(NOMIC, start, prints)
-		sys.exit(2)
+	# if not index:
+	# 	logger.info('not an indexed directory')
+	# 	finale(NOMIC, start, prints)
+	# 	sys.exit(2)
+
+	local = Heart()
 
 	with phones() as conn:
-		with landline(index) as sconn:
+		with landline(local.index) as sconn:
 			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn)
 			newd, deletedd, ledeux = query_dindex(sconn)
 

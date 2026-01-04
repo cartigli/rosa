@@ -18,7 +18,7 @@ from itertools import batched
 
 import mysql.connector # only for error codes in this file
 
-from rosa.confs import RED, RESET
+from rosa.confs import RED, RESET, BLACKLIST
 
 
 logger = logging.getLogger('rosa.log')
@@ -71,6 +71,58 @@ def fat_boy(dir_):
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
 			logger.error(f"{RED}err encountered while attempting to apply atomicy: {c}.", exc_info=True)
 			_lil_guy(abs_path, backup, tmpd)
+			sys.exit(1)
+		else:
+			logger.debug("fat boy finished w.o exception")
+
+
+@contextlib.contextmanager
+def fat_boy1(dir_):
+	"""Conext manager for the temporary directory and backup of original. 
+	
+	Takes over on error and ensures corrupted data is never kept.
+
+	Args:
+		dir_ (Path): Full path of the LOCAL_DIR from config.py
+	
+	Yields: 
+		tmpd (Path): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as LOCAL_DIR if not.
+		backup (Path): The original LOCAL_DIR after being renamed to a backup location/path. Renamed to LOCAL_DIR on error, deleted if not.
+	"""
+	tmpd = None # ORIGINAL
+	backup = None
+	cwd = Path(dir_).resolve()
+
+	# abs_path = Path(dir_)
+	try:
+
+		tmpd, backup = configure1(cwd)
+		if tmpd and backup:
+
+			logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
+			yield tmpd, backup # return these & freeze in place
+
+	except KeyboardInterrupt as e:
+		logger.warning('boss killed it; wrap it up')
+		_lil_guy1(cwd, backup, tmpd)
+		sys.exit(0)
+
+	except (FileNotFoundError, PermissionError, Exception) as e:
+		logger.error(f"{RED}err caught while backup & temporary directories:{RESET} {e}.", exc_info=True)
+		_lil_guy1(cwd, backup, tmpd)
+		sys.exit(1)
+	else:
+		try:
+			apply_atomicy1(tmpd, backup, cwd)
+
+		except KeyboardInterrupt as c:
+			logger.warning('boss killed it; wrap it up')
+			_lil_guy1(cwd, backup, tmpd)
+			sys.exit(0)
+
+		except (mysql.connector.Error, ConnectionError, Exception) as c:
+			logger.error(f"{RED}err encountered while attempting to apply atomicy: {c}.", exc_info=True)
+			_lil_guy1(cwd, backup, tmpd)
 			sys.exit(1)
 		else:
 			logger.debug("fat boy finished w.o exception")
@@ -141,6 +193,58 @@ def _lil_guy(abs_path, backup, tmpd):
 		raise
 	else:
 		logger.info("_lil_guy's cleanup had no exceptions")
+
+
+
+def _lil_guy1(dir_, backup, tmpd):
+	"""Handles recovery if error occurs and is caught by fat_boy. 
+	
+	Mostly checking which directories exist at the time of the error, 
+	And deleting/renaming accordingly.
+
+	Args:
+		dir_ (Path): Full path of the LOCAL_DIR from config.py
+		backup (Path): Original LOCAL_DIR renamed to a backup location while downloading and writing.
+		tmpd (Path): Temporary directory made to hold the updated LOCAL_DIR. Renamed to LOCAL_DIR if succeeds, deleted if error is caught.
+	
+	Returns:
+		None
+	"""
+	try:
+		if backup and backup.exists():
+			if tmpd and tmpd.exists():
+				shutil_fx(tmpd)
+				# backup.rename(dir_)
+				prefix = len(backup.as_posix()) + 1
+
+				for entry in backup.glob('*'):
+					rp = entry.as_posix()[prefix:]
+
+					destin = dir_ / rp
+
+					entry.rename(destin)
+				
+				# shutil_fx(backup)
+
+				logger.warning("moved backup back to original location & deleted the temporary directory")
+		elif tmpd and tmpd.exists():
+			shutil_fx(tmpd)
+			logger.warning(f"_lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
+		else:
+			logger.debug('_lil_guy called on error but no directories to recover were found')
+
+	except (PermissionError, FileNotFoundError, Exception) as e:
+		logger.error(f"{RED}replacement of {dir_} and cleanup encountered an error: {e}.", exc_info=True)
+		if dir_.exists(): # basically fuck the cwd workarounds if an error occurs here
+			shutil_fx(dir_) # too rare and messy to properly deal; just brute force it
+		backup.rename(dir_)
+		raise
+	else:
+		logger.info("_lil_guy's cleanup had no exceptions")
+		shutil_fx(backup)
+		# shutil_fx(tmpd)
+
+
 
 def shutil_fx(dirx):
 	"""Handles deletion of directories. 
@@ -223,6 +327,70 @@ def configure(abs_path):
 		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
 		sys.exit(1)
 
+
+def configure1(dir_):
+	"""Configures the backup and creates the tmpd.
+
+	Renames the LOCAL_DIR as a temporary backup name.
+	Creates a temporary directory for keeping the backup clean.
+
+	Args:
+		dir_ (Path): Pathlib object of the LOCAL_DIR's full path.
+	
+	Returns:
+		tmpd (Path): New (empty) temporary directory.
+		backup (Path): LOCAL_DIR renamed to as a backup location/path.
+	"""
+	if dir_.exists():
+		parent = dir_.parent
+		try:
+			tmpd = Path(tempfile.mkdtemp(dir=parent))
+
+			backup = parent / f".{time.time():.0f}"
+			backup.mkdir(parents=True, exist_ok=True)
+
+			# dir_.rename(backup)
+			prefix = len(dir_.as_posix()) + 1
+
+			for entry in dir_.glob('*'):
+				# if is_ignored(entry.as_posix()):
+				# 	continue
+
+				# else: 
+				# *we want a full backup here, not a selective few files/directories
+
+				rp = entry.as_posix()[prefix:]
+				destin = backup / rp
+
+				entry.rename(destin)
+
+					# if entry.is_dir():
+						# shutil.copytree(entry, destin)
+
+					# elif entry.is_file():
+					# 	shutil.copy2(entry, destin)
+
+			logger.debug('local directory moved to backup')
+
+			if tmpd.exists() and backup.exists():
+				logger.debug(f"{tmpd} and {backup} configured by [configure]")
+	
+		except (PermissionError, FileNotFoundError, Exception) as e:
+			logger.error(f"{RED}err encountered while trying move {dir_} to a backup location:{RESET} {e}.", exc_info=True)
+			raise
+		else:
+			logger.debug('temporary directory created & original directory moved to backup w.o exception')
+			return tmpd, backup
+	else:
+		logger.warning(f"{dir_} doesn't exist; fix the config or run 'rosa get all'")
+		sys.exit(1)
+
+
+def is_ignored(_str):
+	# blacklist = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
+	return any(blckd in _str for blckd in BLACKLIST)
+
+
 def apply_atomicy(tmpd, abs_path, backup):
 	"""Cleans up the 'atomic' writing for fat_boy. 
 	
@@ -246,6 +414,48 @@ def apply_atomicy(tmpd, abs_path, backup):
 	else:
 		logger.debug('temporary directory renamed w.o exception; removing backup of original')
 		shutil_fx(backup)
+
+
+def apply_atomicy1(tmpd, backup, dir_):
+	"""Cleans up the 'atomic' writing for fat_boy. 
+	
+	Only runs if no exceptions are caught by fat_boy. 
+	Renames tmpd as LOCAL_DIR & deletes original backup *if no errors occur/caught.
+
+	Args:
+		tmpd (Path): Temporary directory containing the updated directory.
+		dir_ (Path): Original path of the LOCAL_DIR [empty at this point].
+		backup (Path): Location/path the original LOCAL_DIR was moved to.
+	
+	Returns:
+		None
+	"""
+	try:
+		# tmpd.rename(dir_)
+		prefix = len(tmpd.as_posix()) + 1
+
+		for entry in tmpd.glob('*'):
+			rp = entry.as_posix()[prefix:]
+
+			destin = dir_ / rp
+
+			entry.rename(destin)
+
+			# if entry.is_dir():
+			# 	shutil.copytree(entry, destin)
+			
+			# elif entry.is_file():
+			# 	shutil.copy2(entry, destin)
+
+
+	except (PermissionError, FileNotFoundError, Exception) as e:
+		logger.critical(f"{RED}exception encountered while attempting atomic write:{RESET} {e}.", exc_info=True)
+		raise
+	else:
+		logger.debug('temporary directory renamed w.o exception; removing backup & tmpd')
+		shutil_fx(backup)
+		shutil_fx(tmpd)
+
 
 # WRITING TO DISK
 

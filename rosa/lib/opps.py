@@ -207,12 +207,13 @@ def finale(nomix, start, prints):
 	doit_urself()
 	counter(start, nomix)
 
-	logger.debug(f"rosa {nomix} complete")
+	logger.info(f"rosa {nomix} complete")
 
+	# logger.info('All set.')
 	if prints is True:
 		print('All set.')
 
-def diff_gen(modified, cellar, curr):
+def diff_gen(modified, originals, curr):
 	"""Generates reverse patches between two files.
 
 	Args:
@@ -224,7 +225,7 @@ def diff_gen(modified, cellar, curr):
 		patches (dmp patches): Generated patches as text.
 		originals (Path)): Pathlib path to the folder with the originals.
 	"""
-	originals = cellar / "originals"
+	# originals = cellar / "originals"
 	cur_ = Path(curr)
 	patches = []
 
@@ -261,7 +262,106 @@ def patcher(old, new):
 
 	return p_txt
 
-def find_index():
+def find_index1(cd):
+	"""Finds the index of the cwd from execution.
+
+	Args:
+		None
+
+	Returns:
+		index (Path): Pathlib path to the index, if found.
+	"""
+	# cd = Path.cwd()
+	logger.debug(f"Current working directory: {cd}")
+	nf = True
+
+	while nf is True:
+		for dir_ in cd.glob('*'):
+			if dir_.name == ".index":
+				indexp = dir_
+				index = indexp / "indeces.db"
+
+				logger.debug(f"Found the index: {index}")
+
+				nf = False
+				break
+
+			elif dir_.name == "Volumes":
+				logger.debug("Not an indexed directory.")
+				index = None
+
+				nf = False
+				break
+
+		cd = cd.parent
+
+	return index
+
+def find_index2(cd):
+	index = None
+	nf = True
+	i = 0
+
+	while nf is True:
+		for dir_ in cd.parents[x].glob('*'):
+			if dir_.name == ".index":
+				logger.debug('found [an] index')
+				index = dir_ / "indeces.db"
+
+				nf = False
+				break
+
+			elif dir_.name == "Volumes":
+				nf = False
+				break
+		i += 1
+	
+	return index
+
+def find_index3(cd):
+	index = None
+	nf = True
+	i = 0
+
+	while nf is True:
+		for dir_ in os.listdir(cd.parents[i].as_posix()):
+			if dir_.dirname == ".index":
+				logger.debug('found [an] index')
+				index = dir_ / "indeces.db"
+
+				nf = False
+				break
+
+			elif dir_.dirname == "Volumes":
+				nf = False
+				break
+		i += 1
+
+	return index
+
+
+def find_index(cd):
+	"""Finds the index from the current working directory.
+
+	Args:
+		cd (Path): Current working directory.
+	
+	Returns:
+		index (Path): The index, if found.
+	"""
+	index = None
+
+	for dir_ in [cd] + list(cd.parents):
+		mb = dir_ / ".index" / "indeces.db"
+
+		if mb.exists():
+			index = mb
+			break
+
+	return index
+
+
+def find_index0():
 	"""Finds the index of the cwd from execution.
 
 	Args:
@@ -295,3 +395,51 @@ def find_index():
 		cd = cd.parent
 
 	return index
+
+
+class Heart0: # core
+	__slots__ = ['path', 'target', 'originals'] # don't use a dict
+
+	def __init__(self, path):
+		self.path = path # index's sqlite db file path
+		self.target = path.parents[1] # targeted directory
+		self.originals = path.parent / "originals" # originals directory
+
+
+class Heart1: # core
+
+	def __init__(self):
+		self.index = find_index1(Path.cwd())
+
+		self.target = None
+		self.originals = None
+
+		if self.index:
+			self.target = (self.index).parents[1]
+			self.originals = self.index.parent / "originals"
+
+
+class Heart:
+
+	def __init__(self, strict=True):
+		self.origin = Path.cwd()
+		self.index = find_index1(self.origin)
+
+		self.target = None
+		self.originals = None
+
+		if self.index:
+			self.target = self.index.parents[1]
+			self.originals = self.index.parent / "originals"
+
+		else:
+			if strict is True:
+					logger.warning('not an indexed directory')
+					sys.exit(7)
+
+					# # other option
+					# raise IndexNotFoundError("not an indexed directory")
+
+			# elif strict is False:
+			# 	self.target = None
+			# 	self.originals = None

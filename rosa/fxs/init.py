@@ -23,7 +23,7 @@ from rosa.lib import (
 	phones, mini_ps, finale, _config,
 	init_remote, init_index, _r, init_dindex, 
 	_safety, shutil_fx, find_index, is_ignored,
-	landline, construct
+	landline, construct, Heart
 )
 
 logger = logging.getLogger('rosa.log')
@@ -31,26 +31,13 @@ logger = logging.getLogger('rosa.log')
 
 NOMIC = "[init]"
 
-def _r2(xdir):
+def r2(xdir):
 	for obj in os.scandir(xdir):
 		if obj.is_dir():
 			yield obj
-			yield from _r2(obj.path)
+			yield from r2(obj.path)
 		else:
 			yield obj
-
-def r3(xdir):
-	for obj in os.scandir(xdir):
-		if obj.is_dir():
-			yield from r3(obj.path)
-		else:
-			yield obj.path
-
-def r4(xdir):
-	for obj in os.scandir(xdir):
-		if obj.is_dir():
-			yield obj.path
-			yield from r4(obj.path)
 
 def scraper(dir_):
 	"""'Scrapes' the given directory for every file and directory's relative paths.
@@ -61,7 +48,6 @@ def scraper(dir_):
 	Returns:
 		drps (list): Relative paths of every directory.
 		frps (list): Relative paths of every file.
-
 	"""
 	pfx = len(dir_) + 1
 	dirx = Path(dir_)
@@ -70,7 +56,7 @@ def scraper(dir_):
 	drps = []
 
 	if dirx.exists():
-		for obj in _r2(dir_):
+		for obj in r2(dir_):
 			if is_ignored(obj.path):
 				continue
 
@@ -100,12 +86,13 @@ def main(args=None):
 
 	res = [rex[0] for rex in rez]
 
-	index = find_index()
+	# index = find_index()
+	local = Heart(strict=False)
 
 	if any(res):
 		logger.info(f"found these tables in the server {res}.")
 
-		if not index:
+		if not local.index:
 			logger.info('the server has tables but the local index does not exist; the server needs to be erased.')
 			dec = input('wipe now [w]? [Return to quit]: ').lower()
 			
@@ -118,13 +105,13 @@ def main(args=None):
 							while cursor.nextset():
 								pass
 
-						if index:
-							shutil_fx(index.parent)
+						if local.index:
+							shutil_fx(local.index.parent)
 
 				except Exception as e:
 					logger.info(f"failed to erase server due to: {e}", exc_info=True)
 
-		elif index:
+		elif local.index:
 			logger.info('the server has tables and the local index exists; they both need to be erased.')
 			dec = input('erase now [e]? [Return to quit]: ').lower()
 			
@@ -137,22 +124,22 @@ def main(args=None):
 							while cursor.nextset():
 								pass
 
-						if index:
-							shutil_fx(index.parent)
+						if local.index:
+							shutil_fx(local.index.parent)
 
 				except Exception as e:
 					logger.info(f"failed to erase server due to: {e}", exc_info=True)
 
-	elif index:
-		if index.exists():
+	elif local.index:
+		if local.index.exists():
 			logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
 			dec = input('delete [d] the index now? [Return to quit]: ').lower()
 
 			if dec in('d', 'delete', 'd ', ' d'):
-				shutil_fx(index.parent)
+				shutil_fx(local.index.parent)
 
 	else:
-		dec = input("[i] intiate? [Return to quit] ").lower()
+		dec = input("[i] initiate? [Return to quit] ").lower()
 
 		if dec in('i', 'init', 'initiate'):
 			start = time.perf_counter()
@@ -163,9 +150,11 @@ def main(args=None):
 
 					init_remote(conn, drps, frps)
 
-					index = _config()
-					with landline(index) as sconn:
+					index = _config() # don't use the class's attributes bc they don't exist
+
+					with landline(index) as sconn: # *they are None, but you get it
 						construct(sconn)
+
 						init_dindex(drps, sconn)
 						init_index(sconn, index.parent)
 
@@ -179,7 +168,8 @@ def main(args=None):
 						while cursor.nextset():
 							pass
 
-					shutil_fx(index.parent)
+					if index:
+						shutil_fx(index.parent)
 
 	finale(NOMIC, start, prints)
 
