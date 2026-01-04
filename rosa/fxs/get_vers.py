@@ -67,7 +67,6 @@ def main(args=None):
                 with conn.cursor() as cursor:
                     batch_size, r_sz = calc_batch(conn)
 
-                    # directories (modifications are not considered)
                     logger.info('downloading directories...')
                     VDIRECTORIES = "SELECT rp FROM directories WHERE version <= %s;"
 
@@ -84,8 +83,7 @@ def main(args=None):
                     logger.info('writing directory tree...')
                     mk_rrdir(drps, dirx)
 
-                    # files (unmodified)
-                    logger.info('writing files...')
+                    logger.info('writing unaltered files...')
 
                     VFILES = "SELECT rp, content FROM files WHERE version <= %s;"
                     cursor.execute(VFILES, (version,))
@@ -103,8 +101,7 @@ def main(args=None):
                             with open(fp, 'wb') as f:
                                 f.write(content)
 
-                    # modified files (reverse patching until the requested version is created)
-                    logger.info('downloading and writing patched files...')
+                    logger.info('downloading and writing altered files...')
                     VM_FILES = "SELECT DISTINCT rp FROM deltas WHERE oversion <= %(vs)s AND %(vs)s < xversion;"
 
                     cursor.execute(VM_FILES, vers_)
@@ -146,7 +143,7 @@ def main(args=None):
                             if all(success):
                                 content = previous
                             else:
-                                print(success)
+                                logger.error(success)
                                 raise Exception ('error occured while applying patches')
 
                     logger.info('downloading & writing deleted files...')

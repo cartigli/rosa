@@ -5,6 +5,7 @@ Cleanup large logs and delete oldest.
 Timer, counter, wrap up for runtime info.
 """
 
+import os
 import sys
 import time
 import logging
@@ -226,7 +227,7 @@ def diff_gen(modified, originals, curr):
 		originals (Path)): Pathlib path to the folder with the originals.
 	"""
 	# originals = cellar / "originals"
-	cur_ = Path(curr)
+	# cur_ = Path(curr)
 	patches = []
 
 	for rp in modified:
@@ -234,7 +235,8 @@ def diff_gen(modified, originals, curr):
 		with open(fp_original, 'r', encoding='utf-8', errors='replace') as f:
 			original = f.read()
 
-		fp_modified = cur_ / rp
+		# fp_modified = cur_ / rp
+		fp_modified = os.path.join(curr, rp)
 		with open(fp_modified, 'r', encoding='utf-8', errors='replace') as m:
 			different = m.read()
 
@@ -261,6 +263,11 @@ def patcher(old, new):
 	p_txt = dmp.patch_toText(patches)
 
 	return p_txt
+
+
+def irreversible(force=False):
+	pass
+
 
 def find_index1(cd):
 	"""Finds the index of the cwd from execution.

@@ -47,7 +47,7 @@ def fat_boy(dir_):
 		tmpd, backup = configure(abs_path)
 		if tmpd and backup:
 
-			logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
+			# logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
 			yield tmpd, backup # return these & freeze in place
 
 	except KeyboardInterrupt as e:
@@ -314,8 +314,8 @@ def configure(abs_path):
 			abs_path.rename(backup)
 			logger.debug('local directory moved to backup')
 
-			if tmpd.exists() and backup.exists():
-				logger.debug(f"{tmpd} and {backup} configured by [configure]")
+			# if tmpd.exists() and backup.exists():
+			# 	logger.debug(f"{tmpd} and {backup} configured by [configure]")
 	
 		except (PermissionError, FileNotFoundError, Exception) as e:
 			logger.error(f"{RED}err encountered while trying move {abs_path} to a backup location:{RESET} {e}.", exc_info=True)

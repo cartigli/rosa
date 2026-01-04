@@ -29,7 +29,10 @@ from rosa.lib import (
 NOMIC = "[get][current]"
 
 def main(args=None):
-    """Syncs directory to latest version.""" # has no actual logging; need to add that
+    """Syncs directory to latest version.""" 
+    # has no actual logging; need to add that
+    # I would like to disagree.
+
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     abs_path = Path(LOCAL_DIR).resolve()
@@ -42,6 +45,7 @@ def main(args=None):
             # wait, why the f*ck am I using sfat_boy instead of fat_boy? This function needs to restore the given directory on failure.
             # It feels dumb as hell to retrace my own steps like this, but this is more 
             # evidence that I meant this to be a single execution comprehensive pull.
+            # so this is get_all
             dquery = "SELECT rp FROM directories;"
             with conn.cursor(buffered=False) as cursor:
                 cursor.execute(dquery)

@@ -24,8 +24,8 @@ def ask_to_share(diff_data, force=False):
 	"""Asks the user if they would like to see the details of the discrepancies found (specific files/directories).
 
 	Args:
-		diff_data (list): Dictionaries containing the details, description, and title of the given files/directories, based on how they were found.
-		force (=False): If passed, the function skips the ask-to-show and just prints the count as well as the title for any changes found.
+		diff_data (list): Dictionaries containing the details of differences found.
+		force (bool): If true, ask user to see each types' files. If not, skips.
 	
 	Returns:
 		None
@@ -71,18 +71,12 @@ def main(args=None):
 	"""
 	xdiff = False
 	r = False
+
 	logger, force, prints, start = mini_ps(args, NOMIC)
 	
 	if args:
 		if args.remote:
 			r = True
-	
-	# index = find_index()
-
-	# if not index:
-	# 	logger.info('not an indexed directory')
-	# 	finale(NOMIC, start, prints)
-	# 	sys.exit(2)
 
 	local = Heart()
 
@@ -93,18 +87,18 @@ def main(args=None):
 
 			if r:
 				vok, vers = version_check(conn, sconn)
+
 				if vok is True:
 					logger.info('versions: twinned')
 				elif vok is False:
 					logger.info(f"versions: {RED}twisted{RESET}")
 
-
-	if prints is True:
-		logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
-
 	if xdiff is True:
-		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
-		logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
+		if any((new, deleted, diffs)):
+			logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
+		
+		if any((newd, deletedd)):
+			logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
 
 		diff_data = []
 

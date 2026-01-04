@@ -31,14 +31,8 @@ def main(args=None):
 	removes files/directories not found locally.
 	"""
 	xdiff = False
+
 	logger, force, prints, start = mini_ps(args, NOMIC)
-
-	# index = find_index()
-
-	# if not index:
-	# 	logger.info('not an indexed directory')
-	# 	finale(NOMIC, start, prints)
-	# 	sys.exit(2)
 
 	local = Heart()
 
@@ -76,12 +70,13 @@ def main(args=None):
 						collector(conn, new, LOCAL_DIR, cv, key="new_files")
 
 					if diffs:
+						logger.debug('finding altered files\' previous versions')
 						oversions = {}
 						ovquery = "SELECT version FROM files WHERE rp = %s;"
 
 						with conn.cursor() as cursor:
 							for diff in diffs:
-								print(diff)
+								# print(diff)
 								cursor.execute(ovquery, (diff,))
 
 								oversion = cursor.fetchone()
@@ -107,19 +102,18 @@ def main(args=None):
 
 					logger.info('updating local indexes')
 					with fat_boy(originals) as secure:
-						for p in secure:
-							print(p)
+						# for p in secure:
+						# 	print(p)
 
 						local_audit_(new, diffs, remaining, cv, secure, sconn)
 						local_daudit(newd, deletedd, cv, sconn)
 
 						if deleted:
 							logger.info('backing up deleted files')
-							xxdeleted(conn, deleted, cv, doversions, secure, sconn) # here
+							xxdeleted(conn, deleted, cv, doversions, secure, sconn)
 
 						logger.info('final confirmations')
-						historian(cv, message, sconn) # here
-						# confirm(conn, force)
+						historian(cv, message, sconn)
 
 				else:
 					logger.critical(f"{RED}versions did not align; pull most recent upload from server before committing{RESET}")
@@ -131,7 +125,7 @@ def main(args=None):
 			updates.append(n) # new & remaining need to get updated
 
 		with landline(local.index) as sconn:
-			refresh_index(updates, sconn) # here
+			refresh_index(updates, sconn)
 
 	else:
 		logger.info('no diff!')

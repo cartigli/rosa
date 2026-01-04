@@ -31,13 +31,20 @@ logger = logging.getLogger('rosa.log')
 
 NOMIC = "[init]"
 
-def r2(xdir):
+def r20(xdir):
+	"""Recursively searches a directory for sub-directories & files.
+
+	Args:
+		xdir (Path): A directory's full path.
+	
+	Yields:
+		obj (str): A found file or directories path.
+	"""
 	for obj in os.scandir(xdir):
+		yield obj
+
 		if obj.is_dir():
-			yield obj
-			yield from r2(obj.path)
-		else:
-			yield obj
+			yield from r20(obj.path)
 
 def scraper(dir_):
 	"""'Scrapes' the given directory for every file and directory's relative paths.
@@ -50,32 +57,29 @@ def scraper(dir_):
 		frps (list): Relative paths of every file.
 	"""
 	pfx = len(dir_) + 1
-	dirx = Path(dir_)
 
 	frps = []
 	drps = []
 
-	if dirx.exists():
-		for obj in r2(dir_):
-			if is_ignored(obj.path):
-				continue
+	for obj in r20(dir_):
+		if is_ignored(obj.path):
+			continue
 
-			elif obj.is_file():
-				rp = obj.path[pfx:]
-				frps.append(rp)
-			
-			elif obj.is_dir():
-				rp = obj.path[pfx:]
-				drps.append(rp)
-
-	else:
-		logger.warning('local directory does not exist')
-		sys.exit(1)
+		elif obj.is_file():
+			rp = obj.path[pfx:]
+			frps.append(rp)
+		
+		elif obj.is_dir():
+			rp = obj.path[pfx:]
+			drps.append(rp)
 	
 	return drps, frps
 
 def main(args=None):
-	"""Initiating the local index & remote database."""
+	"""Initiating the local index & remote database.
+	
+	If they exist, partially or in whole, asks to delete.
+	"""
 	logger, force, prints, start = mini_ps(args, NOMIC)
 
 	with phones() as conn:
@@ -86,8 +90,7 @@ def main(args=None):
 
 	res = [rex[0] for rex in rez]
 
-	# index = find_index()
-	local = Heart(strict=False)
+	local = Heart(strict=False) # only script to use =False (non-default value)
 
 	if any(res):
 		logger.info(f"found these tables in the server {res}.")
@@ -156,7 +159,9 @@ def main(args=None):
 						construct(sconn)
 
 						init_dindex(drps, sconn)
-						init_index(sconn, index.parent)
+						print(os.path.dirname(index))
+						init_index(sconn, os.path.dirname(index))
+						# init_index(sconn, index.parent)
 
 				except Exception as err:
 					raise
@@ -169,7 +174,7 @@ def main(args=None):
 							pass
 
 					if index:
-						shutil_fx(index.parent)
+						shutil_fx(os.path.dirname(index))
 
 	finale(NOMIC, start, prints)
 
