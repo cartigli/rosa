@@ -11,6 +11,8 @@ Majority of the time is always uploading.
 Also, these are not genuine network speeds; purely functionality tests.
 """
 
+# check complete
+
 import os
 import sys
 import time
@@ -46,22 +48,22 @@ def r20(xdir):
 		if obj.is_dir():
 			yield from r20(obj.path)
 
-def scraper(dir_):
+def scraper(origin):
 	"""'Scrapes' the given directory for every file and directory's relative paths.
 	
 	Args:
-		dir_ (str): Path to the LOCAL_DIR as a string.
+		origin (str): Path to the LOCAL_DIR.
 	
 	Returns:
 		drps (list): Relative paths of every directory.
 		frps (list): Relative paths of every file.
 	"""
-	pfx = len(dir_) + 1
+	pfx = len(origin) + 1
 
 	frps = []
 	drps = []
 
-	for obj in r20(dir_):
+	for obj in r20(origin):
 		if is_ignored(obj.path):
 			continue
 
@@ -109,7 +111,8 @@ def main(args=None):
 								pass
 
 						if local.index:
-							shutil_fx(local.index.parent)
+							# shutil_fx(local.index.parent)
+							shutil_fx(os.path.dirname(local.index))
 
 				except Exception as e:
 					logger.info(f"failed to erase server due to: {e}", exc_info=True)
@@ -128,18 +131,21 @@ def main(args=None):
 								pass
 
 						if local.index:
-							shutil_fx(local.index.parent)
+							# shutil_fx(local.index.parent)
+							shutil_fx(os.path.dirname(local.index))
 
 				except Exception as e:
 					logger.info(f"failed to erase server due to: {e}", exc_info=True)
 
 	elif local.index:
-		if local.index.exists():
+		# if local.index.exists():
+		if os.path.exists(local.index):
 			logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
 			dec = input('delete [d] the index now? [Return to quit]: ').lower()
 
 			if dec in('d', 'delete', 'd ', ' d'):
-				shutil_fx(local.index.parent)
+				# shutil_fx(local.index.parent)
+				shutil_fx(os.path.dirname(local.index))
 
 	else:
 		dec = input("[i] initiate? [Return to quit] ").lower()
@@ -149,7 +155,7 @@ def main(args=None):
 
 			with phones() as conn:
 				try:
-					drps, frps = scraper(LOCAL_DIR)
+					drps, frps = scraper(LOCAL_DIR) # checked
 
 					init_remote(conn, drps, frps)
 
@@ -161,7 +167,6 @@ def main(args=None):
 						init_dindex(drps, sconn)
 						print(os.path.dirname(index))
 						init_index(sconn, os.path.dirname(index))
-						# init_index(sconn, index.parent)
 
 				except Exception as err:
 					raise

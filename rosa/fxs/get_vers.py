@@ -10,6 +10,8 @@ next to the original, which remains untouched.
 ^ This is why the index is not needed & shouldn't be looked for.
 """
 
+# CHECK INCOMPLETE - nor is it essential atm
+
 import shutil
 import sqlite3
 from pathlib import Path
@@ -23,11 +25,12 @@ from rosa.lib import (
     mini_ps, finale, sfat_boy
 )
 
-NOMIC = "[get][vers]"
+NOMIC = "[get][version]"
 
 def main(args=None):
     """Fetches all versions and downloads the user's choice."""
     xdiff = False
+
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     with phones() as conn:
@@ -58,7 +61,8 @@ def main(args=None):
     if version:
         logger.info(f"requested version recieved: v{version}")
 
-        tmpd = Path(LOCAL_DIR).parent / f"rosa_v{version}"
+        # tmpd = Path(LOCAL_DIR).parent / f"rosa_v{version}" # NOT CHECKED + WTF
+        tmpd = os.path.join(LOCAL_DIR, f"rosa_v{version}")
         dmp = dmp_.diff_match_patch()
         vers_ = {'vs': version}
 
@@ -95,7 +99,8 @@ def main(args=None):
                             break
 
                         for rp, content in fdata:
-                            fp = dirx / rp
+                            # fp = dirx / rp
+                            fp = os.path.join(dirx, rp)
                             fp.touch()
 
                             with open(fp, 'wb') as f:
@@ -114,8 +119,13 @@ def main(args=None):
 
                         cursor.execute(VMDC_FILES, (rp[0], rp[0]))
                         bcontent = cursor.fetchone()
+                        enc = "utf-8"
 
-                        content = bcontent[0].decode('utf-8')
+                        try:
+                            content = bcontent[0].decode('utf-8')
+                        except UnicodeDecodeError as ude:
+                            enc = "latin-1"
+                            content = bcontent[0].decode('latin-1')
 
                         vals = (rp[0], version, version)
 
@@ -126,10 +136,13 @@ def main(args=None):
                             cpatch = cursor.fetchmany(1)
 
                             if not cpatch:
-                                fp = dirx / rp[0]
+                                # fp = dirx / rp[0]
+                                fp = os.path.join(dirx, rp[0])
 
-                                with open(fp, 'w') as f:
-                                    f.write(content)
+                                back_tobytes = content.encode(enc)
+
+                                with open(fp, 'wb') as f:
+                                    f.write(back_tobytes)
                                 break
 
                             patch_astext = cpatch[0][0]

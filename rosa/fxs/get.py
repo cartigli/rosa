@@ -8,6 +8,8 @@ Hashes are only verified if the file's timestamp shows a discrepancy.
 Name should be changed. get_curr should be get & this should be get_last or similar.
 """
 
+# check complete (incomplete commenting)
+
 import os
 import shutil
 import subprocess
@@ -15,7 +17,6 @@ from pathlib import Path
 
 import sqlite3
 
-# LOCAL_DIR used once (besides import)
 from rosa.confs import LOCAL_DIR
 from rosa.lib import (
 	phones, fat_boy1, mk_rrdir, 
@@ -27,22 +28,28 @@ from rosa.lib import (
 NOMIC = "[get]"
 
 def originals(replace, tmpd, backup):
-	"""Copies the originals of deleted or altered files to replace edits."""
-	originals = backup / ".index" / "originals"
+	"""Copies the originals of deleted or altered files to replace edits.""" # fix this mf comment
+	# originals = backup / ".index" / "originals"
+	originals = os.path.join(backup, ".index", "originals")
 
 	for rp in replace:
-		fp = originals / rp
-		bp = tmpd / rp
+		# fp = originals / rp
+		fp = os.path.join(originals, rp)
+		# bp = tmpd / rp
+		bp = os.path.join(tmpd, rp)
 
-		(bp.parent).mkdir(parents=True, exist_ok=True)
+		# (bp.parent).mkdir(parents=True, exist_ok=True)
+		os.makedirs(os.path.dirname(bp), exist_ok=True)
 
 		shutil.copy2(fp, bp)
 
 def finals(tmpd, backup):
-	index = ".index"
+	# index = ".index"
 
-	origin = backup / index
-	destin = tmpd / index
+	# origin = backup / index
+	origin = os.path.join(backup, ".index")
+	# destin = tmpd / index
+	destin = os.path.join(tmpd, ".index")
 
 	shutil.copytree(origin, destin)
 
@@ -61,13 +68,13 @@ def main(args=None):
 	if xdiff is True:
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 
-		with fat_boy1(LOCAL_DIR) as (tmp_, backup):
+		with fat_boy1(LOCAL_DIR) as (tmp_, backup): # CHECKED
 
 			logger.info('copying directory tree...')
-			mk_rrdir(indexed_dirs, tmp_)
+			mk_rrdir(indexed_dirs, tmp_) # checked
 
 			logger.info('hard linking unchanged files...')
-			save_people(remaining, backup, tmp_)
+			save_people(remaining, backup, tmp_) # checked
 
 			# ignore new files
 
@@ -76,13 +83,13 @@ def main(args=None):
 
 			if diffs:
 				logger.info('replacing files with deltas')
-				originals(diffs, tmp_, backup)
+				originals(diffs, tmp_, backup) # checked (bad commenting)
 
 			for r in remaining:
 				diffs.append(r)
 			
 			logger.info('inserting index & originals')
-			finals(tmp_, backup)
+			finals(tmp_, backup) # checked (more bad commenting)
 
 		logger.info('refreshing the index')
 		with landline(local.index) as sconn:

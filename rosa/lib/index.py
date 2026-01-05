@@ -10,14 +10,11 @@ from datetime import datetime, UTC
 import xxhash
 import sqlite3
 
+# check complete
+
 # LOCAL_DIR used 5 times (besides import)
 # last step is pass connection obj. & import landline to every script that uses it
 from rosa.confs import LOCAL_DIR, SINIT, CVERSION, BLACKLIST
-
-# sqlite3 shortcuts in some areas
-# preservation of the C.W.D.
-# fat_boy's operations around the C.W.D. altered accordingly
-# moving away from Pathlib
 
 logger = logging.getLogger('rosa.log')
 
@@ -30,15 +27,11 @@ def _config():
 	Returns:
 		index (Path): Pathlib path to the SQLite's database file.
 	"""
-	# curr = Path.cwd()
 	curr = os.getcwd()
 
-	# ihome = curr / ".index"
 	ihome = os.path.join(curr, ".index")
-	# ihome.mkdir(parents=True, exist_ok=True)
 	os.makedirs(ihome, exist_ok=True)
 
-	# index = ihome / "indeces.db"
 	index = os.path.join(ihome, "indeces.db")
 
 	return index
@@ -57,42 +50,16 @@ def construct(sconn):
 	"""
 	sconn.executescript(SINIT)
 
-
-# def copier(abs_path, originals):
-# 	"""Backs up the current directory to the index with the 'cp -r' unix command.
-
-# 	Args:
-# 		abs_path (Path): Pathlib path to a chosen directory.
-
-# 	Returns:
-# 		None
-# 	"""
-# 	origin = originals / "originals"
-# 	origin.mkdir(parents=True, exist_ok=True)
-
-# 	for xobj in abs_path.glob('*'):
-# 		if is_ignored(xobj.as_posix()):
-# 			continue
-# 		else:
-# 			destination = origin / xobj.name
-
-# 			if xobj.is_dir(): # root level directories
-# 				shutil.copytree(xobj, destination)
-
-# 			elif xobj.is_file(): # root level files
-# 				shutil.copy2(xobj, destination)
-
-
 def copier(origin, originals):
 	"""Backs up the current directory to the index with the 'cp -r' unix command.
 
 	Args:
 		origin (str): Path to a chosen directory.
+		originals (str): Path to the 'originals' directory.
 
 	Returns:
 		None
 	"""
-	# origin = os.path.join(originals, "originals")
 	os.makedirs(originals, exist_ok=True)
 
 	for obj in os.scandir(origin):
@@ -138,20 +105,20 @@ def _rd(dirx):
 			yield d.path
 			yield from _rd(d.path)
 
-def _surveyor(dir_):
+def _surveyor(origin):
 	"""Collects metadata for initial indexing.
 
 	Args:
-	dir (str): Path pointing to the requested directory.
+		origin (str): Path pointing to the requested directory.
 
 	Returns:
 		inventory (list): Tupled relative paths, st_ctimes, and st_sizes for every file found.
 	"""
-	prefix = len(dir_) + 1
+	prefix = len(origin) + 1
 
 	inventory = []
 
-	for file in _r(dir_):
+	for file in _r(origin):
 		if not is_ignored(file.path):
 			rp = file.path[prefix:]
 
@@ -164,11 +131,11 @@ def _surveyor(dir_):
 
 	return inventory
 
-def _survey(dir_, version):
+def _survey(origin, version):
 	"""Collects metadata for initial indexing but includes versions for the index.
 	
 	Args:
-		dir_ (str): Path to the requested directory.
+		origin (str): Path to the requested directory.
 		version (int): Current version for the index.
 	
 	Returns:
@@ -176,9 +143,9 @@ def _survey(dir_, version):
 	"""
 	inventory = []
 
-	prefix = len(dir_) + 1
+	prefix = len(origin) + 1
 
-	for file in _r(dir_):
+	for file in _r(origin):
 		if not is_ignored(file.path):
 			rp = file.path[prefix:]
 
@@ -218,33 +185,30 @@ def _survey1(dir_, version):
 
 	return inventory
 
-def _dsurvey(dir_):
+def _dsurvey(origin):
 	"""Collects the subdirectories within the requested directory.
 
 	Args:
-		dir_ (str): Path to the requested directory.
+		origin (str): Path to the requested directory.
 
 	Returns:
 		ldrps (list): Relative paths of every directory found.
 	"""
-	pfx = len(dir_) + 1
+	pfx = len(origin) + 1
 	ldrps = []
 
-	for obj in _rd(dir_):
+	for obj in _rd(origin):
 		if not is_ignored(obj):
 			ldrps.append(obj[pfx:])
-
-	# drps = [Path(d).as_posix() for d in ldrps]
-	# return drps
 
 	return ldrps
 
 
-def _surveyorx(dir_, rps):
+def _surveyorx(origin, rps):
 	"""Collects the new metadata for altered files from a list of files.
 
 	Args:
-		dir_ (str): Path to the requested directory.
+		origin (str): Path to the given directory.
 		rps (list): Relative paths of all the altered files.
 
 	Returns:
@@ -253,7 +217,7 @@ def _surveyorx(dir_, rps):
 	inventory = []
 
 	for rp in rps:
-		fp = os.path.join(dir_, rp)
+		fp = os.path.join(origin, rp)
 
 		stats = os.stat(fp)
 
@@ -284,16 +248,16 @@ def historian(version, message, sconn):
 
 	sconn.execute(x, values)
 
-def _formatter(dir_):
+def _formatter(origin):
 	"""Builds a dictionary of indexed st_ctimes and st_sizes for every file found.
 
 	Args:
-		dir_ (str): Path to the requested directory.
+		origin (str): Path to the requested directory.
 
 	Returns:
 		rollcall (dictionary): Every file's relative path keyed to its st_ctime and st_size.
 	"""
-	inventory = _surveyor(dir_)
+	inventory = _surveyor(origin)
 
 	rollcall = {rp:(ctime, size) for rp, ctime, size in inventory}
 
@@ -329,15 +293,11 @@ def init_index(sconn, parent):
 	message = "INITIAL"
 	version = 0
 
-	# abs_path = Path(LOCAL_DIR)
-
 	originals = os.path.join(parent, "originals")
 
-	copier(LOCAL_DIR, originals) # backup created first
-	# copier(abs_path, originals) # backup created first
+	copier(LOCAL_DIR, originals) # backup created first - checked
 
-	inventory = _survey(LOCAL_DIR, version) # collect current files' metadata
-	# inventory = _survey(abs_path, version) # collect current files' metadata
+	inventory = _survey(LOCAL_DIR, version) # collect current files' metadata - checked
 
 	query = "INSERT INTO records (rp, version, ctime, bytes) VALUES (?, ?, ?, ?);"
 
@@ -412,14 +372,12 @@ def query_index(conn, sconn):
 	diff = False
 	remaining = []
 
-	# abs_path = Path(LOCAL_DIR)
-
-	real_stats = _formatter(LOCAL_DIR)
+	real_stats = _formatter(LOCAL_DIR) # checked
 	index_records = get_records(sconn)
 
 	new, deleted, diffs, remaining_ = qfdiffr(index_records, real_stats)
 
-	failed, succeeded = verification(conn, diffs, LOCAL_DIR)
+	failed, succeeded = verification(conn, diffs, LOCAL_DIR) # checked
 
 	for x in remaining_:
 		remaining.append(x)
@@ -432,13 +390,13 @@ def query_index(conn, sconn):
 
 	return new, deleted, failed, remaining, diff
 
-def verification(conn, diffs, dir_):
+def verification(conn, diffs, origin):
 	"""Checks actual vs. recorded hash for files with metadata discrepancies.
 
 	Args:
 		conn (mysql): Server's connection object.
 		diffs (list): Files with metadata discrepancies.
-		dir_ (str): The directory to search.
+		origin (str): The directory to search.
 
 	Returns:
 		failed (list): Files whose hash did not match.
@@ -454,8 +412,7 @@ def verification(conn, diffs, dir_):
 
 	for diff in diffs:
 		hasher.reset()
-		# fp = dir_ / diff
-		fp = os.path.join(dir_, diff)
+		fp = os.path.join(origin, diff)
 
 		with open(fp, 'rb') as f:
 			content = f.read()
@@ -497,7 +454,7 @@ def query_dindex(sconn):
 
 	idrps = sconn.execute(query).fetchall()
 
-	ldrps = _dsurvey(LOCAL_DIR)
+	ldrps = _dsurvey(LOCAL_DIR) # checked
 
 	xdrps = [i[0] for i in idrps]
 
@@ -555,7 +512,6 @@ def local_audit_(new, diffs, remaining, version, secure, sconn):
 		None
 	"""
 	logger.debug('auditing the local index')
-	# abs_path = Path(LOCAL_DIR) # nothing
 
 	tmpd, backup = secure
 
@@ -586,11 +542,9 @@ def local_audit_(new, diffs, remaining, version, secure, sconn):
 			destin.hardlink_to(origin)
 
 	if new:
-		inew = xxnew(new, LOCAL_DIR, version, tmpd)
-		# inew = xxnew(new, abs_path, version, tmpd)
+		inew = xxnew(new, LOCAL_DIR, version, tmpd) # checked
 	if diffs:
-		idiffs = xxdiff(diffs, LOCAL_DIR, version, tmpd)
-		# idiffs = xxdiff(diffs, abs_path, version, tmpd)
+		idiffs = xxdiff(diffs, LOCAL_DIR, version, tmpd) # checked
 
 	index_audit(inew, idiffs, sconn)
 
@@ -612,9 +566,6 @@ def xxnew(new, origin, version, tmpd):
 	for rp in new:
 		fp = os.path.join(origin, rp)
 		bp = tmpd / rp
-
-		# fp = os.path.join(abs_path, rp)
-		# bp = os.path.join(tmpd, rp)
 
 		bp.parent.mkdir(parents=True, exist_ok=True)
 		shutil.copy2(fp, bp)
@@ -639,9 +590,8 @@ def xxdiff(diffs, origin, version, tmpd):
 	idiff = []
 
 	for rp in diffs:
-		# fp = abs_path / rp
 		fp = os.path.join(origin, rp)
-		bp = tmpd / rp # tmpd target; local_dir source (outdated)
+		bp = tmpd / rp
 
 		bp.parent.mkdir(parents=True, exist_ok=True)
 		bp.touch()
@@ -652,7 +602,6 @@ def xxdiff(diffs, origin, version, tmpd):
 		with open(bp, 'wb') as o:
 			o.write(modified)
 
-		# stats = fp.stat()
 		stats = os.stat(fp)
 		ctime = stats.st_ctime
 		size = stats.st_size*(10**7)
@@ -765,7 +714,7 @@ def refresh_index(diffs, sconn):
 	Returns:
 		None
 	"""
-	inventory = _surveyorx(LOCAL_DIR, diffs)
+	inventory = _surveyorx(LOCAL_DIR, diffs) # checked
 
 	query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
 

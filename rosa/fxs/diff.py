@@ -6,6 +6,8 @@ If the server and local index are on different versions, this will not tell you.
 It will only identify the changes you made since the latest indexing.
 """
 
+# check complete
+
 import sys
 import logging
 

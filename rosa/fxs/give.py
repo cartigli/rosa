@@ -7,6 +7,9 @@ Updates the local index.
 """
 
 # LOCAL_DIR used 3 times (besides import)
+# check complete
+
+import os
 import sys
 
 from rosa.confs import LOCAL_DIR, RED, RESET
@@ -66,7 +69,7 @@ def main(args=None):
 					remote_records(conn, cv, message)
 
 					if new:
-						logger.info('uploading new files...')
+						logger.info('uploading new files...') # checked
 						collector(conn, new, LOCAL_DIR, cv, key="new_files")
 
 					if diffs:
@@ -76,16 +79,15 @@ def main(args=None):
 
 						with conn.cursor() as cursor:
 							for diff in diffs:
-								# print(diff)
 								cursor.execute(ovquery, (diff,))
 
 								oversion = cursor.fetchone()
 								oversions[diff] = oversion[0]
 
-						logger.info('uploading altered files...')
+						logger.info('uploading altered files...') # checked
 						collector(conn, diffs, LOCAL_DIR, cv, key="altered_files") # updates altered
 
-						logger.info('generating altered files\' patches')
+						logger.info('generating altered files\' patches') # checked
 						patches, originals = diff_gen(diffs, local.originals, LOCAL_DIR) # computes & returns patches
 
 						logger.info('uploading altered files\' patches')
@@ -101,9 +103,7 @@ def main(args=None):
 						upload_dirs(conn, newd, cv)
 
 					logger.info('updating local indexes')
-					with fat_boy(originals) as secure:
-						# for p in secure:
-						# 	print(p)
+					with fat_boy(local.originals) as secure:
 
 						local_audit_(new, diffs, remaining, cv, secure, sconn)
 						local_daudit(newd, deletedd, cv, sconn)
@@ -125,7 +125,7 @@ def main(args=None):
 			updates.append(n) # new & remaining need to get updated
 
 		with landline(local.index) as sconn:
-			refresh_index(updates, sconn)
+			refresh_index(updates, sconn) # should be (sconn, updates)
 
 	else:
 		logger.info('no diff!')

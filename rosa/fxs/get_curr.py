@@ -13,6 +13,8 @@ So clarity is needed on the scripts function, fo sho.
 Good lord, it doesn't even look for the index. Fourth piece of evidence.
 """
 
+# CHECK INCOMPLETE
+
 import sys
 import time
 import shutil
@@ -35,13 +37,13 @@ def main(args=None):
 
     logger, force, prints, start = mini_ps(args, NOMIC)
 
-    abs_path = Path(LOCAL_DIR).resolve()
+    # abs_path = Path(LOCAL_DIR).resolve() # NOT CHECKED
 
-    if not abs_path.exists():
-        abs_path.mkdir()
+    # if not abs_path.exists():
+    #     abs_path.mkdir()
 
     with phones() as conn:
-        with sfat_boy(abs_path) as tmpd: # sfat_boy inside phones ensures sfat_boy catches errors before phones
+        with sfat_boy(LOCAL_DIR) as tmpd: # sfat_boy inside phones ensures sfat_boy catches errors before phones
             # wait, why the f*ck am I using sfat_boy instead of fat_boy? This function needs to restore the given directory on failure.
             # It feels dumb as hell to retrace my own steps like this, but this is more 
             # evidence that I meant this to be a single execution comprehensive pull.
@@ -66,7 +68,8 @@ def main(args=None):
                         break
 
                     for rp, content in fdata:
-                        fp = tmpd / rp
+                        # fp = tmpd / rp
+                        fp = os.path.join(tmpd, rp)
 
                         with open(fp, 'wb') as f:
                             f.write(content)

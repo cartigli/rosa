@@ -3,6 +3,9 @@
 Uploads to, updates in, and deletes data from the server.
 """
 
+# check complete 
+
+import os
 import logging
 from pathlib import Path
 from itertools import batched
@@ -29,7 +32,7 @@ def init_remote(conn, drps, frps):
 	Returns:
 		None
 	"""
-	_path = Path(LOCAL_DIR)
+	# _path = Path(LOCAL_DIR)
 	message = "INITIAL"
 	version = 0
 
@@ -41,7 +44,7 @@ def init_remote(conn, drps, frps):
 			pass
 
 		# start with the bulk file upload
-		collector(conn, frps, _path, version, key="new_files")
+		collector(conn, frps, LOCAL_DIR, version, key="new_files")
 		# then upload the directories
 		upload_dirs(conn, drps, version)
 		# upload the new version no & message last (lightest & least data rich)
@@ -97,14 +100,21 @@ def avg(_list, abs_path):
 	Returns:
 		batch_count (int): Packet size divided by average file size.
 	"""
-	paths = Path(abs_path)
+	# paths = Path(abs_path)
 	tsz = 0
 
-	for x in _list:
-		fp = paths / x
-		tsz += fp.stat().st_size
+	for path in _list:
+		# fp = paths / path
+
+		fp = os.path.join(abs_path, path)
+
+		# tsz += fp.stat().st_size
+		tsz += os.stat(fp).st_size
 	
-	batch_count = int(MAX_ALLOWED_PACKET / (tsz / len(_list)))
+	avg = tsz / len(_list)
+	
+	batch_count = int(MAX_ALLOWED_PACKET / avg)
+
 	return batch_count
 
 def collector(conn, _list, abs_path, version, key=None):
@@ -113,9 +123,9 @@ def collector(conn, _list, abs_path, version, key=None):
 	Args:
 		conn (mysql): Connection object.
 		_list (list): Relative paths, for uploading.
-		abs_path (Path): Pathlib path to the LOCAL_DIR.
+		abs_path (str): Path to the LOCAL_DIR.
 		version (int): Current version.
-		key (var): String for specifying upload created() or edited().
+		key (var): Specifies files as new or altered.
 	
 	Returns:
 		None
@@ -173,17 +183,17 @@ def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faste
 	logger.debug('all batches collected')
 	return all_batches
 
-def collect_data(conn, dicts_, _abs_path, version, key=None):
+def collect_data(conn, dicts_, abs_path, version, key=None):
 	"""Collects details about the batch passed to it.
 
 	Args:
 		dicts_ (list): Batch's relative paths.
-		_abs_path (Path): Pathlib path to the LOCAL_DIR.
+		abs_path (str): Path to the LOCAL_DIR.
 
 	Returns:
 		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.
 	"""
-	abs_path = Path(_abs_path)
+	# abs_path = Path(_abs_path)
 	item_data = []
 
 	# cmpr = zstd.ZstdCompressor(level=3)
@@ -191,10 +201,14 @@ def collect_data(conn, dicts_, _abs_path, version, key=None):
 	hasher = xxhash.xxh64()
 
 	for path in dicts_:
-		item = ( abs_path / path ).resolve()
+		# item = ( abs_path / path ).resolve()
+		item = os.path.join(abs_path, path)
 
-		content = item.read_bytes()
+		# content = item.read_bytes()
 		# c_content = cmpr.compress(content)
+
+		with open(item, 'rb') as f:
+			content = f.read()
 
 		hasher.reset()
 		hasher.update(content)
