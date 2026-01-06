@@ -13,7 +13,7 @@ Name should be changed. get_curr should be get & this should be get_last or simi
 import os
 import shutil
 import subprocess
-from pathlib import Path
+# from pathlib import Path
 
 import sqlite3
 
@@ -27,7 +27,16 @@ from rosa.lib import (
 NOMIC = "[get]"
 
 def originals(replace, tmpd, backup):
-	"""Copies the originals of deleted or altered files to replace edits.""" # fix this mf comment
+	"""Copies the originals of deleted or altered files to replace edits.
+
+	Args:
+		replace (list): Relative paths of files to 'replace'.
+		tmpd (str): Path to the temporary directory.
+		backup (str): Path to the source directory.
+
+	Returns:
+		None
+	"""
 	# originals = backup / ".index" / "originals"
 	originals = os.path.join(backup, ".index", "originals")
 
@@ -43,6 +52,15 @@ def originals(replace, tmpd, backup):
 		shutil.copy2(fp, bp)
 
 def finals(tmpd, backup):
+	"""Copies the index from the backup to the temporary directory.
+
+	Args:
+		tmpd (str): Path to the temporary directory.
+		backup (str): Path to the source directory.
+
+	Returns:
+		None
+	"""
 	# index = ".index"
 
 	# origin = backup / index
@@ -50,7 +68,8 @@ def finals(tmpd, backup):
 	# destin = tmpd / index
 	destin = os.path.join(tmpd, ".index")
 
-	shutil.copytree(origin, destin)
+	# shutil.copytree(origin, destin)
+	os.rename(origin, destin)
 
 def main(args=None):
 	"""Reverts the local state to the most recent commitment."""

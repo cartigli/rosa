@@ -19,7 +19,7 @@ import sys
 import time
 import shutil
 import logging
-from pathlib import Path
+# from pathlib import Path
 
 
 from rosa.lib import (
@@ -30,7 +30,7 @@ from rosa.lib import (
 NOMIC = "[get][current]"
 
 def main(args=None):
-    """Syncs directory to latest version.""" 
+    """Downloads the latest version.""" 
     # has no actual logging; need to add that
     # I would like to disagree.
 

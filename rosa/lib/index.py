@@ -4,7 +4,7 @@ import time
 import shutil
 import logging
 import subprocess
-from pathlib import Path
+# from pathlib import Path
 from datetime import datetime, UTC
 
 import xxhash
@@ -21,7 +21,7 @@ def _config():
 		None
 
 	Returns:
-		index (Path): Pathlib path to the SQLite's database file.
+		index (str): Path to the SQLite's database file.
 	"""
 	curr = os.getcwd()
 
@@ -39,7 +39,7 @@ def construct(sconn):
 	"""Makes the SQLite tables inside the database.
 
 	Args:
-		index (Path): Pathlib path to the SQLite's database file.
+		sconn (sqlite3): Index's connection object.
 
 	Returns:
 		None
@@ -59,9 +59,10 @@ def copier(origin, originals):
 	os.makedirs(originals, exist_ok=True)
 
 	for obj in os.scandir(origin):
-		if is_ignored(obj.path):
-			continue
-		else:
+		# if is_ignored(obj.path):
+		# 	continue
+		# else:
+		if not is_ignored(obj.path):
 			destination = os.path.join(originals, obj.name)
 
 			if obj.is_dir(): # root level directories
@@ -158,7 +159,7 @@ def _survey1(dir_, version):
 	"""Collects metadata for initial indexing but includes versions for the index.
 	
 	Args:
-		dir_ (Path): Pathlib path to the requested directory.
+		dir_ (str): Path to the requested directory.
 		version (int): Current version for the index.
 	
 	Returns:
@@ -428,7 +429,7 @@ def verification(conn, diffs, origin):
 			remote_ids[diff] = rhash
 	
 	for diff in diffs:
-		if remote_ids[diff] != local_ids[diff]:
+		if remote_ids[diff][0] != local_ids[diff]:
 			failed.append(diff)
 		else:
 			succeeded.append(diff)
@@ -497,6 +498,8 @@ def version_check(conn, sconn):
 def local_audit_(sconn, core, new, diffs, remaining, version, secure):
 	"""Reverts the current directory back to the latest locally recorded commit.
 
+	fat_boy uses Pathlib while fat_boy uses os.path, hence the change.
+
 	Args:
 		sconn (sqlite3): Index's connection object.
 		core (str): Main target directory.
@@ -517,27 +520,36 @@ def local_audit_(sconn, core, new, diffs, remaining, version, secure):
 	idiffs = None
 
 	logger.debug('recreating original\'s directory tree')
-	prefix = len(backup.as_posix()) + 1
+	prefix = len(backup) + 1
 
-	for dirs in backup.rglob('*'):
-		if is_ignored(dirs.as_posix()):
+	# for dirs in backup.rglob('*'):
+	for dirs in _rd(backup):
+		if is_ignored(dirs):
 			continue
 		elif dirs.is_dir():
-			rp = dirs.as_posix()[prefix:]
-			ndir = Path(tmpd / rp).resolve()
+			rp = dirs.path[prefix:]
+			# ndir = Path(tmpd / rp).resolve()
+			ndir = os.path.join(tmpd, rp)
 
-			ndir.mkdir(parents=True, exist_ok=True)
+			# ndir.mkdir(parents=True, exist_ok=True)
+			os.makedirs(ndir, exist_ok=True)
 
 	if remaining:
 		logger.debug('hard-linking unchanged originals')
 		for rem in remaining:
-			origin = (backup / rem).resolve()
-			destin = (tmpd / rem).resolve()
+			# origin = (backup / rem).resolve()
+			origin = os.path.join(backup, rem)
+			# destin = (tmpd / rem).resolve()
+			destin = os.path.join(tmpd, rem)
 
-			origin.parent.mkdir(parents=True, exist_ok=True)
-			destin.parent.mkdir(parents=True, exist_ok=True)
+			# origin.parent.mkdir(parents=True, exist_ok=True)
+			os.makedirs(os.path.dirname(origin), exist_ok=True)
+			# destin.parent.mkdir(parents=True, exist_ok=True)
+			os.makedirs(os.path.dirname(destin), exist_ok=True)
 
-			destin.hardlink_to(origin)
+			# destin.hardlink_to(origin)
+			# os.link(destin, origin)
+			os.link(origin, destin)
 
 	if new:
 		inew = xxnew(new, core, version, tmpd) # checked
@@ -553,7 +565,7 @@ def xxnew(new, origin, version, tmpd):
 		new (set): Files created since the last commitment.
 		origin (str): The given directory.
 		version (int): Current version.
-		tmpd (Path): The new directory.
+		tmpd (str): The new directory.
 
 	Returns:
 		inew (list): Tuples containing relative path, 1, 1, version for every new file.
@@ -563,9 +575,12 @@ def xxnew(new, origin, version, tmpd):
 
 	for rp in new:
 		fp = os.path.join(origin, rp)
-		bp = tmpd / rp
+		# bp = tmpd / rp
+		bp = os.path.join(tmpd, rp)
 
-		bp.parent.mkdir(parents=True, exist_ok=True)
+		# bp.parent.mkdir(parents=True, exist_ok=True)
+		os.path.makedirs(os.path.dirname(bp), exist_ok=True)
+
 		shutil.copy2(fp, bp)
 
 		inew.append((rp, 1, 1, version))
@@ -579,7 +594,7 @@ def xxdiff(diffs, origin, version, tmpd):
 		diffs (list): Files whose contents were altered since the last commit.
 		origin (str): The given directory.
 		version (int): Current version.
-		tmpd (Path): The new directory.
+		tmpd (str): The new directory.
 
 	Returns:
 		idiffs (list): Tuples containing the ctime, size, version and relative path of each altered file.
@@ -589,9 +604,11 @@ def xxdiff(diffs, origin, version, tmpd):
 
 	for rp in diffs:
 		fp = os.path.join(origin, rp)
-		bp = tmpd / rp
+		# bp = tmpd / rp
+		bp = os.path.join(tmpd, rp)
 
-		bp.parent.mkdir(parents=True, exist_ok=True)
+		# bp.parent.mkdir(parents=True, exist_ok=True)
+		os.path.makedirs(os.path.dirname(bp), exist_ok=True)
 		bp.touch()
 
 		with open(fp, 'rb') as m:
@@ -648,7 +665,8 @@ def xxdeleted(conn, sconn, deleted, xversion, doversions, secure):
 	xquery = "DELETE FROM records WHERE rp = ?;"
 
 	for rp in deleted:
-		fp = backup / rp
+		# fp = backup / rp
+		fp = os.path.join(backup, rp)
 
 		with open(fp, 'rb') as d:
 			dcontent = d.read()

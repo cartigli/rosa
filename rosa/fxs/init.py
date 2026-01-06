@@ -17,7 +17,7 @@ import sys
 import time
 import shutil
 import logging
-from pathlib import Path
+# from pathlib import Path
 
 from rosa.confs import TABLE_CHECK, _DROP
 from rosa.lib import (
@@ -36,7 +36,7 @@ def r20(xdir):
 	"""Recursively searches a directory for sub-directories & files.
 
 	Args:
-		xdir (Path): A directory's full path.
+		xdir (str): The given directory's path.
 	
 	Yields:
 		obj (str): A found file or directories path.
@@ -51,7 +51,7 @@ def scraper(origin):
 	"""'Scrapes' the given directory for every file and directory's relative paths.
 	
 	Args:
-		origin (str): Path to the given directory.
+		origin (str): Path of the source directory.
 	
 	Returns:
 		drps (list): Relative paths of every directory.

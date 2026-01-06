@@ -14,7 +14,7 @@ next to the original, which remains untouched.
 import os
 import shutil
 import sqlite3
-from pathlib import Path
+# from pathlib import Path
 from datetime import datetime
 import diff_match_patch as dmp_
 

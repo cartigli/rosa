@@ -10,7 +10,7 @@ import sys
 import time
 import logging
 import subprocess
-from pathlib import Path
+# from pathlib import Path
 import diff_match_patch as dp_
 
 from rosa.confs import LOGGING_LEVEL
@@ -30,8 +30,10 @@ def init_logger(logging_level):
 		logger (Logging): Logger.
 	"""
 	if logging_level:
-		file = Path(__file__)
-		log_dest = file.parent.parent / "rosa.log"
+		# file = Path(__file__)
+		file = os.path.abspath(__file__)
+		# log_dest = file.parent.parent / "rosa.log"
+		log_dest = os.path.join(os.path.dirname(os.path.dirname(file)), "rosa.log")
 		
 		# init loggers
 		logger = logging.getLogger('rosa.log')
@@ -90,48 +92,65 @@ def doit_urself():
 	Returns:
 		None
 	"""
-	cd = Path(__file__).resolve()
-	rosa = cd.parent.parent
+	# cd = Path(__file__).resolve()
+	cd = os.path.abspath(__file__)
+	# rosa = cd.parent.parent
+	# rosa = os.path.abspath(os.path.join(cd, os.pardir, os.pardir))
+	rosa = os.path.dirname(os.path.dirname(cd))
 
-	rosa_log = rosa / "rosa.log"
-	rosa_records = rosa / "_rosa_records"
+	# rosa_log = rosa / "rosa.log"
+	rosa_log = os.path.join(rosa, "rosa.log")
+	# rosa_records = rosa / "_rosa_records"
+	rosa_records = os.path.join(rosa, "_rosa_records")
 
 	logger.debug(f"rosa log is @: {rosa_log}")
 	logger.debug(f"rosa records are @: {rosa_records}")
 
-	rosasz = rosa_log.stat().st_size
+	# rosasz = rosa_log.stat().st_size
+	rosasz = os.stat(rosa_log).st_size
 	rosakb = rosasz / 1024
 
 	rosa_records_max = 5 # if 5 files when rosa_log is moved, delete oldest record
 	if rosakb >= 64.0: # 32 kb, and then move it to records
-		if rosa_records.resolve().exists():
-			if rosa_records.is_dir():
+		# if rosa_records.resolve().exists():
+		if os.path.exists(rosa_records):
+			# if rosa_records.is_dir():
+			# if rosa_records.isdir():
+			if os.path.isdir(rosa_records):
 				npriors = 1 # start w.one because this is only occurring when the log is larger than 64 kb
 				previous = []
-				for file in sorted(rosa_records.glob('*')):
+				# for file in sorted(rosa_records.glob('*')):
+				for file in os.scandir(rosa_records):
+					# if file.is_file():
 					if file.is_file():
-						previous.append(file)
+						previous.append(file.path)
 						npriors += 1
 
 				if npriors > rosa_records_max:
 					diff = npriors - rosa_records_max
 					unwanted = previous[0:diff]
 					for x in unwanted:
-						x.unlink()
+						# x.unlink()
+						os.remove(x)
 
-					ctime = f"{time.time():.2f}"
-					subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
+					xtime = f"{time.time():.2f}"
+					# subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
+					os.rename(rosa_log, os.path.join(rosa_records, f"rosa_log_{xtime}_"))
 
 					logger.debug('deleted record of log to make room, and moved current log to records')
 				else:
-					ctime = f"{time.time():.2f}"
-					subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
+					xtime = f"{time.time():.2f}"
+					# subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{xtime}_"])
+					os.rename(rosa_log, os.path.join(rosa_records, f"rosa_log_{xtime}_"))
 
 					logger.debug('rosa_records: ok, backed up current log')
 		else:
-			rosa_records.mkdir(parents=True, exist_ok=True)
-			ctime = f"{time.time():.2f}"
-			subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{ctime}_"])
+			# rosa_records.mkdir(parents=True, exist_ok=True)
+			os.makedirs(rosa_records, exist_ok=True)
+			xtime = f"{time.time():.2f}"
+
+			# subprocess.run(["mv", f"{rosa_log}", f"{rosa_records}/rosa.log_{xtime}_"])
+			os.rename(rosa_log, os.path.join(rosa_records, f"rosa_log_{xtime}_"))
 
 			logger.debug('backed up & replaced rosa.log')
 	else:
@@ -223,7 +242,6 @@ def diff_gen(modified, originals, origin):
 	
 	Returns:
 		patches (dmp patches): Generated patches as text.
-		originals (Path)): Pathlib path to the folder with the originals.
 	"""
 	patches = []
 
@@ -241,7 +259,7 @@ def diff_gen(modified, originals, origin):
 
 		patches.append((rp, patch))
 	
-	return patches, originals
+	return patches
 
 def patcher(old, new):
 	"""Computes the reverse patch.

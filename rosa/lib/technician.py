@@ -6,7 +6,7 @@ Uploads to, updates in, and deletes data from the server.
 
 import os
 import logging
-from pathlib import Path
+# from pathlib import Path
 from itertools import batched
 from datetime import datetime, UTC
 
@@ -25,7 +25,7 @@ def init_remote(conn, core, drps, frps):
 
 	Args:
 		conn (mysql): Connection obj.
-		core (str): Target directory.
+		core (str): Source directory.
 		drps (list): Relative paths of all the directories.
 		frps (list): Relative paths of all the files.
 	
@@ -44,8 +44,10 @@ def init_remote(conn, core, drps, frps):
 
 		# start with the bulk file upload
 		collector(conn, frps, core, version, key="new_files")
+
 		# then upload the directories
 		upload_dirs(conn, drps, version)
+
 		# upload the new version no & message last (lightest & least data rich)
 		remote_records(conn, version, message)
 
@@ -89,39 +91,35 @@ def upload_patches(conn, patches, xversion, oversions):
 
 # EDIT SERVER
 
-def avg(_list, abs_path):
+def avg(files, abs_path):
 	"""Finds abatch size for the files passed.
 
 	Args:
-		_list (list): Relative paths of files.
-		abs_path (str): Target directory.
+		files (list): Relative paths of files.
+		abs_path (str): Source directory.
 	
 	Returns:
 		batch_count (int): Packet size divided by average file size.
 	"""
-	# paths = Path(abs_path)
 	tsz = 0
 
-	for path in _list:
-		# fp = paths / path
-
+	for path in files:
 		fp = os.path.join(abs_path, path)
 
-		# tsz += fp.stat().st_size
 		tsz += os.stat(fp).st_size
 	
-	avg = tsz / len(_list)
+	avg = tsz / len(files)
 	
 	batch_count = int(MAX_ALLOWED_PACKET / avg)
 
 	return batch_count
 
-def collector(conn, _list, abs_path, version, key=None):
+def collector(conn, files, abs_path, version, key=None):
 	"""Manages the batched uploading to the server.
 
 	Args:
 		conn (mysql): Connection object.
-		_list (list): Relative paths, for uploading.
+		files (list): Relative paths, for uploading.
 		abs_path (str): Path to the given directory.
 		version (int): Current version.
 		key (var): Specifies files as new or altered.
@@ -129,58 +127,11 @@ def collector(conn, _list, abs_path, version, key=None):
 	Returns:
 		None
 	"""
-	batch_count = avg(_list[:17], abs_path)
-	batches = list(batched(_list, batch_count))
+	batch_count = avg(files[:50], abs_path)
+	batches = list(batched(files, batch_count))
 
 	for _batch in batches:
 		collect_data(conn, _batch, abs_path, version, key)
-
-def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faster & less I/O
-	"""Creates batches for uploading.
-
-	Adds items to the batch_items until the size limit is met.
-	Appends batch_items to all_batches and resets batch_items.
-	Repeats for all files in the list passed.
-
-	Args:
-		dicts_ (list): List of files' relative paths.
-		_abs_path (Path): Target directory.
-
-	Returns:
-		all_batches (list): List of lists, each inner-list containing one batches' files for uploading.
-	"""
-	# cmpr = zstd.ZstdCompressor(level=3)
-	curr_batch = 0
-
-	abs_path = Path(_abs_path).resolve()
-
-	batch_items = []
-	all_batches = []
-	
-	for i in dicts_:
-		size = 0
-		item = Path( abs_path / i )
-
-		size = item.stat().st_size
-
-		if size > MAX_ALLOWED_PACKET:
-			logger.error(f"{RED}a single file is larger than the maximum packet size allowed:{RESET} {item}")
-			raise
-
-		elif (curr_batch + size) > MAX_ALLOWED_PACKET:
-			all_batches.append((batch_items,))
-
-			batch_items = [i]
-			curr_batch = size
-		else:
-			batch_items.append(i)
-			curr_batch += size
-	
-	if batch_items:
-		all_batches.append((batch_items,))
-	
-	logger.debug('all batches collected')
-	return all_batches
 
 def collect_data(conn, dicts_, abs_path, version, key=None):
 	"""Collects details about the batch passed to it.
@@ -192,19 +143,12 @@ def collect_data(conn, dicts_, abs_path, version, key=None):
 	Returns:
 		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.
 	"""
-	# abs_path = Path(_abs_path)
 	item_data = []
 
-	# cmpr = zstd.ZstdCompressor(level=3)
-	# hasher = hashlib.sha256()
 	hasher = xxhash.xxh64()
 
 	for path in dicts_:
-		# item = ( abs_path / path ).resolve()
 		item = os.path.join(abs_path, path)
-
-		# content = item.read_bytes()
-		# c_content = cmpr.compress(content)
 
 		with open(item, 'rb') as f:
 			content = f.read()
@@ -217,20 +161,23 @@ def collect_data(conn, dicts_, abs_path, version, key=None):
 
 	if key == "new_files":
 		upload_created(conn, item_data)
+
 	elif key == "altered_files":
 		upload_edited(conn, item_data)
 
 # UPLOAD THE COLLECTED
 
-def rm_remdir(conn, gates, xversion):
+def rm_remdir(conn, sconn, gates, xversion):
 	"""Removes directories from the server via DELETE.
 
 	DML so executemany().
 	
 	Args: 
-		conn: Connection object.
+		conn (mysql): Connection object.
+		sconn (sqlite3): Index's connection object.
 		gates (list): Single-element tuples of remote-only directories' relative paths.
-	
+		xversion (int): Version of deletion for the files (Current version).
+
 	Returns:
 		None
 	"""
@@ -238,6 +185,7 @@ def rm_remdir(conn, gates, xversion):
 
 	query = "INSERT INTO depr_directories (rp, xversion, oversion) VALUES (%s, %s, %s);"
 	oquery = "SELECT version FROM directories WHERE rp = %s;"
+	soquery = "SELECT version FROM directories WHERE rp = ?;"
 
 	xquery = "DELETE FROM directories WHERE rp = %s;"
 	xvals = [(gate[0],) for gate in gates]
@@ -245,8 +193,10 @@ def rm_remdir(conn, gates, xversion):
 	with conn.cursor() as cursor:
 		try:
 			for gate in gates:
-				cursor.execute(oquery, (gate,))
-				oversion = cursor.fetchone()
+				# cursor.execute(oquery, (gate,))
+				# oversion = cursor.fetchone()
+
+				oversion = sconn.execute(soquery, (gate,)).fetchone()
 
 				values = (gate[0], xversion, oversion[0])
 				cursor.execute(query, values)
@@ -259,13 +209,14 @@ def rm_remdir(conn, gates, xversion):
 		else:
 			logger.debug('removed remote-only directory[s] from server w.o exception')
 
-def rm_remfile(conn, cherubs):
+def rm_remfile(conn, sconn, cherubs):
 	"""Removes files from the server via DELETE.
 
 	DML so executemany().
 
 	Args:
-		conn: Connection object to query the server.
+		conn (mysql): Connection object to query the server.
+		sconn (sqlite3): Index's connection object.
 		cherubs (list): Single-element tuple of the remote-only files' relative paths.
 	
 	Returns:
@@ -273,14 +224,18 @@ def rm_remfile(conn, cherubs):
 	"""
 	logger.debug('...deleting remote-only file[s] from server...')
 	ovquery = "SELECT version FROM files WHERE rp = %s;"
+	sovquery = "SELECT version FROM records WHERE rp = ?;"
 	query = "DELETE FROM files WHERE rp = %s;"
 	doversions = {}
 
 	with conn.cursor(prepared=True) as cursor:
 		try:
 			for cherub in cherubs:
-				cursor.execute(ovquery, (cherub,))
-				oversion = cursor.fetchone()
+				# cursor.execute(ovquery, (cherub,))
+				# oversion = cursor.fetchone()
+
+				oversion = sconn.execute(sovquery, (cherub,)).fetchone()
+
 				doversions[cherub] = oversion[0]
 
 				cursor.execute(query, (cherub,))
@@ -298,7 +253,7 @@ def upload_dirs(conn, drps, version):
 	DML so executemany().
 
 	Args:
-		conn: Connection object to query the server.
+		conn (mysql): Connection object to query the server.
 		drps (list): Lists of remote-only directories' relative paths.
 
 	Returns:
@@ -321,7 +276,7 @@ def upload_created(conn, serpent_data):
 	DML so executemany().
 
 	Args:
-		conn: Connection object to query the server.
+		conn (mysql): Connection object to query the server.
 		serpent_data (list): 3-element tuples containing each new files' new content, new hash, and new relative path for every file in the batch.
 
 	Returns:
@@ -344,7 +299,7 @@ def upload_edited(conn, soul_data):
 	DML so executemany().
 
 	Args:
-		conn: Connection object to query the server.
+		conn (mysql): Connection object to query the server.
 		soul_data (list): 3-element tuples containing each altered files' new content, new hash, and relative path for every file in the batch.
 	
 	Returns:

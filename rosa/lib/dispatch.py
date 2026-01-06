@@ -28,7 +28,7 @@ def phones():
 		None
 
 	Yields: 
-		conn: Connection object.
+		conn (mysql): Connection object.
 	"""
 	conn = None
 	logger.debug('...phone call, connecting...')
@@ -100,7 +100,7 @@ def init_conn(db_user, db_pswd, db_name, db_addr): # used by all scripts
 		db_addr: IP address of the server [or machine running the server]
 	
 	Returns:
-		conn: Connection object.
+		conn (mysql): Connection object.
 	"""
 	config = {
 		# 'unix_socket': '/tmp/mysql.sock',
@@ -165,7 +165,7 @@ def calc_batch(conn): # this one as referenced on analyst, should be in dispatch
 	ASSESS2 is 1/100 the speed of ASSESS, especially with large datasets.
 
 	Args:
-		conn: Connection object.
+		conn (mysql): Connection object.
 	
 	Returns:
 		A 2-element tuple containing:
@@ -205,7 +205,7 @@ def _safety(conn):
 	If not, return. Autocommit = False, so reconnecting for rollback is pointless.
 
 	Args:
-		conn: Conneciton object.
+		conn (mysql): Conneciton object.
 	
 	Returns:
 		None
@@ -231,7 +231,7 @@ def confirm(conn, force=False): # to dispatch? or could be to opps?
 	Asks for y/n response and rolls-back on any error or [n] no.
 
 	Args:
-		conn: Connection object to query the server with.
+		conn (mysql): Connection object to query the server with.
 		force (=False): If True, does *not* ask for user confirmation before attempting to commit. Default is False.
 	
 	Returns:

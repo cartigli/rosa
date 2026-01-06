@@ -4,7 +4,7 @@ Configures directories for safe writing.
 Downloads data, creates directories, and writes files.
 Also deletes directories and files.
 Majority of the logic is for handling errors, and ensuring
-the original LOCAL_DIR is not altered on failure.
+the original source directory is not altered on failure.
 """
 
 
@@ -15,7 +15,7 @@ import shutil
 import logging
 import tempfile
 import contextlib
-from pathlib import Path
+# from pathlib import Path
 from itertools import batched
 
 import mysql.connector # only for error codes in this file
@@ -34,11 +34,11 @@ def fat_boy(dir_):
 	Takes over on error and ensures corrupted data is never kept.
 
 	Args:
-		abs_path (str): Path of the LOCAL_DIR.
+		abs_path (str): Path of the Source directory.
 	
 	Yields: 
-		tmpd (Path): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as LOCAL_DIR if not.
-		backup (Path): The original LOCAL_DIR after being renamed to a backup location/path. Renamed to LOCAL_DIR on error, deleted if not.
+		tmpd (Path): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as source directory if not.
+		backup (Path): The original source directory after being renamed to a backup location/path. Renamed to source directory on error, deleted if not.
 	"""
 	tmpd = None # ORIGINAL
 	backup = None
@@ -79,17 +79,68 @@ def fat_boy(dir_):
 
 
 @contextlib.contextmanager
+def fat_boy_o(dir_):
+	"""Conext manager for the temporary directory and backup of original. 
+	
+	Takes over on error and ensures corrupted data is never kept.
+
+	Args:
+		dir_ (str): Path of the Source directory.
+	
+	Yields: 
+		tmpd (str): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as source directory if not.
+		backup (str): The original source directory after being renamed to a backup location/path. Renamed to source directory on error, deleted if not.
+	"""
+	tmpd = None # ORIGINAL
+	backup = None
+
+	# dir_ = Path(dir_)
+	try:
+
+		tmpd, backup = configure_o(dir_)
+		if tmpd and backup:
+
+			# logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
+			yield tmpd, backup # return these & freeze in place
+
+	except KeyboardInterrupt as e:
+		logger.warning('boss killed it; wrap it up')
+		_lil_guy_o(dir_, backup, tmpd)
+		sys.exit(0)
+
+	except (FileNotFoundError, PermissionError, Exception) as e:
+		logger.error(f"{RED}err caught while backup & temporary directories:{RESET} {e}.", exc_info=True)
+		_lil_guy_o(dir_, backup, tmpd)
+		sys.exit(1)
+	else:
+		try:
+			apply_atomicy_o(dir_, tmpd, backup)
+
+		except KeyboardInterrupt as c:
+			logger.warning('boss killed it; wrap it up')
+			_lil_guy_o(dir_, backup, tmpd)
+			sys.exit(0)
+
+		except (mysql.connector.Error, ConnectionError, Exception) as c:
+			logger.error(f"{RED}err encountered while attempting to apply atomicy: {c}.", exc_info=True)
+			_lil_guy_o(dir_, backup, tmpd)
+			sys.exit(1)
+		else:
+			logger.debug("fat boy finished w.o exception")
+
+
+@contextlib.contextmanager
 def fat_boy1(dir_):
 	"""Conext manager for the temporary directory and backup of original. 
 	
 	Takes over on error and ensures corrupted data is never kept.
 
 	Args:
-		dir_ (str): Path of the LOCAL_DIR.
+		dir_ (str): Path of the source directory.
 
 	Yields: 
 		tmpd (str): The temporary directory.
-		backup (str): The original LOCAL_DIR as a backup.
+		backup (str): The original source directory as a backup.
 	"""
 	tmpd = None # ORIGINAL
 	backup = None
@@ -173,9 +224,9 @@ def _lil_guy(abs_path, backup, tmpd):
 	And deleting/renaming accordingly.
 
 	Args:
-		abs_path (Path): Full path of the LOCAL_DIR from config.py
-		backup (Path): Original LOCAL_DIR renamed to a backup location while downloading and writing.
-		tmpd (Path): Temporary directory made to hold the updated LOCAL_DIR. Renamed to LOCAL_DIR if succeeds, deleted if error is caught.
+		abs_path (Path): Full path of the source directory from config.py
+		backup (Path): Original source directory renamed to a backup location while downloading and writing.
+		tmpd (Path): Temporary directory made to hold the updated source directory. Renamed to source directory if succeeds, deleted if error is caught.
 	
 	Returns:
 		None
@@ -200,6 +251,45 @@ def _lil_guy(abs_path, backup, tmpd):
 
 
 
+def _lil_guy_o(abs_path, backup, tmpd):
+	"""Handles recovery if error occurs and is caught by fat_boy. 
+	
+	Mostly checking which directories exist at the time of the error, 
+	And deleting/renaming accordingly.
+
+	Args:
+		abs_path (str): Full path of the source directory from config.py
+		backup (str): Original source directory renamed to a backup location while downloading and writing.
+		tmpd (str): Temporary directory made to hold the updated source directory. Renamed to source directory if succeeds, deleted if error is caught.
+	
+	Returns:
+		None
+	"""
+	try:
+		# if backup and backup.exists():
+		if backup and os.path.exists(backup):
+			# if tmpd and tmpd.exists():
+			if tmpd and os.path.exists(tmpd):
+				# backup.rename(abs_path)
+				os.rename(backup, abs_path)
+				shutil_fx(tmpd)
+				logger.warning("moved backup back to original location & deleted the temporary directory")
+		# elif tmpd and tmpd.exists():
+		elif tmpd and os.path.exists(tmpd):
+			# shutil_fx(tmpd.as_posix())
+			shutil_fx(tmpd)
+			logger.warning(f"_lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
+		else:
+			logger.debug('_lil_guy called on error but no directories to recover were found')
+
+	except (PermissionError, FileNotFoundError, Exception) as e:
+		logger.error(f"{RED}replacement of {abs_path} and cleanup encountered an error: {e}.", exc_info=True)
+		raise
+	else:
+		logger.info("_lil_guy's cleanup had no exceptions")
+
+
+
 def _lil_guy1(dir_, backup, tmpd):
 	"""Handles recovery if error occurs and is caught by fat_boy. 
 	
@@ -207,8 +297,8 @@ def _lil_guy1(dir_, backup, tmpd):
 	And deleting/renaming accordingly.
 
 	Args:
-		dir_ (str): Path of the LOCAL_DIR.
-		backup (str): Path to the LOCAL_DIR.
+		dir_ (str): Path of the source directory.
+		backup (str): Path to the source directory.
 		tmpd (str): Temporary directory.
 	
 	Returns:
@@ -308,15 +398,15 @@ def shutil_fx(dirx):
 def configure(abs_path):
 	"""Configures the backup and creates the tmpd.
 
-	Renames the LOCAL_DIR as a temporary backup name.
+	Renames the source directory as a backup.
 	Creates a temporary directory for keeping the backup clean.
 
 	Args:
-		abs_path (Path): Pathlib object of the LOCAL_DIR's full path.
+		abs_path (Path): Pathlib object of the source directory.
 	
 	Returns:
 		tmpd (Path): New (empty) temporary directory.
-		backup (Path): LOCAL_DIR renamed to as a backup location/path.
+		backup (Path): Source directory renamed to as a backup location/path.
 	"""
 	if abs_path.exists():
 		parent = abs_path.parent
@@ -334,7 +424,47 @@ def configure(abs_path):
 			logger.error(f"{RED}err encountered while trying move {abs_path} to a backup location:{RESET} {e}.", exc_info=True)
 			raise
 		else:
-			logger.debug('temporary directory created & original directory moved to backup w.o exception')
+			logger.debug('temporary directory created & source directory contents moved to backup')
+			return tmpd, backup
+	else:
+		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
+		sys.exit(1)
+
+
+def configure_o(abs_path):
+	"""Configures the backup and creates the tmpd.
+
+	Renames the source directory as a backup.
+	Creates a temporary directory for keeping the backup clean.
+
+	Args:
+		abs_path (str): Path of the source directory.
+	
+	Returns:
+		tmpd (str): New (empty) temporary directory.
+		backup (str): Source directory renamed to as a backup location/path.
+	"""
+	# if abs_path.exists():
+	if os.path.exists(abs_path):
+		# parent = abs_path.parent
+		parent = os.path.dirname(abs_path)
+		try:
+			tmpd = tempfile.mkdtemp(dir=parent)
+			# backup = parent / f".{time.time():.0f}"
+			backup = os.path.join(parent, f".{time.time():.0f}")
+
+			# abs_path.rename(backup)
+			os.rename(abs_path, backup)
+			logger.debug('local directory moved to backup')
+
+			# if tmpd.exists() and backup.exists():
+			# 	logger.debug(f"{tmpd} and {backup} configured by [configure]")
+	
+		except (PermissionError, FileNotFoundError, Exception) as e:
+			logger.error(f"{RED}err encountered while trying move {abs_path} to a backup location:{RESET} {e}", exc_info=True)
+			raise
+		else:
+			logger.debug('temporary directory created & source directory contents moved to backup')
 			return tmpd, backup
 	else:
 		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
@@ -344,15 +474,15 @@ def configure(abs_path):
 def configure1(dir_):
 	"""Configures the backup and creates the tmpd.
 
-	Moves content of the LOCAL_DIR to a backup.
+	Moves content of the source directory to a backup.
 	Creates a temporary directory.
 
 	Args:
-		dir_ (str): Path of the LOCAL_DIR.
+		dir_ (str): Path of the source directory.
 	
 	Returns:
 		tmpd (str): Temporary directory.
-		backup (str): LOCAL_DIR renamed as a backup.
+		backup (str): Source directory renamed as a backup.
 	"""
 	dir_ = dir_.rstrip(os.sep)
 
@@ -397,7 +527,7 @@ def configure1(dir_):
 			return tmpd, backup
 	else:
 		logger.warning(f"{dir_} doesn't exist; fix the config or run 'rosa get all'")
-		raise FileNotFoundError ('LOCAL_DIR does not exist')
+		raise FileNotFoundError ('source directory does not exist')
 
 
 def is_ignored(_str):
@@ -409,12 +539,12 @@ def apply_atomicy(tmpd, abs_path, backup):
 	"""Cleans up the 'atomic' writing for fat_boy. 
 	
 	Only runs if no exceptions are caught by fat_boy. 
-	Renames tmpd as LOCAL_DIR & deletes original backup *if no errors occur/caught.
+	Renames tmpd as source directory & deletes backup *if no errors are caught.
 
 	Args:
-		tmpd (Path): Temporary directory containing the updated directory.
-		abs_path (Path): Original path of the LOCAL_DIR [empty at this point].
-		backup (Path): Location/path the original LOCAL_DIR was moved to.
+		tmpd (str): Temporary directory containing the updated directory.
+		abs_path (str): Original path of the source directory [empty at this point].
+		backup (str): Location/path the source directory was moved to.
 	
 	Returns:
 		None
@@ -430,17 +560,45 @@ def apply_atomicy(tmpd, abs_path, backup):
 		logger.debug('temporary directory renamed and backup removed')
 
 
+
+def apply_atomicy_o(abs_path, tmpd, backup):
+	"""Cleans up the 'atomic' writing for fat_boy. 
+	
+	Only runs if no exceptions are caught by fat_boy. 
+	Renames tmpd as source directory & deletes backup *if no errors are caught.
+
+	Args:
+		tmpd (str): Temporary directory containing the updated directory.
+		abs_path (str): Original path of the source directory [empty at this point].
+		backup (str): Location/path the source directory was moved to.
+	
+	Returns:
+		None
+	"""
+	try:
+		# tmpd.rename(abs_path)
+		os.rename(tmpd, abs_path)
+
+	except (PermissionError, FileNotFoundError, Exception) as e:
+		logger.critical(f"{RED}exception encountered while attempting atomic write:{RESET} {e}.", exc_info=True)
+		raise
+	else:
+		shutil_fx(backup)
+		logger.debug('temporary directory renamed and backup removed')
+
+
 def apply_atomicy1(tmpd, backup, dir_):
 	"""Cleans up the 'atomic' writing for fat_boy. 
 	
 	Only runs if no exceptions are caught by fat_boy. 
-	Renames tmpd as LOCAL_DIR & deletes original backup *if no errors occur/caught.
+	Renames all of tmpd's contents as backup's content.
+	Deletes backup & tmpd if no errors are caught.
 
 	Args:
 		tmpd (str): Temporary directory.
-		dir_ (str): Original path of the LOCAL_DIR.
+		dir_ (str): Original path of the source directory.
 		backup (str): Path to the backup.
-	
+
 	Returns:
 		None
 	"""
@@ -479,7 +637,7 @@ def save_people(people, backup, tmpd):
 
 	Args:
 		people (list): List of relative paths of unchanged files.
-		backup (str): Path of the original LOCAL_DIR.
+		backup (str): Path of the source directory.
 		tmpd (str): Path of the temporary directory.
 
 	Returns:
@@ -510,7 +668,7 @@ def wr_batches(data, tmpd):
 
 	Args:
 		data (2-element tuple): Tupled list of pairs (relative paths, content).
-		tmpd (Path): Target directory to write to.
+		tmpd (str): Target directory.
 
 	Returns:
 		None
@@ -519,11 +677,13 @@ def wr_batches(data, tmpd):
 
 	try:
 		for frp, content in data:
-			t_path = Path ( tmpd / frp )
-			(t_path.parent).mkdir(parents=True, exist_ok=True)
+			# t_path = Path ( tmpd / frp )
+			t_path = os.path.join(tmpd, frp)
+			# (t_path.parent).mkdir(parents=True, exist_ok=True)
+			os.makedirs(os.path.dirname(t_path), exist_ok=True)
 
 			# d_content = dcmpr.decompress(content)
-			with open(t_path, 'r', encoding='utf-8') as t:
+			with open(t_path, 'w', encoding='utf-8') as t:
 				t.write(content)
 
 	except KeyboardInterrupt as ki:

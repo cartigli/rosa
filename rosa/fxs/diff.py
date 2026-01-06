@@ -64,12 +64,7 @@ def ask_to_share(diff_data, force=False):
 					logger.info('ok, freak')
 
 def main(args=None):
-	"""Runs the diff'ing engine before asking to show the user what was found, if anything. 
-
-	Function ran the most often.
-	Using --force (-f) skips the ask-to-show.
-	If no changes, it does not try to show.
-	"""
+	"""Runs the diff'ing engine before asking to show the user what was found, if anything."""
 	xdiff = False
 	r = False
 
