@@ -13,16 +13,15 @@ So clarity is needed on the scripts function, fo sho.
 Good lord, it doesn't even look for the index. Fourth piece of evidence.
 """
 
-# CHECK INCOMPLETE
 
+import os
 import sys
 import time
 import shutil
 import logging
 from pathlib import Path
 
-# LOCAL_DIR used once (besides import)
-from rosa.confs import LOCAL_DIR
+
 from rosa.lib import (
     phones, calc_batch, 
     sfat_boy, mk_rrdir, mini_ps, finale
@@ -37,13 +36,15 @@ def main(args=None):
 
     logger, force, prints, start = mini_ps(args, NOMIC)
 
-    # abs_path = Path(LOCAL_DIR).resolve() # NOT CHECKED
+    target = os.path.expanduser('~')
+
+    tdir = os.path.join(target, "rosa_current")
 
     # if not abs_path.exists():
     #     abs_path.mkdir()
 
     with phones() as conn:
-        with sfat_boy(LOCAL_DIR) as tmpd: # sfat_boy inside phones ensures sfat_boy catches errors before phones
+        with sfat_boy(tdir) as tmpd: # sfat_boy inside phones ensures sfat_boy catches errors before phones
             # wait, why the f*ck am I using sfat_boy instead of fat_boy? This function needs to restore the given directory on failure.
             # It feels dumb as hell to retrace my own steps like this, but this is more 
             # evidence that I meant this to be a single execution comprehensive pull.

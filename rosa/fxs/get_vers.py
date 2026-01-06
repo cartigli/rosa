@@ -10,16 +10,15 @@ next to the original, which remains untouched.
 ^ This is why the index is not needed & shouldn't be looked for.
 """
 
-# CHECK INCOMPLETE - nor is it essential atm
 
+import os
 import shutil
 import sqlite3
 from pathlib import Path
 from datetime import datetime
 import diff_match_patch as dmp_
 
-# LOCAL_DIR used once (besides import)
-from rosa.confs import LOCAL_DIR, VERSIONS
+from rosa.confs import VERSIONS
 from rosa.lib import (
     phones, fat_boy, mk_rrdir, calc_batch, 
     mini_ps, finale, sfat_boy
@@ -60,11 +59,12 @@ def main(args=None):
 
     if version:
         logger.info(f"requested version recieved: v{version}")
-
-        # tmpd = Path(LOCAL_DIR).parent / f"rosa_v{version}" # NOT CHECKED + WTF
-        tmpd = os.path.join(LOCAL_DIR, f"rosa_v{version}")
-        dmp = dmp_.diff_match_patch()
         vers_ = {'vs': version}
+
+        target = os.path.expanduser('~')
+        tmpd = os.path.join(target, f"rosa_v{version}")
+
+        dmp = dmp_.diff_match_patch()
 
         with sfat_boy(tmpd) as dirx:
             with phones() as conn:
@@ -101,7 +101,7 @@ def main(args=None):
                         for rp, content in fdata:
                             # fp = dirx / rp
                             fp = os.path.join(dirx, rp)
-                            fp.touch()
+                            # fp.touch()
 
                             with open(fp, 'wb') as f:
                                 f.write(content)
@@ -171,12 +171,14 @@ def main(args=None):
                             break
 
                         for content, rp in fdata:
-                            fp = tmpd / rp
+                            # fp = tmpd / rp
+                            fp = os.path.join(tmpd, rp)
 
-                            if fp.exists() and fp.is_file():
+                            # if fp.exists() and fp.is_file():
+                            if os.path.isfile(fp):
                                 continue
 
-                            fp.touch()
+                            # fp.touch()
 
                             with open(fp, 'wb') as f:
                                 f.write(content)

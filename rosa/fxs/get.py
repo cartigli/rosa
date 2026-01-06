@@ -8,7 +8,7 @@ Hashes are only verified if the file's timestamp shows a discrepancy.
 Name should be changed. get_curr should be get & this should be get_last or similar.
 """
 
-# check complete (incomplete commenting)
+# (incomplete commenting)
 
 import os
 import shutil
@@ -17,7 +17,6 @@ from pathlib import Path
 
 import sqlite3
 
-from rosa.confs import LOCAL_DIR
 from rosa.lib import (
 	phones, fat_boy1, mk_rrdir, 
 	save_people, mini_ps, finale,
@@ -62,41 +61,41 @@ def main(args=None):
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
-			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn)
+			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
 			indexed_dirs = scrape_dindex(sconn)
 
-	if xdiff is True:
-		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
+		if xdiff is True:
+			logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 
-		with fat_boy1(LOCAL_DIR) as (tmp_, backup): # CHECKED
+			with fat_boy1(local.target) as (tmp_, backup): # CHECKED
 
-			logger.info('copying directory tree...')
-			mk_rrdir(indexed_dirs, tmp_) # checked
+				logger.info('copying directory tree...')
+				mk_rrdir(indexed_dirs, tmp_) # checked
 
-			logger.info('hard linking unchanged files...')
-			save_people(remaining, backup, tmp_) # checked
+				logger.info('hard linking unchanged files...')
+				save_people(remaining, backup, tmp_) # checked
 
-			# ignore new files
+				# ignore new files
 
-			for d in deleted:
-				diffs.append(d)
+				for d in deleted:
+					diffs.append(d)
 
-			if diffs:
-				logger.info('replacing files with deltas')
-				originals(diffs, tmp_, backup) # checked (bad commenting)
+				if diffs:
+					logger.info('replacing files with deltas')
+					originals(diffs, tmp_, backup) # checked (bad commenting)
 
-			for r in remaining:
-				diffs.append(r)
-			
-			logger.info('inserting index & originals')
-			finals(tmp_, backup) # checked (more bad commenting)
+				for r in remaining:
+					diffs.append(r)
+				
+				logger.info('inserting index & originals')
+				finals(tmp_, backup) # checked (more bad commenting)
 
-		logger.info('refreshing the index')
-		with landline(local.index) as sconn:
-			refresh_index(diffs, sconn)
+			logger.info('refreshing the index')
+			with landline(local.index) as sconn:
+				refresh_index(sconn, local.target, diffs)
 
-	else:
-		logger.info('no diff!')
+		else:
+			logger.info('no diff!')
 
 	finale(NOMIC, start, prints)
 

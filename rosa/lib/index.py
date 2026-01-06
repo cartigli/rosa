@@ -10,11 +10,7 @@ from datetime import datetime, UTC
 import xxhash
 import sqlite3
 
-# check complete
-
-# LOCAL_DIR used 5 times (besides import)
-# last step is pass connection obj. & import landline to every script that uses it
-from rosa.confs import LOCAL_DIR, SINIT, CVERSION, BLACKLIST
+from rosa.confs import SINIT, CVERSION, BLACKLIST
 
 logger = logging.getLogger('rosa.log')
 
@@ -228,15 +224,13 @@ def _surveyorx(origin, rps):
 	
 	return inventory
 
-
-
-def historian(version, message, sconn):
+def historian(sconn, version, message):
 	"""Records the version & message, if present, in the index.
 
 	Args:
+		sconn (sqlite3): Index's connection object.
 		version (int): Current version of the update or initiation.
 		message (str): Message, if present, to be recorded.
-		sconn (sqlite3): Index's connection object.
 
 	Returns:
 		None
@@ -280,12 +274,13 @@ def get_records(sconn):
 
 	return index_records
 
-def init_index(sconn, parent):
+def init_index(sconn, origin, parent):
 	"""Initiates a new index.
 
 	Args:
 		sconn (sqlite3): Index's connection object.
-		originals (str): The index's parent directory.
+		origin (str): Target directory.
+		parent (str): Index's parent directory.
 
 	Returns:
 		None
@@ -295,15 +290,15 @@ def init_index(sconn, parent):
 
 	originals = os.path.join(parent, "originals")
 
-	copier(LOCAL_DIR, originals) # backup created first - checked
+	copier(origin, originals) # backup created first - checked
 
-	inventory = _survey(LOCAL_DIR, version) # collect current files' metadata - checked
+	inventory = _survey(origin, version) # collect current files' metadata - checked
 
 	query = "INSERT INTO records (rp, version, ctime, bytes) VALUES (?, ?, ?, ?);"
 
 	sconn.executemany(query, inventory)
 
-	historian(version, message, sconn) # load the version into the local records table
+	historian(sconn, version, message) # load the version into the local records table
 
 def init_dindex(drps, sconn):
 	"""Initiates the table for the directories with version 0 data.
@@ -355,12 +350,13 @@ def qfdiffr(index_records, real_stats):
 
 	return new, deleted, diffs, unchanged
 
-def query_index(conn, sconn):
+def query_index(conn, sconn, core):
 	"""Finds file discrepancies between indexed and actual files.
 
 	Args:
 		conn (mysql): Server's connection object.
 		sconn (sqlite3): Index's connection object.
+		core (str): Main target directory.
 
 	Returns:
 		new (set): Files created since the last commitment.
@@ -372,12 +368,12 @@ def query_index(conn, sconn):
 	diff = False
 	remaining = []
 
-	real_stats = _formatter(LOCAL_DIR) # checked
+	real_stats = _formatter(core) # checked
 	index_records = get_records(sconn)
 
 	new, deleted, diffs, remaining_ = qfdiffr(index_records, real_stats)
 
-	failed, succeeded = verification(conn, diffs, LOCAL_DIR) # checked
+	failed, succeeded = verification(conn, diffs, core) # checked
 
 	for x in remaining_:
 		remaining.append(x)
@@ -439,11 +435,12 @@ def verification(conn, diffs, origin):
 	
 	return failed, succeeded
 
-def query_dindex(sconn):
+def query_dindex(sconn, core):
 	"""Checks the actual directories against recorded.
 
 	Args:
 		sconn (sqlite3): Index's connection object.
+		core (str): Main target directory.
 
 	Returns:
 		newd (set): Directories created since the last recorded commitment.
@@ -454,7 +451,7 @@ def query_dindex(sconn):
 
 	idrps = sconn.execute(query).fetchall()
 
-	ldrps = _dsurvey(LOCAL_DIR) # checked
+	ldrps = _dsurvey(core) # checked
 
 	xdrps = [i[0] for i in idrps]
 
@@ -497,16 +494,17 @@ def version_check(conn, sconn):
 
 	return vok, lc_version[0]
 
-def local_audit_(new, diffs, remaining, version, secure, sconn):
+def local_audit_(sconn, core, new, diffs, remaining, version, secure):
 	"""Reverts the current directory back to the latest locally recorded commit.
 
 	Args:
+		sconn (sqlite3): Index's connection object.
+		core (str): Main target directory.
 		new (set): Files created since the last commitment.
 		failed (list): Files whose recorded and actual hashes differ.
 		remaining (set): Unaltered files.
 		version (int): Current version.
 		secure (Tuple): Contains the two paths to tmp & backup directories.
-		sconn (sqlite3): Index's connection object.
 
 	Returns:
 		None
@@ -542,11 +540,11 @@ def local_audit_(new, diffs, remaining, version, secure, sconn):
 			destin.hardlink_to(origin)
 
 	if new:
-		inew = xxnew(new, LOCAL_DIR, version, tmpd) # checked
+		inew = xxnew(new, core, version, tmpd) # checked
 	if diffs:
-		idiffs = xxdiff(diffs, LOCAL_DIR, version, tmpd) # checked
+		idiffs = xxdiff(diffs, core, version, tmpd) # checked
 
-	index_audit(inew, idiffs, sconn)
+	index_audit(sconn, inew, idiffs)
 
 def xxnew(new, origin, version, tmpd):
 	"""Backs up new files to the 'originals' directory.
@@ -610,7 +608,7 @@ def xxdiff(diffs, origin, version, tmpd):
 
 	return idiff
 
-def index_audit(new, diffs, sconn):
+def index_audit(sconn, new, diffs):
 	"""Updates the current index to show metadata from recent changes.
 
 	Args:
@@ -629,16 +627,16 @@ def index_audit(new, diffs, sconn):
 		query = "UPDATE records SET ctime = ?, bytes = ?, version = ? WHERE rp = ?;"
 		sconn.executemany(query, diffs)
 
-def xxdeleted(conn, deleted, xversion, doversions, secure, sconn): # deleted should be its own logic
+def xxdeleted(conn, sconn, deleted, xversion, doversions, secure):
 	"""Backs up deleted files to the server; deletes them from the index.
 
 	Args:
 		conn (mysql): Server's connection object.
+		sconn (sqlite3): Index's connection object.
 		deleted (set): Deleted files' relative paths.
 		xversion (int): Version in wich the given file was deleted.
 		doversion (int): Original (prior) version of the deleted file.
 		secure (tuple): Temporary and backup directory's paths.
-		sconn (sqlite3): Index's connection object.
 
 	Returns:
 		None
@@ -665,14 +663,14 @@ def xxdeleted(conn, deleted, xversion, doversions, secure, sconn): # deleted sho
 
 	sconn.executemany(xquery, data)
 
-def local_daudit(newd, deletedd, version, sconn):
+def local_daudit(sconn, newd, deletedd, version):
 	"""Refreshes the indexed directories to reflect the current contents.
 
 	Args:
+		sconn (sqlite3): Index's connection object.
 		newd (set): Directories made since the latest commitment.
 		deletedd (set): Directories deleted since the latest commitment.
 		version (int): Current version.
-		sconn (sqlite3): Index's connection object.
 
 	Returns:
 		None
@@ -704,17 +702,18 @@ def scrape_dindex(sconn):
 
 	return drps
 
-def refresh_index(diffs, sconn):
+def refresh_index(sconn, core, diffs):
 	"""Refreshes the index to show currently accurate metadata of the files.
 
 	Args:
-		diffs (set): Relative paths of altered files.
 		sconn (sqlite3): Index's connection object.
+		core (str): Main target directory.
+		diffs (set): Relative paths of altered files.
 
 	Returns:
 		None
 	"""
-	inventory = _surveyorx(LOCAL_DIR, diffs) # checked
+	inventory = _surveyorx(core, diffs) # checked
 
 	query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
 

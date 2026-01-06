@@ -3,7 +3,6 @@
 Uploads to, updates in, and deletes data from the server.
 """
 
-# check complete 
 
 import os
 import logging
@@ -14,25 +13,25 @@ from datetime import datetime, UTC
 import mysql.connector # to connect with the mysql server
 import xxhash # can be replaced w.native hashlib
 
-from rosa.confs import MAX_ALLOWED_PACKET, LOCAL_DIR, RED, RESET, INIT2
+from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET, INIT2
 
 
 logger = logging.getLogger('rosa.log')
 
 # INITIATE SERVER
 
-def init_remote(conn, drps, frps):
+def init_remote(conn, core, drps, frps):
 	"""Initiates the first upload to and creation of the database.
 
 	Args:
 		conn (mysql): Connection obj.
+		core (str): Target directory.
 		drps (list): Relative paths of all the directories.
 		frps (list): Relative paths of all the files.
 	
 	Returns:
 		None
 	"""
-	# _path = Path(LOCAL_DIR)
 	message = "INITIAL"
 	version = 0
 
@@ -44,7 +43,7 @@ def init_remote(conn, drps, frps):
 			pass
 
 		# start with the bulk file upload
-		collector(conn, frps, LOCAL_DIR, version, key="new_files")
+		collector(conn, frps, core, version, key="new_files")
 		# then upload the directories
 		upload_dirs(conn, drps, version)
 		# upload the new version no & message last (lightest & least data rich)
@@ -95,7 +94,7 @@ def avg(_list, abs_path):
 
 	Args:
 		_list (list): Relative paths of files.
-		abs_path (Path): Pathlib path of the LOCAL_DIR.
+		abs_path (str): Target directory.
 	
 	Returns:
 		batch_count (int): Packet size divided by average file size.
@@ -123,7 +122,7 @@ def collector(conn, _list, abs_path, version, key=None):
 	Args:
 		conn (mysql): Connection object.
 		_list (list): Relative paths, for uploading.
-		abs_path (str): Path to the LOCAL_DIR.
+		abs_path (str): Path to the given directory.
 		version (int): Current version.
 		key (var): Specifies files as new or altered.
 	
@@ -145,7 +144,7 @@ def collect_info(dicts_, _abs_path): # should use sizes in the dictionary; faste
 
 	Args:
 		dicts_ (list): List of files' relative paths.
-		_abs_path (Path): Original path of LOCAL_DIR.
+		_abs_path (Path): Target directory.
 
 	Returns:
 		all_batches (list): List of lists, each inner-list containing one batches' files for uploading.
@@ -188,7 +187,7 @@ def collect_data(conn, dicts_, abs_path, version, key=None):
 
 	Args:
 		dicts_ (list): Batch's relative paths.
-		abs_path (str): Path to the LOCAL_DIR.
+		abs_path (str): Path to the given directory.
 
 	Returns:
 		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.

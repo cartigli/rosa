@@ -6,7 +6,6 @@ If the server and local index are on different versions, this will not tell you.
 It will only identify the changes you made since the latest indexing.
 """
 
-# check complete
 
 import sys
 import logging
@@ -84,8 +83,8 @@ def main(args=None):
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
-			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn)
-			newd, deletedd, ledeux = query_dindex(sconn)
+			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
+			newd, deletedd, ledeux = query_dindex(sconn, local.target)
 
 			if r:
 				vok, vers = version_check(conn, sconn)

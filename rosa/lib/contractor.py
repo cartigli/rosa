@@ -7,10 +7,8 @@ Majority of the logic is for handling errors, and ensuring
 the original LOCAL_DIR is not altered on failure.
 """
 
-# check complete 
-# [the majority, if not all, use Pathlib but are passed a Path; they don't create one]
-# shutil_fx() expects a string now!
 
+import os
 import sys
 import time
 import shutil
@@ -132,7 +130,7 @@ def fat_boy1(dir_):
 			logger.debug("fat boy finished w.o exception")
 
 @contextlib.contextmanager
-def sfat_boy(abs_path):
+def sfat_boy(tmpd):
 	"""Simplified context manager for rosa [get][all] because there is no original to backup. 
 
 	[third piece of evidence]
@@ -148,15 +146,13 @@ def sfat_boy(abs_path):
 	try:
 		if tmpd:
 			# if tmpd.is_dir():
-			if os.path.is_dir(tmpd):
+			if os.path.isdir(tmpd):
 				logger.warning('A directory already exists where sfat_boy was pointed; deleting & recreating')
 				shutil_fx(tmpd)
-				os.makedirs(tmpd, exist_ok=True)
-			else:
-				# tmpd.mkdir(parents=True, exist_ok=True)
-				os.makedirs(tmpd, exist_ok=True)
 
-			logger.debug(f"sfat_boy made {tmpd}; yielding...")
+			os.makedirs(tmpd, exist_ok=True)
+
+			logger.debug(f"sfat_boy yielding {tmpd}...")
 			yield tmpd # return these & freeze in place
 
 	except KeyboardInterrupt as e:
@@ -348,8 +344,8 @@ def configure(abs_path):
 def configure1(dir_):
 	"""Configures the backup and creates the tmpd.
 
-	Renames the LOCAL_DIR as a temporary backup name.
-	Creates a temporary directory for keeping the backup clean.
+	Moves content of the LOCAL_DIR to a backup.
+	Creates a temporary directory.
 
 	Args:
 		dir_ (str): Path of the LOCAL_DIR.
@@ -358,9 +354,9 @@ def configure1(dir_):
 		tmpd (str): Temporary directory.
 		backup (str): LOCAL_DIR renamed as a backup.
 	"""
-	# if dir_.exists():
+	dir_ = dir_.rstrip(os.sep)
+
 	if os.path.exists(dir_):
-		# parent = dir_.parent
 		parent = os.path.dirname(dir_)
 		try:
 			# tmpd = Path(tempfile.mkdtemp(dir=parent))
@@ -401,7 +397,7 @@ def configure1(dir_):
 			return tmpd, backup
 	else:
 		logger.warning(f"{dir_} doesn't exist; fix the config or run 'rosa get all'")
-		sys.exit(1)
+		raise FileNotFoundError ('LOCAL_DIR does not exist')
 
 
 def is_ignored(_str):
@@ -453,7 +449,7 @@ def apply_atomicy1(tmpd, backup, dir_):
 		# prefix = len(tmpd.as_posix()) + 1
 
 		# for entry in tmpd.glob('*'):
-		for entry in os.scandir(dir_):
+		for entry in os.scandir(tmpd):
 			# rp = entry.as_posix()[prefix:]
 
 			# destin = dir_ / rp
@@ -501,7 +497,8 @@ def save_people(people, backup, tmpd):
 		try:
 
 			# tmp_.hardlink_to(curr)
-			os.link(tmp_, curr)
+			# os.link(tmp_, curr)
+			os.link(curr, tmp_)
 
 		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
 			raise

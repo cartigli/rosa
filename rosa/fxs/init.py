@@ -11,7 +11,6 @@ Majority of the time is always uploading.
 Also, these are not genuine network speeds; purely functionality tests.
 """
 
-# check complete
 
 import os
 import sys
@@ -20,7 +19,7 @@ import shutil
 import logging
 from pathlib import Path
 
-from rosa.confs import LOCAL_DIR, TABLE_CHECK, _DROP
+from rosa.confs import TABLE_CHECK, _DROP
 from rosa.lib import (
 	phones, mini_ps, finale, _config,
 	init_remote, init_index, _r, init_dindex, 
@@ -52,7 +51,7 @@ def scraper(origin):
 	"""'Scrapes' the given directory for every file and directory's relative paths.
 	
 	Args:
-		origin (str): Path to the LOCAL_DIR.
+		origin (str): Path to the given directory.
 	
 	Returns:
 		drps (list): Relative paths of every directory.
@@ -155,9 +154,9 @@ def main(args=None):
 
 			with phones() as conn:
 				try:
-					drps, frps = scraper(LOCAL_DIR) # checked
+					drps, frps = scraper(local.target) # checked
 
-					init_remote(conn, drps, frps)
+					init_remote(conn, local.target, drps, frps)
 
 					index = _config() # don't use the class's attributes bc they don't exist
 
@@ -165,8 +164,7 @@ def main(args=None):
 						construct(sconn)
 
 						init_dindex(drps, sconn)
-						print(os.path.dirname(index))
-						init_index(sconn, os.path.dirname(index))
+						init_index(sconn, local.target, os.path.dirname(index))
 
 				except Exception as err:
 					raise

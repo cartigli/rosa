@@ -219,7 +219,7 @@ def diff_gen(modified, originals, origin):
 	Args:
 		modified (list): Relative paths of the modified files.
 		originals (str): Path to the 'originals' directory.
-		origin (str): The LOCAL_DIR.
+		origin (str): Target directory.
 	
 	Returns:
 		patches (dmp patches): Generated patches as text.
@@ -315,7 +315,6 @@ def find_index00(cd):
 class Heart:
 
 	def __init__(self, strict=True):
-		# self.origin = Path.cwd()
 		self.origin = os.getcwd()
 		self.index = find_index00(self.origin)
 
@@ -323,14 +322,13 @@ class Heart:
 		self.originals = None
 
 		if self.index:
-			# self.target = self.index.parents[1] xPathlib
 			self.target = os.path.dirname(os.path.dirname(self.index))
-			# self.target = os.path.abspath(os.path.join(self.index, os.pardir, os.pardir))
 
-			# self.originals = self.index.parent / "originals" xPathlib
 			self.originals = os.path.join(os.path.dirname(self.index), "originals")
 
 		else:
+			self.target = self.origin
+
 			if strict is True:
 					logger.warning('not an indexed directory')
 					sys.exit(7)

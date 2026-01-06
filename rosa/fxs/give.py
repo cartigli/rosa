@@ -6,13 +6,11 @@ and updates altered files.
 Updates the local index.
 """
 
-# LOCAL_DIR used 3 times (besides import)
-# check complete
 
 import os
 import sys
 
-from rosa.confs import LOCAL_DIR, RED, RESET
+from rosa.confs import RED, RESET
 from rosa.lib import (
 	phones, rm_remfile, # confirm, 
 	mini_ps, finale, collector,
@@ -41,8 +39,8 @@ def main(args=None):
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
-			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn)
-			newd, deletedd, ledeux = query_dindex(sconn)
+			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
+			newd, deletedd, ledeux = query_dindex(sconn, local.target)
 
 	# All the oversions I am querying the server for should be from the local index; 
 	# they all existed here so ARE indexed & if they are new, they need no oversion here
@@ -70,7 +68,7 @@ def main(args=None):
 
 					if new:
 						logger.info('uploading new files...') # checked
-						collector(conn, new, LOCAL_DIR, cv, key="new_files")
+						collector(conn, new, local.target, cv, key="new_files")
 
 					if diffs:
 						logger.debug('finding altered files\' previous versions')
@@ -85,10 +83,10 @@ def main(args=None):
 								oversions[diff] = oversion[0]
 
 						logger.info('uploading altered files...') # checked
-						collector(conn, diffs, LOCAL_DIR, cv, key="altered_files") # updates altered
+						collector(conn, diffs, local.target, cv, key="altered_files") # updates altered
 
 						logger.info('generating altered files\' patches') # checked
-						patches, originals = diff_gen(diffs, local.originals, LOCAL_DIR) # computes & returns patches
+						patches, originals = diff_gen(diffs, local.originals, local.target) # computes & returns patches
 
 						logger.info('uploading altered files\' patches')
 						upload_patches(conn, patches, cv, oversions) # uploads the patches to deltas
@@ -105,15 +103,15 @@ def main(args=None):
 					logger.info('updating local indexes')
 					with fat_boy(local.originals) as secure:
 
-						local_audit_(new, diffs, remaining, cv, secure, sconn)
-						local_daudit(newd, deletedd, cv, sconn)
+						local_audit_(sconn, local.target, new, diffs, remaining, cv, secure)
+						local_daudit(sconn, newd, deletedd, cv)
 
 						if deleted:
 							logger.info('backing up deleted files')
-							xxdeleted(conn, deleted, cv, doversions, secure, sconn)
+							xxdeleted(conn, sconn, deleted, cv, doversions, secure)
 
 						logger.info('final confirmations')
-						historian(cv, message, sconn)
+						historian(sconn, cv, message)
 
 				else:
 					logger.critical(f"{RED}versions did not align; pull most recent upload from server before committing{RESET}")
@@ -125,7 +123,7 @@ def main(args=None):
 			updates.append(n) # new & remaining need to get updated
 
 		with landline(local.index) as sconn:
-			refresh_index(updates, sconn) # should be (sconn, updates)
+			refresh_index(sconn, local.target, updates) # should be (sconn, updates)
 
 	else:
 		logger.info('no diff!')
