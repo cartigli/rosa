@@ -21,7 +21,6 @@ import mysql.connector
 
 from rosa.confs import RED, RESET, BLACKLIST
 
-
 logger = logging.getLogger('rosa.log')
 
 # SETUP EDITOR FOR LOCAL DISK
@@ -39,7 +38,7 @@ def fat_boy(dir_):
 		tmpd (Path): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as source directory if not.
 		backup (Path): The original source directory after being renamed to a backup location/path. Renamed to source directory on error, deleted if not.
 	"""
-	tmpd = None # ORIGINAL
+	tmpd = None
 	backup = None
 
 	abs_path = Path(dir_)
@@ -48,7 +47,7 @@ def fat_boy(dir_):
 		tmpd, backup = configure(abs_path)
 		if tmpd and backup:
 
-			# logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
+			logger.debug(f"fat boy yielding tmpd and backup...")
 			yield tmpd, backup # return these & freeze in place
 
 	except KeyboardInterrupt as e:
@@ -76,7 +75,6 @@ def fat_boy(dir_):
 		else:
 			logger.debug("fat boy finished w.o exception")
 
-
 @contextlib.contextmanager
 def fat_boy_o(dir_):
 	"""Conext manager for the temporary directory and backup of original. 
@@ -90,16 +88,15 @@ def fat_boy_o(dir_):
 		tmpd (str): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as source directory if not.
 		backup (str): The original source directory after being renamed to a backup location/path. Renamed to source directory on error, deleted if not.
 	"""
-	tmpd = None # ORIGINAL
+	tmpd = None
 	backup = None
 
-	# dir_ = Path(dir_)
 	try:
 
 		tmpd, backup = configure_o(dir_)
 		if tmpd and backup:
 
-			# logger.debug(f"fat boy made {tmpd} and {backup}; yielding...")
+			logger.debug(f"fat boy o yielding tmpd and backup...")
 			yield tmpd, backup # return these & freeze in place
 
 	except KeyboardInterrupt as e:
@@ -127,7 +124,6 @@ def fat_boy_o(dir_):
 		else:
 			logger.debug("fat boy finished w.o exception")
 
-
 @contextlib.contextmanager
 def fat_boy1(dir_):
 	"""Conext manager for the temporary directory and backup of original. 
@@ -141,17 +137,15 @@ def fat_boy1(dir_):
 		tmpd (str): The temporary directory.
 		backup (str): The original source directory as a backup.
 	"""
-	tmpd = None # ORIGINAL
+	tmpd = None
 	backup = None
-	# cwd = Path(dir_).resolve()
 
-	# abs_path = Path(dir_)
 	try:
 
 		tmpd, backup = configure1(dir_)
 		if tmpd and backup:
 
-			logger.debug(f"fat boy1 made tmpd and backup; yielding...")
+			logger.debug(f"fat boy1 yielding tmpd and backup...")
 			yield tmpd, backup # return these & freeze in place
 
 	except KeyboardInterrupt as e:
@@ -191,18 +185,15 @@ def sfat_boy(tmpd):
 	Yields: 
 		tmpd: A new directory.
 	"""
-	# tmpd = Path(abs_path)
-
 	try:
 		if tmpd:
-			# if tmpd.is_dir():
 			if os.path.isdir(tmpd):
 				logger.warning('A directory already exists where sfat_boy was pointed; deleting & recreating')
 				shutil_fx(tmpd)
 
 			os.makedirs(tmpd, exist_ok=True)
 
-			logger.debug(f"sfat_boy yielding {tmpd}...")
+			logger.debug(f"sfat_boy yielding tmpd...")
 			yield tmpd # return these & freeze in place
 
 	except KeyboardInterrupt as e:
@@ -234,11 +225,14 @@ def _lil_guy(abs_path, backup, tmpd):
 		if backup and backup.exists():
 			if tmpd and tmpd.exists():
 				shutil_fx(tmpd.as_posix())
+
 				backup.rename(abs_path)
 				logger.warning("moved backup back to original location & deleted the temporary directory")
+
 		elif tmpd and tmpd.exists():
 			shutil_fx(tmpd.as_posix())
 			logger.warning(f"_lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
+
 		else:
 			logger.debug('_lil_guy called on error but no directories to recover were found')
 
@@ -247,8 +241,6 @@ def _lil_guy(abs_path, backup, tmpd):
 		raise
 	else:
 		logger.info("_lil_guy's cleanup had no exceptions")
-
-
 
 def _lil_guy_o(abs_path, backup, tmpd):
 	"""Handles recovery if error occurs and is caught by fat_boy. 
@@ -265,19 +257,17 @@ def _lil_guy_o(abs_path, backup, tmpd):
 		None
 	"""
 	try:
-		# if backup and backup.exists():
 		if backup and os.path.exists(backup):
-			# if tmpd and tmpd.exists():
 			if tmpd and os.path.exists(tmpd):
-				# backup.rename(abs_path)
 				os.rename(backup, abs_path)
+
 				shutil_fx(tmpd)
 				logger.warning("moved backup back to original location & deleted the temporary directory")
-		# elif tmpd and tmpd.exists():
+
 		elif tmpd and os.path.exists(tmpd):
-			# shutil_fx(tmpd.as_posix())
 			shutil_fx(tmpd)
 			logger.warning(f"_lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
+
 		else:
 			logger.debug('_lil_guy called on error but no directories to recover were found')
 
@@ -286,8 +276,6 @@ def _lil_guy_o(abs_path, backup, tmpd):
 		raise
 	else:
 		logger.info("_lil_guy's cleanup had no exceptions")
-
-
 
 def _lil_guy1(dir_, backup, tmpd):
 	"""Handles recovery if error occurs and is caught by fat_boy. 
@@ -304,44 +292,33 @@ def _lil_guy1(dir_, backup, tmpd):
 		None
 	"""
 	try:
-		# if backup and backup.exists():
 		if backup and os.path.exists(backup):
-			# if tmpd and tmpd.exists():
 			if tmpd and os.path.exists(tmpd):
 				shutil_fx(tmpd)
 
-				# prefix = len(backup.as_posix()) + 1
-
-				# for entry in backup.glob('*'):
 				for entry in os.scandir(backup):
-					# rp = entry.as_posix()[prefix:]
-
-					# destin = dir_ / rp
 					destin = os.path.join(dir_, entry.name)
 
-					# entry.rename(destin)
 					os.rename(entry.path, destin)
 
 				logger.warning("moved backup back to original location & deleted the temporary directory")
-		# elif tmpd and tmpd.exists():
+
 		elif tmpd and os.path.exists(tmpd):
 			shutil_fx(tmpd)
 			logger.warning(f"_lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
+
 		else:
 			logger.debug('_lil_guy called on error but no directories to recover were found')
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		logger.error(f"{RED}replacement of {dir_} and cleanup encountered an error: {e}.", exc_info=True)
-		# if dir_.exists(): # basically fuck the cwd workarounds if an error occurs here
 		if os.path.exists(dir_):
-			shutil_fx(dir_) # too rare and messy to properly deal; just brute force it
-		# backup.rename(dir_)
+			shutil_fx(dir_)
 		os.rename(backup, dir_)
 		raise
 	else:
 		logger.info("_lil_guy's cleanup had no exceptions")
 		shutil_fx(backup)
-
 
 def shutil_fx(dirx):
 	"""Handles deletion of directories. 
@@ -356,18 +333,17 @@ def shutil_fx(dirx):
 		None
 	"""
 	if dirx:
-		# if dirx.exists() and dirx.is_dir():
-		# if os.path.exists(dirx) and os.path.isdir(dirx):
 		if os.path.isdir(dirx):
 			try:
 				shutil.rmtree(dirx)
 			except:
 				logger.warning('err for shutil fx, letting her relax and retrying')
 				time.sleep(5)
-				# if dirx.exists():
+
 				if os.path.exists(dirx):
 					try:
 						shutil.rmtree(dirx)
+
 					except:
 						logger.warning(f"failed to delete {dirx} twice, calling it")
 						raise
@@ -375,10 +351,10 @@ def shutil_fx(dirx):
 					logger.debug(f"shutil_fx removed {dirx} on retry")
 					return
 			else:
-				# if dirx.exists():
 				if os.path.exists(dirx):
 					try:
 						shutil.rmtree(dirx)
+
 					except:
 						logger.warning('failed twice, calling it')
 						raise
@@ -388,7 +364,6 @@ def shutil_fx(dirx):
 		else:
 			logger.warning('shutil_fx passed something that was not a directory')
 		
-		# if dirx.exists():
 		if os.path.exists(dirx):
 			logger.warning(f"shutil_fx could not delete {dirx}")
 		else:
@@ -415,9 +390,6 @@ def configure(abs_path):
 
 			abs_path.rename(backup)
 			logger.debug('local directory moved to backup')
-
-			# if tmpd.exists() and backup.exists():
-			# 	logger.debug(f"{tmpd} and {backup} configured by [configure]")
 	
 		except (PermissionError, FileNotFoundError, Exception) as e:
 			logger.error(f"{RED}err encountered while trying move {abs_path} to a backup location:{RESET} {e}.", exc_info=True)
@@ -428,7 +400,6 @@ def configure(abs_path):
 	else:
 		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
 		sys.exit(1)
-
 
 def configure_o(abs_path):
 	"""Configures the backup and creates the tmpd.
@@ -443,22 +414,15 @@ def configure_o(abs_path):
 		tmpd (str): New (empty) temporary directory.
 		backup (str): Source directory renamed to as a backup location/path.
 	"""
-	# if abs_path.exists():
 	if os.path.exists(abs_path):
-		# parent = abs_path.parent
 		parent = os.path.dirname(abs_path)
 		try:
 			tmpd = tempfile.mkdtemp(dir=parent)
-			# backup = parent / f".{time.time():.0f}"
 			backup = os.path.join(parent, f".{time.time():.0f}")
 
-			# abs_path.rename(backup)
 			os.rename(abs_path, backup)
 			logger.debug('local directory moved to backup')
 
-			# if tmpd.exists() and backup.exists():
-			# 	logger.debug(f"{tmpd} and {backup} configured by [configure]")
-	
 		except (PermissionError, FileNotFoundError, Exception) as e:
 			logger.error(f"{RED}err encountered while trying move {abs_path} to a backup location:{RESET} {e}", exc_info=True)
 			raise
@@ -468,7 +432,6 @@ def configure_o(abs_path):
 	else:
 		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
 		sys.exit(1)
-
 
 def configure1(dir_):
 	"""Configures the backup and creates the tmpd.
@@ -488,33 +451,19 @@ def configure1(dir_):
 	if os.path.exists(dir_):
 		parent = os.path.dirname(dir_)
 		try:
-			# tmpd = Path(tempfile.mkdtemp(dir=parent))
 			tmpd = tempfile.mkdtemp(dir=parent)
 
-			# backup = parent / f".{time.time():.0f}"
 			backup = os.path.join(parent, f".{time.time():.0f}")
-			# backup.mkdir(parents=True, exist_ok=True)
 			os.makedirs(backup, exist_ok=True)
 
-			# dir_.rename(backup)
-			# prefix = len(dir_.as_posix()) + 1
-			# prefix = len(dir_) + 1
-
-			# for entry in dir_.glob('*'):
 			for entry in os.scandir(dir_):
-				# rp = entry.as_posix()[prefix:]
-				# rp = entry.path[prefix:]
 				rp = entry.name # K.I.S.S.
-
-				# destin = backup / rp
 				destin = os.path.join(backup, rp)
 
-				# entry.rename(destin)
 				os.rename(entry.path, destin)
 
 			logger.debug('local directory moved to backup')
 
-			# if tmpd.exists() and backup.exists():
 			if os.path.exists(tmpd) and os.path.exists(backup):
 				logger.debug("tmpd and backup configured by [configure1]")
 
@@ -528,11 +477,8 @@ def configure1(dir_):
 		logger.warning(f"{dir_} doesn't exist; fix the config or run 'rosa get all'")
 		raise FileNotFoundError ('source directory does not exist')
 
-
 def is_ignored(_str):
-	# blacklist = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
 	return any(blckd in _str for blckd in BLACKLIST)
-
 
 def apply_atomicy(tmpd, abs_path, backup):
 	"""Cleans up the 'atomic' writing for fat_boy. 
@@ -557,8 +503,6 @@ def apply_atomicy(tmpd, abs_path, backup):
 	else:
 		shutil_fx(backup.as_posix())
 		logger.debug('temporary directory renamed and backup removed')
-
-
 
 def apply_atomicy_o(abs_path, tmpd, backup):
 	"""Cleans up the 'atomic' writing for fat_boy. 

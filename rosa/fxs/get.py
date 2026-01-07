@@ -8,7 +8,6 @@ Hashes are only verified if the file's timestamp shows a discrepancy.
 Name should be changed. get_curr should be get & this should be get_last or similar.
 """
 
-# (incomplete commenting)
 
 import os
 import shutil
@@ -78,13 +77,13 @@ def main(args=None):
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 
 		try:
-			with fat_boy1(local.target) as (tmp_, backup): # CHECKED
+			with fat_boy1(local.target) as (tmp_, backup):
 
 				logger.info('copying directory tree...')
-				mk_rrdir(indexed_dirs, tmp_) # checked
+				mk_rrdir(indexed_dirs, tmp_)
 
 				logger.info(f'hard linking {len(remaining)} unchanged files...')
-				save_people(remaining, backup, tmp_) # checked
+				save_people(remaining, backup, tmp_)
 
 				# ignore new files
 
@@ -92,12 +91,12 @@ def main(args=None):
 
 				if diffs:
 					logger.info('replacing files with deltas')
-					originals(diffs, tmp_, backup) # checked (bad commenting)
+					originals(diffs, tmp_, backup) # (bad commenting)
 
 				diffs += remaining
 
 				logger.info('replacing index & originals')
-				finals(tmp_, backup) # checked (more bad commenting)
+				finals(tmp_, backup) # (more bad commenting)
 
 			logger.info('refreshing the index')
 			with landline(local.index) as sconn:

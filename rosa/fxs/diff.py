@@ -8,7 +8,6 @@ It will only identify the changes you made since the latest indexing.
 
 
 import sys
-# import logging
 
 from rosa.confs import RED, RESET
 from rosa.lib import (
@@ -31,8 +30,6 @@ def ask_to_share(diff_data, force=False):
 	Returns:
 		None
 	"""
-	# logger = logging.getLogger('rosa.log')
-
 	if force is True:
 		return
 
@@ -60,8 +57,6 @@ def ask_to_share(diff_data, force=False):
 
 				elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
 					print('heard')
-				# else:
-				# 	logger.info('ok, freak')
 
 def main(args=None):
 	"""Runs the diff'ing engine before asking to show the user what was found, if anything."""

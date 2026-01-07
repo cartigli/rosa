@@ -14,7 +14,6 @@ import xxhash
 
 from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET, INIT2
 
-
 logger = logging.getLogger('rosa.log')
 
 # INITIATE SERVER
@@ -146,7 +145,6 @@ def collector(conn, files, abs_path, version, key=None):
 		base = f"[{fill*i}{none*(length - i)}] uploading batch {fin}/{total}"
 		print(base, end='\r', flush=True)
 
-	# print(f"[{fill*length}] upload complete! {total}/{total}", flush=True)
 	print("\x1b[2K\r", end="", flush=True)
 
 
@@ -210,9 +208,6 @@ def rm_remdir(conn, sconn, gates, xversion):
 	with conn.cursor() as cursor:
 		try:
 			for gate in gates:
-				# cursor.execute(oquery, (gate,))
-				# oversion = cursor.fetchone()
-
 				oversion = sconn.execute(soquery, (gate,)).fetchone()
 
 				values = (gate[0], xversion, oversion[0])
@@ -248,9 +243,6 @@ def rm_remfile(conn, sconn, cherubs):
 	with conn.cursor(prepared=True) as cursor:
 		try:
 			for cherub in cherubs:
-				# cursor.execute(ovquery, (cherub,))
-				# oversion = cursor.fetchone()
-
 				oversion = sconn.execute(sovquery, (cherub,)).fetchone()
 
 				doversions[cherub] = oversion[0]

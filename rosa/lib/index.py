@@ -1,3 +1,11 @@
+"""Management and interactions with the index.
+
+Sqlite3 database w.files' ctimes, 
+sizes, and path. Used to detect
+files that were changed or touched.
+"""
+
+
 import os
 import sys
 import time

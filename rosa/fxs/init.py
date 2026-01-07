@@ -25,7 +25,6 @@ from rosa.lib import (
 	landline, construct, Heart
 )
 
-
 NOMIC = "[init]"
 
 def r20(xdir):
@@ -108,7 +107,6 @@ def main(args=None):
 									pass
 
 							if local.index:
-								# shutil_fx(local.index.parent)
 								shutil_fx(os.path.dirname(local.index))
 
 					except Exception as e:
@@ -128,20 +126,17 @@ def main(args=None):
 									pass
 
 							if local.index:
-								# shutil_fx(local.index.parent)
 								shutil_fx(os.path.dirname(local.index))
 
 					except Exception as e:
 						logger.info(f"failed to erase server due to: {e}", exc_info=True)
 
 		elif local.index:
-			# if local.index.exists():
 			if os.path.exists(local.index):
 				logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
 				dec = input('Delete [d] the index now? [Return to quit]: ').lower()
 
 				if dec in('d', 'delete', 'd ', ' d'):
-					# shutil_fx(local.index.parent)
 					shutil_fx(os.path.dirname(local.index))
 
 		else:
