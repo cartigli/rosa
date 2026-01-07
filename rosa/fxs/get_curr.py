@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """Retrieves the current version from the server.
 
-Used to sync before another version can be uploaded.
-If the local and remote versions do not match, i.e.,
-there has been an update from another machine since you pulled,
-you cannot give. Sync before trying to give.
-
-Why pull everything w.out checking for diffs??
-Did I mean for this to be only if the directory doesn't exist? Good lord.
-So clarity is needed on the scripts function, fo sho.
-
-Good lord, it doesn't even look for the index. Fourth piece of evidence.
+Whole thing gotta be rewrote.
 """
 
 
@@ -22,15 +13,14 @@ import logging
 
 from rosa.lib import (
     phones, calc_batch, 
-    sfat_boy, mk_rrdir, mini_ps, finale
+    sfat_boy, mk_rrdir, 
+    mini_ps, finale
 )
 
 NOMIC = "[get][current]"
 
 def main(args=None):
     """Downloads the latest version.""" 
-    # has no actual logging; need to add that
-    # I would like to disagree.
 
     logger, force, prints, start = mini_ps(args, NOMIC)
 
@@ -38,15 +28,8 @@ def main(args=None):
 
     tdir = os.path.join(target, "rosa_current")
 
-    # if not abs_path.exists():
-    #     abs_path.mkdir()
-
     with phones() as conn:
-        with sfat_boy(tdir) as tmpd: # sfat_boy inside phones ensures sfat_boy catches errors before phones
-            # wait, why the f*ck am I using sfat_boy instead of fat_boy? This function needs to restore the given directory on failure.
-            # It feels dumb as hell to retrace my own steps like this, but this is more 
-            # evidence that I meant this to be a single execution comprehensive pull.
-            # so this is get_all
+        with sfat_boy(tdir) as tmpd:
             dquery = "SELECT rp FROM directories;"
             with conn.cursor(buffered=False) as cursor:
                 cursor.execute(dquery)

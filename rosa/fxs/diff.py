@@ -11,10 +11,8 @@ import sys
 
 from rosa.confs import RED, RESET
 from rosa.lib import (
-	phones, finale, 
-	mini_ps, query_index,
-	phones, query_dindex,
-	version_check, find_index,
+	phones, finale, mini_ps, query_index,
+	phones, query_dindex, version_check, 
 	landline, Heart
 )
 

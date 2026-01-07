@@ -19,7 +19,7 @@ from rosa.lib import (
 	phones, fat_boy1, mk_rrdir, 
 	save_people, mini_ps, finale,
 	query_index, _config, refresh_index,
-	scrape_dindex, find_index, landline, Heart
+	scrape_dindex, landline, Heart
 )
 
 NOMIC = "[get]"

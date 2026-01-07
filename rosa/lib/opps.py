@@ -27,7 +27,7 @@ def init_logger(logging_level):
 		logging_level (str): Logging level from the config file.
 	
 	Returns:
-		logger (Logging): Logger.
+		logger (logging): Logger.
 	"""
 	if logging_level:
 		file = os.path.abspath(__file__)
@@ -137,7 +137,7 @@ def doit_urself():
 	else:
 		logger.debug('rosa.log: [ok]')
 
-def mini_ps(args, nomix): # (operations)
+def mini_ps(args, nomix):
 	"""Mini parser for arguments passed from the command line (argparse).
 
 	Args:
@@ -177,22 +177,26 @@ def mini_ps(args, nomix): # (operations)
 
 def counter(start, nomix):
 	"""Counts diff between end and start for timing functions.
-	
+
 	Args:
-		start (int): A time.perf_counter() value obtained at the start of execution.
-		nomix (var): Name variable passed from each script for logging.
-	
+		start (int): A time.perf_counter() value.
+		nomix (str): Name variable for logging.
+
 	Returns:
 		None
 	"""
+	pace = None
+
 	if start:
 		end = time.perf_counter()
 		duration = end - start
+		factor = "seconds"
 		if duration > 60:
-			duration_minutes = duration / 60
-			logger.debug(f"time [in minutes] for rosa {nomix}: {duration_minutes:.3f}")
-		else:
-			logger.debug(f"time [in seconds] for rosa {nomix}: {duration:.3f}")
+			duration = duration / 60
+			factor = "minutes"
+		pace = f"{duration:.4f} {factor}"
+	
+	return pace
 
 def finale(nomix, start, prints):
 	"""Wraps up each files' execution & logging statements.
@@ -206,9 +210,9 @@ def finale(nomix, start, prints):
 		None
 	"""
 	doit_urself()
-	counter(start, nomix)
+	pace = counter(start, nomix)
 
-	logger.info(f"rosa {nomix} complete")
+	logger.info(f"rosa {nomix} complete [{pace}]")
 
 	if prints is True:
 		print('All set.')

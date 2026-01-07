@@ -12,15 +12,13 @@ import sys
 
 from rosa.confs import RED, RESET
 from rosa.lib import (
-	phones, rm_remfile, # confirm, 
-	mini_ps, finale, collector,
-	query_index, version_check, 
-	diff_gen, remote_records, 
-	upload_patches, local_audit_,
-	historian, fat_boy_o, refresh_index,
-	xxdeleted, rm_remdir, local_daudit,
-	upload_dirs, query_dindex, find_index,
-	landline, Heart
+	phones, rm_remfile, mini_ps, 
+	finale, collector, query_index, 
+	version_check, diff_gen, remote_records, 
+	upload_patches, local_audit_, historian, 
+	rm_remdir, local_daudit, upload_dirs,
+	fat_boy_o, refresh_index, xxdeleted, 
+	query_dindex, landline, Heart
 )
 
 NOMIC = "[give]"

@@ -158,33 +158,6 @@ def _survey(origin, version):
 
 	return inventory
 
-def _survey1(dir_, version):
-	"""Collects metadata for initial indexing but includes versions for the index.
-	
-	Args:
-		dir_ (str): Path to the requested directory.
-		version (int): Current version for the index.
-	
-	Returns:
-		inventory (list): Tupled relative pats, versions, st_ctimes and st_sizes for all the files found.
-	"""
-	inventory = []
-
-	prefix = len(dir_.as_posix()) + 1
-
-	for file in _r(dir_):
-		if not is_ignored(file.path):
-			rp = file.path[prefix:]
-
-			stats = os.stat(file)
-
-			ctime = stats.st_ctime
-			size = stats.st_size*(10**7)
-
-			inventory.append((rp, version, ctime, size))
-
-	return inventory
-
 def _dsurvey(origin):
 	"""Collects the subdirectories within the requested directory.
 

@@ -3,12 +3,8 @@
 
 Initiates local & remote databases & indexing.
 Needs to be run before anything else.
-This uploads the current files, indexes the 
+Uploads the current files, indexes the 
 entire directory and makes the copies.
-
-Latest test was about 32 seconds for a 4.0 GB directory.
-Majority of the time is always uploading.
-Also, these are not genuine network speeds; purely functionality tests.
 """
 
 
@@ -21,7 +17,7 @@ from rosa.confs import TABLE_CHECK, _DROP
 from rosa.lib import (
 	phones, mini_ps, finale, _config,
 	init_remote, init_index, _r, init_dindex, 
-	_safety, shutil_fx, find_index, is_ignored,
+	_safety, shutil_fx, is_ignored,
 	landline, construct, Heart
 )
 
@@ -89,7 +85,6 @@ def main(args=None):
 	local = Heart(strict=False) # only script to use =False (non-default value)
 
 	try:
-
 		if any(res):
 			logger.info(f"found these tables in the server {res}.")
 
@@ -148,7 +143,7 @@ def main(args=None):
 				with phones() as conn:
 					try:
 						logger.info('scraping source directory...')
-						drps, frps = scraper(local.target) # checked
+						drps, frps = scraper(local.target)
 
 						logger.info('initiating the index...')
 						index = _config() # don't use the class's attributes bc they don't exist

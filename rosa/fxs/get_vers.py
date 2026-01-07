@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 """Pulls the directory's state from a chosen version.
 
-Fetches and prints all currently recorded versions.
-Asks user to choose one and pulls that choice.
-Retrieves deleted files, applies reverse patches to
-generate altered files, and deletes new.
 Downloads to a directory named 'rosa_v[version]'
 next to the original, which remains untouched.
-^ This is why the index is not needed & shouldn't be looked for.
 """
 
 

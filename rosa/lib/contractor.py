@@ -2,7 +2,6 @@
 
 Configures directories for safe writing.
 Downloads data, creates directories, and writes files.
-Also deletes directories and files.
 Majority of the logic is for handling errors, and ensuring
 the original source directory is not altered on failure.
 """
@@ -519,7 +518,6 @@ def apply_atomicy_o(abs_path, tmpd, backup):
 		None
 	"""
 	try:
-		# tmpd.rename(abs_path)
 		os.rename(tmpd, abs_path)
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
@@ -546,17 +544,9 @@ def apply_atomicy1(tmpd, backup, dir_):
 		None
 	"""
 	try:
-		# tmpd.rename(dir_)
-		# prefix = len(tmpd.as_posix()) + 1
-
-		# for entry in tmpd.glob('*'):
 		for entry in os.scandir(tmpd):
-			# rp = entry.as_posix()[prefix:]
-
-			# destin = dir_ / rp
 			destin = os.path.join(dir_, entry.name)
 
-			# entry.rename(destin)
 			os.rename(entry.path, destin)
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
@@ -586,19 +576,12 @@ def save_people(people, backup, tmpd):
 	Returns:
 		None
 	"""
-	# for people in population:
 	for person in people:
-		# curr = Path( backup / person ).resolve()
 		curr = os.path.join(backup, person)
-		# tmp_ = Path( tmpd / person ).resolve()
 		tmp_ = os.path.join(tmpd, person)
 
-		# tmp_.parent.mkdir(parents=True, exist_ok=True)
 		os.makedirs(os.path.dirname(tmp_), exist_ok=True)
 		try:
-
-			# tmp_.hardlink_to(curr)
-			# os.link(tmp_, curr)
 			os.link(curr, tmp_)
 
 		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception):
@@ -616,16 +599,11 @@ def wr_batches(data, tmpd):
 	Returns:
 		None
 	"""
-	# dcmpr = zstd.ZstdDecompressor() # init outside of loop; duh
-
 	try:
 		for frp, content in data:
-			# t_path = Path ( tmpd / frp )
 			t_path = os.path.join(tmpd, frp)
-			# (t_path.parent).mkdir(parents=True, exist_ok=True)
 			os.makedirs(os.path.dirname(t_path), exist_ok=True)
 
-			# d_content = dcmpr.decompress(content)
 			with open(t_path, 'w', encoding='utf-8') as t:
 				t.write(content)
 
@@ -647,8 +625,5 @@ def mk_rrdir(drps, tmpd):
 	logger.debug('...correcting local directory tree...')
 
 	for rp in drps:
-		# rx = rp[0]
-		# fp = tmpd / rx
 		fp = os.path.join(tmpd, rp[0])
-		# fp.mkdir(parents=True, exist_ok=True)
 		os.makedirs(fp, exist_ok=True)
