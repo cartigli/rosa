@@ -1,80 +1,95 @@
-Time-stamp and metadata based versioning is here. After checking for potentially modified files, only those flagged are hashed and verified. Diffing and comaprison is multitudes faster.
-The lib now includes:
-  - [Index] (new) versioning, diffing, and tracking logic/manager. uses a local sqlite3 index for storage/retrieval
-  - [Technician] handles uploading to the server and commiting changes, includes uplaoding & batching logic
-  - [Contractor] handles the downloading and writing of data to the disk, including context managers & download logic
-  - [Dispatch] manages the connection to the server: initiates, yields, and handles errors for the connection object
-  - [Opps] handles wrap-ups and conclusions, mini functions, and helpers for the main scripts that don't fit in the other libraries
+# rosa
+Version: 1.2.0
+Self-hosted versioning. Track your data on your machine.
 
-The scripts were moved into a seperate directory named 'fxs' and import the needed functions from the lib directory. The lib 
-directory's __init__.py file maps the lib's files functions so imports can be ('from rosa.lib import x, y') instead of ('from 
-rosa.lib.analyst import x, from rosa.lib.dispatch import y'). Also, the router.py script's imports were corrected and the following 
-commands are the main functions of rosa [rosa...]:
-  - [give] finds changes between the local and remote data, uploads new files/directories, removes old ones, and updates altered files
-  - [get][current] does not consider the changes and brute forces download of the server's latest commit to the disk (simpler than [get])
-  - [diff] finds changes between the two sources and simply presents them to the user; makes no changes to either of the sources
-  - [init] checks the server for tables and triggers, asks the user how to proceed. Used for initiation of the server & truncating/deleting 
-        * [rosa][diff] *can also be called with* [rosa][get][diff] *for convienance*
+## Prerequisites
+Before using [rosa], MySQL should be installed and running.
+MacOS (via Homebrew):
+```
+brew install mysql
+brew services start mysql
+```
+### MySQL Management:
+- **Configure root:** `mysql -u root -p`
+- **Start:** `mysql.server start`
+- **Restart:** `mysql.server restart`
+- **Shutdown:** `mysql.server stop`
 
-All scripts accept certain flags with their behavior outlined below:
-    - [force] (-f), (--force) if the scripts asks for confirmation or input normally, it will skip and proceed with the default
-    - [verbose] (-v), (--verbose) sets the logging_level to DEBUG for maximum logging output
-    - [silent] (-s), (--silent) sets the logging_level to CRITICAL for minimum logging output
-        - *Neither the silent nor verbose flags affect the rosa.log's content; it logs at the DEBUG level regardless of flags passed at runtime.*
+### Setup Python Environment
+It is recommended to run [rosa] in a virtual environment.
+```bash
+python -m venv venv_name
+source venv_name/bin/activate
+```
 
-[Versioning Logic]
-Works by tracking new and deleted files after a commit is made.
+### Install [rosa]
+Navigate to the project root and install the package.
+*This should install the dependencies.*
+```bash
+pip install .
+```
+If manual installation is required:
+```bash
+pip install mysql-connector-python diff-match-patch xxhash
+```
 
-Commits are recorded as versions 0-n where 0 is the first commit and consecutive versions are the 
-previous commit version + 1. If a file is made and uploaded in version n, it is uploaded/inserted 
-into files table as version n and left untouched until it is deleted (*or altered). If a file is 
-uploaded in commit/version n, but deleted in commit/version n + 1, the file is moved from the files 
-table to the deleted table with oversion (original_version) [n] and xversion (final version/commit 
-with delete) [n + 1], defining the time this file existed for (from version n to version n + 1).  
+## Configuration
+[rosa] requires configuration variables to authenticate with the server & manage preferences.
+File location: ./rosa/confs/config.py
+Adjust the following variables according to your preferences:
+- [XCONFIG] authenticating with the server
+    - [user] username ('root' if on host machine)
+    - [pswd] password (set at initial [mysql -u root -p login])
+    - [name] database name
+    - [addr] server ip address ('localhost' if on host machine)
+- [BLACKLIST] directories whose contents should not be tracked ('.index' should not be removed)
+- [MAX_ALLOWED_PACKET] maximum packet size for the server
+- [LOGGING_LEVEL] verbosity level of the logging output
+- [TZ] time-zone
 
-To retrieve a specific version, you must request a version by specifying an integer within the range 
-of verified commitments (0 - n where n is the latest commit). For every file which existed at version n, 
-the program finds the current record of the file in the files table. If it exists and has a version less 
-than the requested version n, it is pulled. If it exists with a version greater than the requested n, 
-then the program continues to finding altered content (diff logic).
+## Usage
+```bash
+rosa [command] [options]
+```
 
-The deleted table must also be queried for any/all files whose xversion is greater than (but not equal to) the requested n.
+### Initialization
+Initiate the versioning base. Upload current state 
+as v0, backup originals, and populate the index.
+```bash
+rosa .
+```
+*If already initialized, asks if you want to wipe the program.*
 
-[un-diff'ing logc]
-Every delta on the deltas table in which the xversion is greater than the requested n and up to the current 
-version are pulled. If there is a record in deleted with the consecutive version from the highest xversion 
-of the latest delta, this is pulled as the base. If this record still exists in the records table, this file 
-is the base. The decided base gets the highest patch applied to it, and the version of the patch is compared 
-to the requested n. If the modified base files' verison == the requested n, stop the loop and return the 
-modified base as the given file in version n. If not, continue the loop until the versions are equal, then 
-pass as the requested version n.
+### Track changes
+Identifies changes since last local commit.
+Creates diff of deleted, created, and altered files (hash verified).
+```bash
+rosa diff
+```
 
-[Basics]
-After configuring the config.py file in rosa/confs, add your mysql user's details & the server's ip address. 
-run 'rosa .' to initiate the program. rosa will create and populate both the remote database and the local 
-index. After rosa . is finished, you can run 'rosa diff' or 'rosa get diff' to see changes made to the local 
-directory. To commit these changes, running 'rosa give' will identify the same changes 'rosa .' found, and 
-adjust the server's database accordingly. The new files are uploaded, deleted files are moved to deleted, and 
-altered files are updated after their reverse patch is computed. if the versions do not match when this is run, 
-the program will exit and ask you to pull the most recent version. running 'rosa get' with uncommitted changes 
-will erase those changes and revert to the latest commit (using only local data). It will revert the directory 
-so that running 'rosa diff' will return 'no diff!'. **This will not pull the most recent version.** It only 
-pulls the most recent version *stored locally*, or the latest commit specifically ran on the given device. It 
-is a local rollback and does not effect or query the server (except for hash verification). Pulling the most 
-recent version & a specified previous version is coming soon.
+### Upload_changes
+Uploads the difference found to the database.
+Uploads created, backs up deleted, and updates altered files.
+```bash
+rosa give
+```
 
+### Rollback changes
+Tracks changes and recovers from them.
+Deletes new, recovers deleted, and reverts altered files to last local commitment.
+```bash
+rosa get
+```
 
-Check out the snql3 repository for the history and more information on this program and the MySQL server for this project.
+### Download history
+Shows all currently stored versions; downloads given selection (i.e., v3, v6, etc.).
+Rebuilds edits through reverse patches and ignores files uploaded after the given version.
+```bash
+rosa get version
+```
 
-To install and run, navigate to the project directory and run "pip install ." which will configure the needed packages and configure the path for [rosa]. Then, rosa's commands will be usable from anywhere, not just the root directory. If you do not want to install, running 'python -m path.to.script will work as well, as long as you are in rosa's root directory.
-
-Required packages:
-  - xxhash (unless using hashlib; xxhash is mad fast but less secure. Just swap the code with xxhash for the commented out hashlib functions)
-  - mysql-connector-python
-  - diff_match_patch
-
-
-*I am in the process of removing the 'hard-configuration' of the LOCAL_DIR. The initiation will be based off the Current Working Directory (cwd) the*
-*initiation command was ran in, unless specified otherwise with '-rd' or '--redirect'. This will also move the index to the project directory (duh) and*
-*forces dynamic index searching if commands are run from within the directory instead of root level.*
-*Also error handling for when the server doesn't yield or config is corrupt.*
+## Flags
+- [--force] [-f] skips confirmations for diff, skips message for give
+- [--verbose] [-v] sets logging level to DEBUG (max output)
+- [--silent] [-s] sets logging level to CRITICAL (min output)
+- [--remote] [-r] diff will compare local and remote versions
