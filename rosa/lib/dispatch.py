@@ -132,7 +132,7 @@ def landline(local):
 	except KeyboardInterrupt as ki:
 		logger.warning('Boss killed it; wrap it up')
 		_emerg(sconn)
-		raise
+		# raise
 	except sqlite3.OperationalError as oe:
 		if "unable to open database file" in str(oe):
 			logger.error('unable to find the sqlite\'s database file')

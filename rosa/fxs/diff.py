@@ -8,7 +8,7 @@ It will only identify the changes you made since the latest indexing.
 
 
 import sys
-import logging
+# import logging
 
 from rosa.confs import RED, RESET
 from rosa.lib import (
@@ -31,12 +31,12 @@ def ask_to_share(diff_data, force=False):
 	Returns:
 		None
 	"""
-	logger = logging.getLogger('rosa.log')
+	# logger = logging.getLogger('rosa.log')
 
 	if force is True:
 		return
 
-	logger.info('discrepancy[s] found between the server and local data:')
+	print('discrepancy[s] found between the server and local data:')
 
 	for i in diff_data:
 		title = i["type"]
@@ -45,7 +45,7 @@ def ask_to_share(diff_data, force=False):
 
 		if count > 0:
 			if force is True:
-				logger.info(f"found: {count} {descr}")
+				print(f"found: {count} {descr}")
 				return
 			else:
 				decis0 = input(f"found {count} {descr}. do you want details? y/n: ").lower()
@@ -56,12 +56,12 @@ def ask_to_share(diff_data, force=False):
 					[c.append(item) for item in i["details"]]
 
 					[formatted.append(f"\n{item}") for item in c]
-					logger.info(f".../{title} ({descr}):\n{''.join(formatted)}")
+					print(f".../{title} ({descr}):\n{''.join(formatted)}")
 
 				elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
-					logger.info('heard')
-				else:
-					logger.info('ok, freak')
+					print('heard')
+				# else:
+				# 	logger.info('ok, freak')
 
 def main(args=None):
 	"""Runs the diff'ing engine before asking to show the user what was found, if anything."""
@@ -89,56 +89,61 @@ def main(args=None):
 				elif vok is False:
 					logger.info(f"versions: {RED}twisted{RESET}")
 
-	if xdiff is True:
-		if any((new, deleted, diffs)):
-			logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
-		
-		if any((newd, deletedd)):
-			logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
+	try:
+		if xdiff is True:
+			if any((new, deleted, diffs)):
+				logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
+			
+			if any((newd, deletedd)):
+				logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
 
-		diff_data = []
+			diff_data = []
 
-		diff_data.append(
-			{ # CHERUBS
-				"type": "deleted files", 
-				"details": deleted,
-				"message": "file[s] that only exist in server"
-			}
-		)
-		diff_data.append(
-			{ # SERPENTS
-				"type": "new files", 
-				"details": new,
-				"message": "local-only file[s]"
-			}
-		)
-		diff_data.append(
-			{ # SOULS
-				"type": "altered files", 
-				"details": diffs,
-				"message": "file[s] with hash discrepancies"
-			}
-		)
+			diff_data.append(
+				{ # CHERUBS
+					"type": "deleted files", 
+					"details": deleted,
+					"message": "file[s] that only exist in server"
+				}
+			)
+			diff_data.append(
+				{ # SERPENTS
+					"type": "new files", 
+					"details": new,
+					"message": "local-only file[s]"
+				}
+			)
+			diff_data.append(
+				{ # SOULS
+					"type": "altered files", 
+					"details": diffs,
+					"message": "file[s] with hash discrepancies"
+				}
+			)
 
-		diff_data.append(
-			{ # CAVES
-				"type": "new directories", 
-				"details": newd,
-				"message": "new directories"
-			}
-		)
-		diff_data.append(
-			{ # GATES
-				"type": "deleted directories", 
-				"details": deletedd,
-				"message": "deleted directories"
-			}
-		)
+			diff_data.append(
+				{ # CAVES
+					"type": "new directories", 
+					"details": newd,
+					"message": "new directories"
+				}
+			)
+			diff_data.append(
+				{ # GATES
+					"type": "deleted directories", 
+					"details": deletedd,
+					"message": "deleted directories"
+				}
+			)
 
-		ask_to_share(diff_data, force)
+			ask_to_share(diff_data, force)
 
-	else:
-		logger.info('no diff!')
+		else:
+			logger.info('no diff!')
+
+	except KeyboardInterrupt:
+		logger.warning(f'\nboss killed the process; abandoning...')
+		sys.exit(1)
 
 	finale(NOMIC, start, prints)
 

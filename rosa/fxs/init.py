@@ -16,8 +16,6 @@ import os
 import sys
 import time
 import shutil
-import logging
-# from pathlib import Path
 
 from rosa.confs import TABLE_CHECK, _DROP
 from rosa.lib import (
@@ -26,8 +24,6 @@ from rosa.lib import (
 	_safety, shutil_fx, find_index, is_ignored,
 	landline, construct, Heart
 )
-
-logger = logging.getLogger('rosa.log')
 
 
 NOMIC = "[init]"
@@ -93,91 +89,99 @@ def main(args=None):
 
 	local = Heart(strict=False) # only script to use =False (non-default value)
 
-	if any(res):
-		logger.info(f"found these tables in the server {res}.")
+	try:
 
-		if not local.index:
-			logger.info('the server has tables but the local index does not exist; the server needs to be erased.')
-			dec = input('wipe now [w]? [Return to quit]: ').lower()
-			
-			if dec in('w', 'wipe', ' w', 'w '):
-				try:
-					with phones() as conn:
-						with conn.cursor() as cursor:
-							cursor.execute(_DROP)
+		if any(res):
+			logger.info(f"found these tables in the server {res}.")
 
-							while cursor.nextset():
-								pass
+			if not local.index:
+				logger.info('the server has tables but the local index does not exist; the server needs to be erased.')
+				dec = input('Wipe now [w]? [Return to quit]: ').lower()
+				
+				if dec in('w', 'wipe', ' w', 'w '):
+					try:
+						with phones() as conn:
+							with conn.cursor() as cursor:
+								cursor.execute(_DROP)
 
-						if local.index:
-							# shutil_fx(local.index.parent)
-							shutil_fx(os.path.dirname(local.index))
+								while cursor.nextset():
+									pass
 
-				except Exception as e:
-					logger.info(f"failed to erase server due to: {e}", exc_info=True)
+							if local.index:
+								# shutil_fx(local.index.parent)
+								shutil_fx(os.path.dirname(local.index))
+
+					except Exception as e:
+						logger.info(f"failed to erase server due to: {e}", exc_info=True)
+
+			elif local.index:
+				logger.info('the server has tables and the local index exists; they both need to be erased.')
+				dec = input('Erase now [e]? [Return to quit]: ').lower()
+				
+				if dec in('e', 'erase', ' e', 'e '):
+					try:
+						with phones() as conn:
+							with conn.cursor() as cursor:
+								cursor.execute(_DROP)
+
+								while cursor.nextset():
+									pass
+
+							if local.index:
+								# shutil_fx(local.index.parent)
+								shutil_fx(os.path.dirname(local.index))
+
+					except Exception as e:
+						logger.info(f"failed to erase server due to: {e}", exc_info=True)
 
 		elif local.index:
-			logger.info('the server has tables and the local index exists; they both need to be erased.')
-			dec = input('erase now [e]? [Return to quit]: ').lower()
-			
-			if dec in('e', 'erase', ' e', 'e '):
-				try:
-					with phones() as conn:
+			# if local.index.exists():
+			if os.path.exists(local.index):
+				logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
+				dec = input('Delete [d] the index now? [Return to quit]: ').lower()
+
+				if dec in('d', 'delete', 'd ', ' d'):
+					# shutil_fx(local.index.parent)
+					shutil_fx(os.path.dirname(local.index))
+
+		else:
+			dec = input("Initiate [i]? [Return to quit] ").lower()
+
+			if dec in('i', 'init', 'initiate'):
+				start = time.perf_counter()
+
+				with phones() as conn:
+					try:
+						logger.info('scraping source directory...')
+						drps, frps = scraper(local.target) # checked
+
+						logger.info('initiating the index...')
+						index = _config() # don't use the class's attributes bc they don't exist
+
+						with landline(index) as sconn: # *they are None, but you get it
+							construct(sconn)
+
+							init_dindex(drps, sconn)
+							init_index(sconn, local.target, os.path.dirname(index))
+
+						logger.info(f'initiating remote database...')
+						init_remote(conn, local.target, drps, frps)
+
+					except KeyboardInterrupt as ki:
+						logger.info(f"\ninitiation process killed")
+						if index:
+							shutil_fx(os.path.dirname(index))
+
 						with conn.cursor() as cursor:
 							cursor.execute(_DROP)
 
 							while cursor.nextset():
 								pass
+						sys.exit(1)
 
-						if local.index:
-							# shutil_fx(local.index.parent)
-							shutil_fx(os.path.dirname(local.index))
-
-				except Exception as e:
-					logger.info(f"failed to erase server due to: {e}", exc_info=True)
-
-	elif local.index:
-		# if local.index.exists():
-		if os.path.exists(local.index):
-			logger.warning('the local index exists but the server has no tables; the index needs to be deleted')
-			dec = input('delete [d] the index now? [Return to quit]: ').lower()
-
-			if dec in('d', 'delete', 'd ', ' d'):
-				# shutil_fx(local.index.parent)
-				shutil_fx(os.path.dirname(local.index))
-
-	else:
-		dec = input("[i] initiate? [Return to quit] ").lower()
-
-		if dec in('i', 'init', 'initiate'):
-			start = time.perf_counter()
-
-			with phones() as conn:
-				try:
-					drps, frps = scraper(local.target) # checked
-
-					init_remote(conn, local.target, drps, frps)
-
-					index = _config() # don't use the class's attributes bc they don't exist
-
-					with landline(index) as sconn: # *they are None, but you get it
-						construct(sconn)
-
-						init_dindex(drps, sconn)
-						init_index(sconn, local.target, os.path.dirname(index))
-
-				except Exception as err:
-					raise
-				except KeyboardInterrupt as ki:
-					logger.info(f"initiation failed due to: {ki}", exc_info=True)
-					with conn.cursor() as cursor:
-						cursor.execute(_DROP)
-
-						while cursor.nextset():
-							pass
-
-					if index:
-						shutil_fx(os.path.dirname(index))
+	except KeyboardInterrupt:
+		logger.warning(f'\nboss killed the process; abandoning...')
+		sys.exit(1)
 
 	finale(NOMIC, start, prints)
 

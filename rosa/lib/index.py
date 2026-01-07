@@ -4,7 +4,6 @@ import time
 import shutil
 import logging
 import subprocess
-# from pathlib import Path
 from datetime import datetime, UTC
 
 import xxhash
@@ -59,9 +58,6 @@ def copier(origin, originals):
 	os.makedirs(originals, exist_ok=True)
 
 	for obj in os.scandir(origin):
-		# if is_ignored(obj.path):
-		# 	continue
-		# else:
 		if not is_ignored(obj.path):
 			destination = os.path.join(originals, obj.name)
 
@@ -69,7 +65,8 @@ def copier(origin, originals):
 				shutil.copytree(obj, destination)
 
 			elif obj.is_file(): # root level files
-				shutil.copy2(obj, destination)
+				# shutil.copy2(obj, destination)
+				shutil.copyfile(obj, destination)
 
 def _r(dir_):
 	"""Recursive function for files.
@@ -87,15 +84,13 @@ def _r(dir_):
 			yield obj
 
 def _rd(dirx):
-	"""Recursive function for directories.
+	"""Recursive function for finding directories.
 
 	Args:
 		dirx (str): Path to the given directory.
 	
 	Yields:
 		d.path (str): A directory found.
-		Yields from:
-			d.path (str): A directory found.
 	"""
 	for d in os.scandir(dirx):
 		if d.is_dir():
@@ -291,9 +286,9 @@ def init_index(sconn, origin, parent):
 
 	originals = os.path.join(parent, "originals")
 
-	copier(origin, originals) # backup created first - checked
+	copier(origin, originals) # backup created first
 
-	inventory = _survey(origin, version) # collect current files' metadata - checked
+	inventory = _survey(origin, version) # collect current files' metadata
 
 	query = "INSERT INTO records (rp, version, ctime, bytes) VALUES (?, ?, ?, ?);"
 
@@ -369,23 +364,19 @@ def query_index(conn, sconn, core):
 	diff = False
 	remaining = []
 
-	real_stats = _formatter(core) # checked
+	real_stats = _formatter(core)
 	index_records = get_records(sconn)
 
 	new, deleted, diffs, remaining_ = qfdiffr(index_records, real_stats)
 
-	failed, succeeded = verification(conn, diffs, core) # checked
+	failed, succeeded = verification(conn, diffs, core)
 
-	for x in remaining_:
-		remaining.append(x)
-	
-	for y in succeeded:
-		remaining.append(y)
+	passed = list(remaining_) + succeeded
 
 	if any(failed) or any(new) or any(deleted):
 		diff = True
 
-	return new, deleted, failed, remaining, diff
+	return new, deleted, failed, passed, diff
 
 def verification(conn, diffs, origin):
 	"""Checks actual vs. recorded hash for files with metadata discrepancies.
@@ -452,7 +443,7 @@ def query_dindex(sconn, core):
 
 	idrps = sconn.execute(query).fetchall()
 
-	ldrps = _dsurvey(core) # checked
+	ldrps = _dsurvey(core)
 
 	xdrps = [i[0] for i in idrps]
 
@@ -486,12 +477,13 @@ def version_check(conn, sconn):
 		rc_version = cursor.fetchone()
 	
 	if rc_version and lc_version:
-		if rc_version[0] != lc_version[0]:
-			print(f"versions misaligned: remote: {rc_version} | local: {lc_version}")
-			vok = False
-
-		elif rc_version[0] == lc_version[0]:
+		if rc_version[0] == lc_version[0]:
+			logger.info('versions: twinned')
 			vok = True
+
+		# if rc_version[0] != lc_version[0]:
+		else:
+			logger.error(f"versions misaligned: remote: {rc_version} | local: {lc_version}")
 
 	return vok, lc_version[0]
 
@@ -522,39 +514,31 @@ def local_audit_(sconn, core, new, diffs, remaining, version, secure):
 	logger.debug('recreating original\'s directory tree')
 	prefix = len(backup) + 1
 
-	# for dirs in backup.rglob('*'):
 	for dirs in _rd(backup):
-		if is_ignored(dirs):
-			continue
-		elif dirs.is_dir():
+		# if is_ignored(dirs):
+		# 	continue
+		if not is_ignored(dirs):
+			# if dirs.is_dir():
 			rp = dirs.path[prefix:]
-			# ndir = Path(tmpd / rp).resolve()
 			ndir = os.path.join(tmpd, rp)
 
-			# ndir.mkdir(parents=True, exist_ok=True)
 			os.makedirs(ndir, exist_ok=True)
 
 	if remaining:
 		logger.debug('hard-linking unchanged originals')
 		for rem in remaining:
-			# origin = (backup / rem).resolve()
 			origin = os.path.join(backup, rem)
-			# destin = (tmpd / rem).resolve()
 			destin = os.path.join(tmpd, rem)
 
-			# origin.parent.mkdir(parents=True, exist_ok=True)
 			os.makedirs(os.path.dirname(origin), exist_ok=True)
-			# destin.parent.mkdir(parents=True, exist_ok=True)
 			os.makedirs(os.path.dirname(destin), exist_ok=True)
 
-			# destin.hardlink_to(origin)
-			# os.link(destin, origin)
 			os.link(origin, destin)
 
 	if new:
-		inew = xxnew(new, core, version, tmpd) # checked
+		inew = xxnew(new, core, version, tmpd)
 	if diffs:
-		idiffs = xxdiff(diffs, core, version, tmpd) # checked
+		idiffs = xxdiff(diffs, core, version, tmpd)
 
 	index_audit(sconn, inew, idiffs)
 
@@ -575,13 +559,12 @@ def xxnew(new, origin, version, tmpd):
 
 	for rp in new:
 		fp = os.path.join(origin, rp)
-		# bp = tmpd / rp
 		bp = os.path.join(tmpd, rp)
 
-		# bp.parent.mkdir(parents=True, exist_ok=True)
 		os.path.makedirs(os.path.dirname(bp), exist_ok=True)
 
-		shutil.copy2(fp, bp)
+		# shutil.copy2(fp, bp)
+		shutil.copyfile(fp, bp)
 
 		inew.append((rp, 1, 1, version))
 
@@ -604,10 +587,8 @@ def xxdiff(diffs, origin, version, tmpd):
 
 	for rp in diffs:
 		fp = os.path.join(origin, rp)
-		# bp = tmpd / rp
 		bp = os.path.join(tmpd, rp)
 
-		# bp.parent.mkdir(parents=True, exist_ok=True)
 		os.path.makedirs(os.path.dirname(bp), exist_ok=True)
 		bp.touch()
 
@@ -665,7 +646,6 @@ def xxdeleted(conn, sconn, deleted, xversion, doversions, secure):
 	xquery = "DELETE FROM records WHERE rp = ?;"
 
 	for rp in deleted:
-		# fp = backup / rp
 		fp = os.path.join(backup, rp)
 
 		with open(fp, 'rb') as d:
@@ -693,7 +673,6 @@ def local_daudit(sconn, newd, deletedd, version):
 	Returns:
 		None
 	"""
-	# this is also current with last change's version, so get oversion from here instead of remote
 	nquery = "INSERT INTO directories (rp, version) VALUES (?, ?);"
 	dquery = "DELETE FROM directories WHERE rp = ?;"
 
@@ -726,12 +705,12 @@ def refresh_index(sconn, core, diffs):
 	Args:
 		sconn (sqlite3): Index's connection object.
 		core (str): Main target directory.
-		diffs (set): Relative paths of altered files.
+		diffs (list): Relative paths of altered files.
 
 	Returns:
 		None
 	"""
-	inventory = _surveyorx(core, diffs) # checked
+	inventory = _surveyorx(core, diffs)
 
 	query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
 

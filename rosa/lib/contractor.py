@@ -15,10 +15,9 @@ import shutil
 import logging
 import tempfile
 import contextlib
-# from pathlib import Path
 from itertools import batched
 
-import mysql.connector # only for error codes in this file
+import mysql.connector
 
 from rosa.confs import RED, RESET, BLACKLIST
 
@@ -658,7 +657,7 @@ def save_people(people, backup, tmpd):
 			# os.link(tmp_, curr)
 			os.link(curr, tmp_)
 
-		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception) as te:
+		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception):
 			raise
 
 def wr_batches(data, tmpd):

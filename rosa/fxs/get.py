@@ -13,7 +13,6 @@ Name should be changed. get_curr should be get & this should be get_last or simi
 import os
 import shutil
 import subprocess
-# from pathlib import Path
 
 import sqlite3
 
@@ -37,19 +36,16 @@ def originals(replace, tmpd, backup):
 	Returns:
 		None
 	"""
-	# originals = backup / ".index" / "originals"
 	originals = os.path.join(backup, ".index", "originals")
 
 	for rp in replace:
-		# fp = originals / rp
 		fp = os.path.join(originals, rp)
-		# bp = tmpd / rp
 		bp = os.path.join(tmpd, rp)
 
-		# (bp.parent).mkdir(parents=True, exist_ok=True)
 		os.makedirs(os.path.dirname(bp), exist_ok=True)
 
-		shutil.copy2(fp, bp)
+		# shutil.copy2(fp, bp)
+		shutil.copyfile(fp, bp)
 
 def finals(tmpd, backup):
 	"""Copies the index from the backup to the temporary directory.
@@ -61,14 +57,9 @@ def finals(tmpd, backup):
 	Returns:
 		None
 	"""
-	# index = ".index"
-
-	# origin = backup / index
 	origin = os.path.join(backup, ".index")
-	# destin = tmpd / index
 	destin = os.path.join(tmpd, ".index")
 
-	# shutil.copytree(origin, destin)
 	os.rename(origin, destin)
 
 def main(args=None):
@@ -83,38 +74,43 @@ def main(args=None):
 			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
 			indexed_dirs = scrape_dindex(sconn)
 
-		if xdiff is True:
-			logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
+	if xdiff is True:
+		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 
+		try:
 			with fat_boy1(local.target) as (tmp_, backup): # CHECKED
 
 				logger.info('copying directory tree...')
 				mk_rrdir(indexed_dirs, tmp_) # checked
 
-				logger.info('hard linking unchanged files...')
+				logger.info(f'hard linking {len(remaining)} unchanged files...')
 				save_people(remaining, backup, tmp_) # checked
 
 				# ignore new files
 
-				for d in deleted:
-					diffs.append(d)
+				diffs += list(deleted)
 
 				if diffs:
 					logger.info('replacing files with deltas')
 					originals(diffs, tmp_, backup) # checked (bad commenting)
 
-				for r in remaining:
-					diffs.append(r)
-				
-				logger.info('inserting index & originals')
+				diffs += remaining
+
+				logger.info('replacing index & originals')
 				finals(tmp_, backup) # checked (more bad commenting)
 
 			logger.info('refreshing the index')
 			with landline(local.index) as sconn:
 				refresh_index(sconn, local.target, diffs)
 
-		else:
-			logger.info('no diff!')
+		except KeyboardInterrupt:
+			logger.warning(f'\nboss killed the process; index could be corrupted; refreshing before exit...')
+			with landline(local.index) as sconn:
+				refresh_index(sconn, local.target, diffs)
+			sys.exit(1)
+
+	else:
+		logger.info('no diff!')
 
 	finale(NOMIC, start, prints)
 

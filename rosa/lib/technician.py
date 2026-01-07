@@ -6,12 +6,11 @@ Uploads to, updates in, and deletes data from the server.
 
 import os
 import logging
-# from pathlib import Path
 from itertools import batched
 from datetime import datetime, UTC
 
-import mysql.connector # to connect with the mysql server
-import xxhash # can be replaced w.native hashlib
+import mysql.connector
+import xxhash
 
 from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET, INIT2
 
@@ -130,8 +129,26 @@ def collector(conn, files, abs_path, version, key=None):
 	batch_count = avg(files[:50], abs_path)
 	batches = list(batched(files, batch_count))
 
+	total = len(batches)
+	length = 100
+	fin = 0
+
+	fill = '%'
+	none = '-'
+
+	# try:
 	for _batch in batches:
 		collect_data(conn, _batch, abs_path, version, key)
+
+		fin += 1
+		i = int((fin / total )*length)
+
+		base = f"[{fill*i}{none*(length - i)}] uploading batch {fin}/{total}"
+		print(base, end='\r', flush=True)
+
+	# print(f"[{fill*length}] upload complete! {total}/{total}", flush=True)
+	print("\x1b[2K\r", end="", flush=True)
+
 
 def collect_data(conn, dicts_, abs_path, version, key=None):
 	"""Collects details about the batch passed to it.
@@ -170,7 +187,7 @@ def collect_data(conn, dicts_, abs_path, version, key=None):
 def rm_remdir(conn, sconn, gates, xversion):
 	"""Removes directories from the server via DELETE.
 
-	DML so executemany().
+	DML, so executemany().
 	
 	Args: 
 		conn (mysql): Connection object.

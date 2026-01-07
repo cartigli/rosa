@@ -61,6 +61,8 @@ def main(args=None):
                 # hash alter-er [1 in 777] & file delete-r [1 in 8]
                 elif item.is_file():
                     item_no += 1
+
+                    # # editor
                     # if item_no % 107 == 0:
                     #     with open(item, 'a', encoding='utf-8') as f:
                     #         f.write("hello, world")

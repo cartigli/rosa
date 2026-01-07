@@ -19,8 +19,6 @@ import sys
 import time
 import shutil
 import logging
-# from pathlib import Path
-
 
 from rosa.lib import (
     phones, calc_batch, 
