@@ -15,7 +15,7 @@ import diff_match_patch as dmp_
 
 from rosa.confs import VERSIONS
 from rosa.lib import (
-    phones, fat_boy, mk_rrdir, calc_batch, 
+    phones, mk_rrdir, calc_batch, 
     mini_ps, finale, sfat_boy
 )
 
@@ -94,9 +94,7 @@ def main(args=None):
                             break
 
                         for rp, content in fdata:
-                            # fp = dirx / rp
                             fp = os.path.join(dirx, rp)
-                            # fp.touch()
 
                             with open(fp, 'wb') as f:
                                 f.write(content)
@@ -131,7 +129,6 @@ def main(args=None):
                             cpatch = cursor.fetchmany(1)
 
                             if not cpatch:
-                                # fp = dirx / rp[0]
                                 fp = os.path.join(dirx, rp[0])
 
                                 back_tobytes = content.encode(enc)
@@ -166,14 +163,10 @@ def main(args=None):
                             break
 
                         for content, rp in fdata:
-                            # fp = tmpd / rp
                             fp = os.path.join(tmpd, rp)
 
-                            # if fp.exists() and fp.is_file():
                             if os.path.isfile(fp):
                                 continue
-
-                            # fp.touch()
 
                             with open(fp, 'wb') as f:
                                 f.write(content)

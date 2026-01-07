@@ -21,7 +21,6 @@ NOMIC = "[get][current]"
 
 def main(args=None):
     """Downloads the latest version.""" 
-
     logger, force, prints, start = mini_ps(args, NOMIC)
 
     target = os.path.expanduser('~')

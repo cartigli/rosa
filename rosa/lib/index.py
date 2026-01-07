@@ -461,8 +461,6 @@ def version_check(conn, sconn):
 		if rc_version[0] == lc_version[0]:
 			logger.info('versions: twinned')
 			vok = True
-
-		# if rc_version[0] != lc_version[0]:
 		else:
 			logger.error(f"versions misaligned: remote: {rc_version} | local: {lc_version}")
 
@@ -470,8 +468,6 @@ def version_check(conn, sconn):
 
 def local_audit_(sconn, core, new, diffs, remaining, version, secure):
 	"""Reverts the current directory back to the latest locally recorded commit.
-
-	fat_boy uses Pathlib while fat_boy uses os.path, hence the change.
 
 	Args:
 		sconn (sqlite3): Index's connection object.
@@ -496,10 +492,7 @@ def local_audit_(sconn, core, new, diffs, remaining, version, secure):
 	prefix = len(backup) + 1
 
 	for dirs in _rd(backup):
-		# if is_ignored(dirs):
-		# 	continue
 		if not is_ignored(dirs):
-			# if dirs.is_dir():
 			rp = dirs.path[prefix:]
 			ndir = os.path.join(tmpd, rp)
 

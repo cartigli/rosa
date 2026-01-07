@@ -16,7 +16,7 @@ import subprocess
 import sqlite3
 
 from rosa.lib import (
-	phones, fat_boy1, mk_rrdir, 
+	phones, fat_boy, mk_rrdir, 
 	save_people, mini_ps, finale,
 	query_index, _config, refresh_index,
 	scrape_dindex, landline, Heart
@@ -77,7 +77,7 @@ def main(args=None):
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
 
 		try:
-			with fat_boy1(local.target) as (tmp_, backup):
+			with fat_boy(local.target) as (tmp_, backup):
 
 				logger.info('copying directory tree...')
 				mk_rrdir(indexed_dirs, tmp_)
