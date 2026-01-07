@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+"""Testing"""
+
+
 import sys
 import time
 import shutil
@@ -11,9 +15,11 @@ from pathlib import Path
 import xxhash
 # import datetime
 
-from rosa.confs.config import LOCAL_DIR, RED, RESET
+from rosa.confs.config import RED, RESET
 
 BLACKLIST = ['.index', '.git', '.obsidian', '.vscode', '.DS_Store']
+
+xxdir = "/Volumes/HomeXx/compuir/texts"
 
 """
 Scan local directory, collect data from server, and compare all contents. Upload/insert files found locally but not in server, 
@@ -24,7 +30,7 @@ of directories if not found locally, and add new ones.
 logger = logging.getLogger('rosa.log')
 
 def main(args=None):
-    local_dir = LOCAL_DIR
+    local_dir = xxdir
 
     print(f"{RED}[rm3] executed{RESET}")
     abs_path = Path(local_dir).resolve()
