@@ -26,7 +26,7 @@ logger = logging.getLogger('rosa.log')
 
 @contextlib.contextmanager
 def fat_boy(dir_):
-	"""Conext manager for the temporary directory and backup of original. 
+	"""Context manager for the temporary directory and backup of original. 
 	
 	Moves contents instead of renaming directory for C.W.D. preservation.
 
@@ -74,7 +74,7 @@ def fat_boy(dir_):
 
 @contextlib.contextmanager
 def fat_boy_o(dir_):
-	"""Conext manager for the temporary directory and backup of original. 
+	"""Context manager for the temporary directory and backup of original. 
 	
 	Replaces corrupted directory with backup on error.
 
@@ -177,10 +177,10 @@ def lil_guy(dir_, backup, tmpd):
 
 		elif tmpd and os.path.exists(tmpd):
 			shutil_fx(tmpd)
-			logger.warning(f"lil_guy called to recover on error but the backup was no where to  be found. deleted temporary directory")
+			logger.error(f"lil_guy called to recover on error and couldn't find the backup. deleted temporary directory")
 
 		else:
-			logger.debug('lil_guy called on error but no directories to recover were found')
+			logger.error('lil_guy called on error but no directories to recover were found')
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		logger.error(f"{RED}replacement of {dir_} and cleanup encountered an error: {e}.", exc_info=True)
@@ -213,10 +213,10 @@ def _lil_guy_o(abs_path, backup, tmpd):
 
 		elif tmpd and os.path.exists(tmpd):
 			shutil_fx(tmpd)
-			logger.warning(f"_lil_guy_o called to recover on error but the backup was no where to  be found. deleted temporary directory")
+			logger.error(f"_lil_guy_o called to recover on error and couldn't find the backup. deleted temporary directory")
 
 		else:
-			logger.debug('_lil_guy_o called on error but no directories to recover were found')
+			logger.error('_lil_guy_o called on error but no directories to recover were found')
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		logger.error(f"{RED}replacement of {abs_path} and cleanup encountered an error: {e}.", exc_info=True)
@@ -311,7 +311,7 @@ def configure(dir_):
 			logger.debug('temporary directory created & original directory moved to backup w.o exception')
 			return tmpd, backup
 	else:
-		logger.warning(f"{dir_} doesn't exist; fix the config or run 'rosa get all'")
+		logger.warning(f"{dir_} doesn't exist; fix the config or pull a version")
 		raise FileNotFoundError ('source directory does not exist')
 
 def configure_o(abs_path):
@@ -343,8 +343,8 @@ def configure_o(abs_path):
 			logger.debug('temporary directory created & source directory contents moved to backup')
 			return tmpd, backup
 	else:
-		logger.warning(f"{abs_path} doesn't exist; fix the config or run 'rosa get all'")
-		sys.exit(1)
+		logger.warning(f"{dir_} doesn't exist; fix the config or pull a version")
+		raise FileNotFoundError ('source directory does not exist')
 
 def is_ignored(_str):
 	return any(blckd in _str for blckd in BLACKLIST)

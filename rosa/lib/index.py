@@ -154,9 +154,27 @@ def _survey(origin, version):
 			ctime = stats.st_ctime
 			size = stats.st_size*(10**7)
 
-			inventory.append((rp, version, ctime, size))
+			track = encoding(file.path)
+
+			inventory.append((rp, version, version, ctime, size, track))
 
 	return inventory
+
+def encoding(obj):
+     utf = False
+
+     with open(obj, 'rb') as f:
+          raw = f.read(1024*1024)
+     
+     try:
+          raw.decode('utf-8')
+     except UnicodeDecodeError:
+          # print("binary")
+          utf = "F"
+     else:
+          utf = "T"
+     
+     return utf
 
 def _dsurvey(origin):
 	"""Collects the subdirectories within the requested directory.
@@ -185,9 +203,24 @@ def _surveyorx(origin, rps):
 		rps (list): Relative paths of all the altered files.
 
 	Returns:
-		inventory (list): Tupled st_ctimes, st_sizes and relative paths of revery file path in rps.
+		inventory (list): Tupled st_ctimes, st_sizes and relative paths of every file path in rps.
 	"""
 	inventory = []
+
+	# if version:
+	# 	query = "UPDATE records SET ctime = ?, bytes = ?, from_version = ? WHERE rp = ?;"
+
+	# 	for rp in rps:
+	# 		fp = os.path.join(origin, rp)
+
+	# 		stats = os.stat(fp)
+
+	# 		ctime = stats.st_ctime
+	# 		size = stats.st_size *(10**7)
+
+	# 		inventory.append((ctime, size, version, rp))
+	# else:
+	query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
 
 	for rp in rps:
 		fp = os.path.join(origin, rp)
@@ -199,7 +232,7 @@ def _surveyorx(origin, rps):
 
 		inventory.append((ctime, size, rp))
 	
-	return inventory
+	return query, inventory
 
 def historian(sconn, version, message):
 	"""Records the version & message, if present, in the index.
@@ -269,10 +302,9 @@ def init_index(sconn, origin, parent):
 
 	copier(origin, originals) # backup created first
 
+	query = "INSERT INTO records (rp, original_version, from_version, ctime, bytes, track) VALUES (?, ?, ?, ?, ?, ?);"
+
 	inventory = _survey(origin, version) # collect current files' metadata
-
-	query = "INSERT INTO records (rp, version, ctime, bytes) VALUES (?, ?, ?, ?);"
-
 	sconn.executemany(query, inventory)
 
 	historian(sconn, version, message) # load the version into the local records table
@@ -357,7 +389,7 @@ def query_index(conn, sconn, core):
 	if any(failed) or any(new) or any(deleted):
 		diff = True
 
-	return new, deleted, failed, passed, diff
+	return list(new), deleted, failed, passed, diff
 
 def verification(conn, diffs, origin):
 	"""Checks actual vs. recorded hash for files with metadata discrepancies.
@@ -535,12 +567,14 @@ def xxnew(new, origin, version, tmpd):
 		fp = os.path.join(origin, rp)
 		bp = os.path.join(tmpd, rp)
 
-		os.path.makedirs(os.path.dirname(bp), exist_ok=True)
+		os.makedirs(os.path.dirname(bp), exist_ok=True)
+
+		track = encoding(fp)
 
 		# shutil.copy2(fp, bp)
 		shutil.copyfile(fp, bp)
 
-		inew.append((rp, 1, 1, version))
+		inew.append((rp, 1, 1, track, version, version))
 
 	return inew
 
@@ -563,8 +597,7 @@ def xxdiff(diffs, origin, version, tmpd):
 		fp = os.path.join(origin, rp)
 		bp = os.path.join(tmpd, rp)
 
-		os.path.makedirs(os.path.dirname(bp), exist_ok=True)
-		bp.touch()
+		os.makedirs(os.path.dirname(bp), exist_ok=True)
 
 		with open(fp, 'rb') as m:
 			modified = m.read()
@@ -592,23 +625,24 @@ def index_audit(sconn, new, diffs):
 		None
 	"""
 	if new:
-		query = "INSERT INTO records (rp, ctime, bytes, version) VALUES (?, ?, ?, ?);"
+		query = "INSERT INTO records (rp, ctime, bytes, track, original_version, from_version) VALUES (?, ?, ?, ?, ?, ?);"
 		sconn.executemany(query, new)
 
 	if diffs:
-		query = "UPDATE records SET ctime = ?, bytes = ?, version = ? WHERE rp = ?;"
+		query = "UPDATE records SET ctime = ?, bytes = ?, from_version = ? WHERE rp = ?;"
 		sconn.executemany(query, diffs)
 
-def xxdeleted(conn, sconn, deleted, xversion, doversions, secure):
+# def xxdeleted(conn, sconn, deleted, to_version, doversions, dogversions, track, secure):
+def xxdeleted(conn, sconn, deleted, to_version, secure, dodata):
 	"""Backs up deleted files to the server; deletes them from the index.
 
 	Args:
 		conn (mysql): Server's connection object.
 		sconn (sqlite3): Index's connection object.
 		deleted (set): Deleted files' relative paths.
-		xversion (int): Version in wich the given file was deleted.
-		doversion (int): Original (prior) version of the deleted file.
+		to_version (int): Version in wich the given file was deleted.
 		secure (tuple): Temporary and backup directory's paths.
+		dodata (tuple): Relevant deleted data.
 
 	Returns:
 		None
@@ -616,7 +650,9 @@ def xxdeleted(conn, sconn, deleted, xversion, doversions, secure):
 	logger.debug('archiving deleted files...')
 	tmpd, backup = secure
 
-	query = "INSERT INTO deleted (rp, xversion, oversion, content) VALUES (%s, %s, %s, %s);"
+	dov, dog, trk = dodata
+
+	query = "INSERT INTO deleted (rp, original_version, to_version, from_version, content, track) VALUES (%s, %s, %s, %s, %s, %s);"
 	xquery = "DELETE FROM records WHERE rp = ?;"
 
 	for rp in deleted:
@@ -625,10 +661,12 @@ def xxdeleted(conn, sconn, deleted, xversion, doversions, secure):
 		with open(fp, 'rb') as d:
 			dcontent = d.read()
 		
-		oversion = doversions[rp]
+		from_version = dov[rp]
+		original_version = dog[rp]
+		track = trk[rp]
 
 		with conn.cursor(prepared=True) as cursor:
-			deletedx = (rp, xversion, oversion, dcontent)
+			deletedx = (rp, original_version, to_version, from_version, dcontent, track)
 			cursor.execute(query, deletedx)
 
 	data = [(rp,) for rp in deleted]
@@ -678,14 +716,12 @@ def refresh_index(sconn, core, diffs):
 
 	Args:
 		sconn (sqlite3): Index's connection object.
-		core (str): Main target directory.
+		core (str): Main target directory path.
 		diffs (list): Relative paths of altered files.
 
 	Returns:
 		None
 	"""
-	inventory = _surveyorx(core, diffs)
-
-	query = "UPDATE records SET ctime = ?, bytes = ? WHERE rp = ?;"
+	query, inventory = _surveyorx(core, diffs)
 
 	sconn.executemany(query, inventory)

@@ -1,4 +1,3 @@
 xxhash
 mysql-connector-python
-zstandard
 diff_match_patch

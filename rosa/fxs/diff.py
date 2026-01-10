@@ -28,9 +28,6 @@ def ask_to_share(diff_data, force=False):
 	Returns:
 		None
 	"""
-	if force is True:
-		return
-
 	print('discrepancy[s] found between the server and local data:')
 
 	for i in diff_data:
@@ -57,17 +54,20 @@ def ask_to_share(diff_data, force=False):
 					print('heard')
 
 def main(args=None):
-	"""Runs the diff'ing engine before asking to show the user what was found, if anything."""
+	"""Runs the diff'ing engine before asking to show what was found, if anything."""
+	redirect = None
 	xdiff = False
 	r = False
 
 	logger, force, prints, start = mini_ps(args, NOMIC)
 	
 	if args:
-		if args.remote:
+		if args.extra:
 			r = True
+		if args.redirect:
+			redirect = args.redirect
 
-	local = Heart()
+	local = Heart(redirect)
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
@@ -129,7 +129,8 @@ def main(args=None):
 				}
 			)
 
-			ask_to_share(diff_data, force)
+			if prints is True:
+				ask_to_share(diff_data, force)
 
 		else:
 			logger.info('no diff!')

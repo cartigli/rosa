@@ -88,8 +88,107 @@ Rebuilds edits through reverse patches and ignores files uploaded after the give
 rosa get version
 ```
 
+## Examples
+### Checking for changes
+```bash
+(tensor) compuir@minicartiglia ~ % rosa diff
+not an indexed directory
+(tensor) compuir@minicartiglia ~ % rosa diff --redirect /Volumes/HomeXx/compuir/texts
+no diff!
+rosa [diff] complete [0.0718 seconds]
+(tensor) compuir@minicartiglia ~ % rosa diff -r ~/texts                      
+no diff!
+rosa [diff] complete [0.0721 seconds]
+(tensor) compuir@minicartiglia ~ %
+```
+
+### Uploading changes found
+```bash
+(tensor) compuir@minicartiglia texts % rosa diff
+no diff!
+rosa [diff] complete [0.0729 seconds]
+(tensor) compuir@minicartiglia texts % rosa give
+no diff!
+rosa [give] complete [0.0714 seconds]
+
+...edit and delete files...
+
+(tensor) compuir@minicartiglia texts % rosa diff
+found 0 new files, 47 deleted files, and 169 altered files.
+discrepancy[s] found between the server and local data:
+found 47 file[s] that only exist in server. do you want details? y/n: n
+heard
+found 169 file[s] with hash discrepancies. do you want details? y/n: n
+heard
+rosa [diff] complete [4.1789 seconds]
+(tensor) compuir@minicartiglia texts % rosa give   
+found 0 new files, 47 deleted files, and 169 altered files.
+versions: twinned
+attach a message to this version (or enter for None): Test
+updating records...
+uploading altered files...
+generating altered files's patches...
+uploading altered files' patches...
+removing deleted files...
+updating local index...
+backing up deleted files...
+rosa [give] complete [9.2518 seconds]
+(tensor) compuir@minicartiglia texts % 
+```
+
+### Rolling back edits
+```bash
+(tensor) compuir@minicartiglia texts % rosa diff
+no diff!
+rosa [diff] complete [0.0751 seconds]
+(tensor) compuir@minicartiglia texts % rosa get
+no diff!
+rosa [get] complete [0.0645 seconds]
+(tensor) compuir@minicartiglia texts % rosa rm
+
+...edit and delete files...
+
+(tensor) compuir@minicartiglia texts % rosa get
+found 0 new files, 41 deleted files, and 163 altered files.
+copying directory tree...
+hard linking 4476 unchanged files...
+replacing files with deltas
+replacing index & originals
+refreshing the index
+rosa [get] complete [1.5632 seconds]
+(tensor) compuir@minicartiglia texts % rosa diff
+no diff!
+rosa [diff] complete [0.0727 seconds]
+(tensor) compuir@minicartiglia texts % 
+```
+
+### Getting a version
+```bash
+(tensor) compuir@minicartiglia texts % rosa get version
+all the currently recorded commitments:
+(0, '2026-01-07 - 29:05:58', 'INITIAL')
+(1, '2026-01-07 - 30:05:14', 'upload v0')
+(2, '2026-01-07 - 30:05:33')
+(3, '2026-01-07 - 40:05:12')
+(4, '2026-01-07 - 25:06:33', 'j')
+(5, '2026-01-07 - 35:22:54')
+(6, '2026-01-07 - 39:22:15')
+(7, '2026-01-07 - 41:22:34', 'n')
+(8, '2026-01-07 - 48:22:10', 'upload v7')
+(9, '2026-01-07 - 38:23:51', 'Test')
+Enter the version you would like to receive ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]): 8
+requested version recieved: v8
+downloading directories...
+writing directory tree...
+writing unaltered files...
+downloading and writing altered files...
+downloading & writing deleted files...
+rosa got v8
+rosa [get][version] complete [11.8313 seconds]
+(tensor) compuir@minicartiglia texts %
+```
+
 ## Flags
 - [--force] [-f] skips confirmations for diff, skips message for give
 - [--verbose] [-v] sets logging level to DEBUG (max output)
 - [--silent] [-s] sets logging level to CRITICAL (min output)
-- [--remote] [-r] diff will compare local and remote versions

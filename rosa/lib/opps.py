@@ -217,11 +217,12 @@ def finale(nomix, start, prints):
 	if prints is True:
 		print('All set.')
 
-def diff_gen(modified, originals, origin):
+def diff_gen(diffs, details, originals, origin):
 	"""Generates reverse patches between two files.
 
 	Args:
-		modified (list): Relative paths of the modified files.
+		diffs (list): Relative paths of the modified files.
+		details (dict): Relative paths keyed to encoding & versions.
 		originals (str): Path to the 'originals' directory.
 		origin (str): Target directory.
 	
@@ -229,20 +230,28 @@ def diff_gen(modified, originals, origin):
 		patches (dmp patches): Generated patches as text.
 	"""
 	patches = []
+	enc = None
 
-	for rp in modified:
-		fp_original = os.path.join(originals, rp)
-		with open(fp_original, 'r', encoding='utf-8', errors='replace') as f:
-			original = f.read()
+	for rp in diffs:
+		fp_alt = os.path.join(originals, rp)
+		fp_mod = os.path.join(origin, rp)
 
-		fp_modified = os.path.join(origin, rp)
-		with open(fp_modified, 'r', encoding='utf-8', errors='replace') as m:
-			different = m.read()
+		if details[rp][2] == "T":
+			with open(fp_alt, 'r', encoding="utf-8") as f:
+				alt = f.read()
+			with open(fp_mod, 'r', encoding="utf-8") as m:
+				mod = m.read()
 
-		patch = patcher(original, different) # returned as text
+			patch = patcher(alt, mod) # returned as binary
 
-		patches.append((rp, patch))
-	
+			patches.append((rp, patch))
+
+		else:
+			with open(fp_alt, 'rb') as f:
+				patch = f.read()
+
+			patches.append((rp, patch))
+
 	return patches
 
 def patcher(old, new):
@@ -258,9 +267,15 @@ def patcher(old, new):
 	dmp = dp_.diff_match_patch()
 
 	patches = dmp.patch_make(new, old)
-	p_txt = dmp.patch_toText(patches)
+	ptxt = dmp.patch_toText(patches)
 
-	return p_txt
+	patch = ptxt.encode("utf-8")
+
+	# patch = bsdiff4.diff(new, old)
+	# patch = xdelta3.encode(new, old)
+	# patch = fossil_delta.create(new, old)
+
+	return patch
 
 def find_index(cd):
 	"""Finds the index from the current working directory.
@@ -315,9 +330,24 @@ def find_index00(cd):
 	return index
 
 class Heart:
+	"""Finds the index based off the C.W.D.
 
-	def __init__(self, strict=True):
-		self.origin = os.getcwd()
+	Attributes:
+		redirect (str): Optional replacement of the C.W.D (init, diff).
+		strict (bool): Optional enforcement of found index (init).
+	"""
+	def __init__(self, redirect=None, strict=True):
+		"""Finds index and originals' paths.
+
+		Args:
+			redirect (str): Optional path.
+			strict (bool): Optional force finding.
+		"""
+		if redirect:
+			self.origin = redirect
+		else:
+			self.origin = os.getcwd()
+
 		self.index = find_index00(self.origin)
 
 		self.target = None

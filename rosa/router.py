@@ -16,27 +16,25 @@ def diff(args):
 	from rosa.fxs import diff
 	diff.main(args)
 
-def get_curr(args):
-	from rosa.fxs import get_curr
-	get_curr.main(args)
+def rm(args):
+	from rosa.fxs import gen
+	args.redirect = "rm"
+	gen.main(args)
+
+def gen(args):
+	from rosa.fxs import gen
+	gen.main(args)
 
 def get_vers(args):
 	from rosa.fxs import get_vers
 	get_vers.main(args)
 
-def test(args):
-	print('Hello, world.')
-
-def rm(args):
-	from rosa.xtra import rm3
-	rm3.main(args)
-
-def index(args):
-	from rosa.fxs import init
-	init.main(args)
+def get_curr(args):
+	from rosa.fxs import get_curr
+	get_curr.main(args)
 
 rosa = {
-	'get': {
+	'get': { # rosa get
 		'func': get, 
 		'name': "get", 
 		'root_cmds': {
@@ -44,21 +42,13 @@ rosa = {
 				'func': get_curr,
 				'name': "current"
 			},
-			'diff': { # rosa get diff
-				'func': diff, 
-				'name': "diff"
-			}, 
 			'version': { # rosa get version
 				'func': get_vers, 
-				'name': "version" # get version or get vers ? It should be like 10 things tbh. Bad setup?
-			}, # it needs its own arguments so i'll add a more specific call
-			'test': { # test function
-				'func': test, 
-				'name': "test"
+				'name': "version"
 			}
 		}
 	}, 
-	'give': {
+	'give': { # rosa give
 		'func': give, 
 		'name': "give"
 	},
@@ -74,22 +64,18 @@ rosa = {
 		'func': diff, 
 		'name': "diff"
 	},
-	'version': {
+	'version': { # rosa version
 		'func': get_vers,
 		'name': "version"
 	},
-	'vers': {
-		'func': get_vers,
-		'name': "vers"
-	},
-	'test': {
-		'func': test, 
-		'name': "test"
-	},
-	'rm': {
+	'rm': { # rosa rm
 		'func': rm,
 		'name': "rm"
-	} # dumb xtra/ fx for testing how it handles changes n whatnot
+	},
+	'gen': { # rosa gen -r [options]
+		'func': gen,
+		'name': "gen"
+	}
 }
 
 arguments = {
@@ -110,20 +96,7 @@ arguments = {
 		'shorthand': "-v",
 		'action': "store_true",
 		'help': "runs with logging_level set to debug; enables print statements"
-	},
-	'remote': {
-		'flag': "--remote",
-		'shorthand': "-r",
-		'action': "store_true",
-		'help': "diff checks also ping the server for version verification"
 	}
-	# 'redirect': {
-	# 	'flag': "--redirect",
-	# 	'shorthand': "-rd",
-	# 	'type': "str",
-	# 	'action': "store_true",
-	# 	'help': "choose a path besides the one in the config file"
-	# }
 }
 
 def main():
@@ -131,8 +104,6 @@ def main():
 
 	for arg in arguments.values():
 		prt.add_argument(arg['shorthand'], arg['flag'], action=arg['action'], help=arg['help'])
-	
-	prt.add_argument("-rd", "--redirect", type=str, help="point to a different directory than in the config")
 
 	ops = argparse.ArgumentParser()
 	sp = ops.add_subparsers(dest='rosa', required=True) 
@@ -142,9 +113,16 @@ def main():
 
 		ps = sp.add_parser(fx['name'], parents=[prt])
 		ps.set_defaults(func=fx['func']) # get, diff, etc.,
-		
+
+		if fx['name'] in("init", ".", "diff", "gen"):
+			ps.add_argument("--redirect", "-r", type=str, help="give a path instead of C.W.D.")
+
+		if fx['name'] == "diff":
+			ps.add_argument("--extra", "-x", action="store_true", help="compare local and remote versions")
+
 		if fx.get('root_cmds'):
-			sbp = ps.add_subparsers() # for all, few, etc.,
+			sbp = ps.add_subparsers() # for current, version
+
 			for sub_cmd, sb_data in fx['root_cmds'].items():
 				sub_parser = sbp.add_parser(sb_data['name'], parents=[prt])
 				sub_parser.set_defaults(func=sb_data['func'])

@@ -9,16 +9,16 @@ WHERE version <= %s;
 VD_DIRECTORIES = os.getenv("""VD_DIRECTORIES""","""
 SELECT rp 
 FROM depr_directories 
-WHERE oversion <= %(vs)s 
-AND %(vs)s < xversion;
+WHERE from_version <= %(vs)s 
+AND %(vs)s < to_version;
 """)
 
 VD_DIRECTORIES1 = os.getenv("""VD_DIRECTORIES""","""
 SELECT rp 
 FROM depr_directories 
 WHERE %s 
-BETWEEN oversion 
-AND (xversion - 1);
+BETWEEN from_version 
+AND (to_version - 1);
 """)
 
 VFILES = os.getenv("""VFILES""","""
@@ -30,8 +30,8 @@ WHERE version <= %s;
 VM_FILES = os.getenv("""VM_FILES""","""
 SELECT DISTINCT rp 
 FROM deltas 
-WHERE oversion <= %(vs)s 
-AND %(vs)s < xversion;
+WHERE from_version <= %(vs)s 
+AND %(vs)s < to_version;
 """) # get all files who need to be repatched
 
 VMC_FILES = os.getenv("""VMO_FILES""","""
@@ -55,17 +55,17 @@ VMP_FILES = os.getenv("""VMP_FILES""","""
 SELECT patch 
 FROM deltas 
 WHERE rp = %s 
-AND oversion <= %s 
-AND %s < xversion
-ORDER BY xversion DESC;
+AND from_version <= %s 
+AND %s < to_version
+ORDER BY to_version DESC;
 """) # limit 1 and write/diff each file as it is recieved in the While loop
 # but put that whole thing ina for loop
 
 VD_FILES = os.getenv("""D_FILES""","""
 SELECT content, rp 
 FROM deleted
-WHERE oversion <= %(vs)s
-AND xversion > %(vs)s;
+WHERE from_version <= %(vs)s
+AND to_version > %(vs)s;
 """) # this will end up pulling altered files' originals, which is sub-ideal
 # maybe select all from deleted in the given range, find the ones with edits,
 # deal accordingly, and then select all deleted where rp = a rp left from the

@@ -11,21 +11,21 @@ import time
 import string
 from collections import defaultdict
 
-TARGET_TOTAL_SIZE_GB = 6.0
+TARGET_TOTAL_SIZE_GB = 2.0
 BASE_DIR = "/Volumes/HomeXx/compuir/texts"
 WIKI_URL = "https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles.xml.bz2"
 
 # File size limits (in MB)
-MIN_FILE_SIZE_MB = 0.01  # 10 KB minimum
+MIN_FILE_SIZE_MB = 0.5  # 10 KB minimum
 MAX_FILE_SIZE_MB = 10.0   # 10 MB maximum
 
 # Target files per directory for even distribution
 TARGET_FILES_PER_DIR = 30  # Will distribute evenly across all directories
 
 # Directory structure parameters
-MAX_DEPTH = 5
-TOTAL_DIRECTORIES = 150  # Total number of directories to create
-DIR_CREATION_PROBABILITY = 0.85
+MAX_DEPTH = 3
+TOTAL_DIRECTORIES = 17  # Total number of directories to create
+DIR_CREATION_PROBABILITY = 0.65
 
 # File type distribution for more realistic testing
 FILE_EXTENSIONS = [
@@ -51,6 +51,7 @@ FILE_SIZE_DISTRIBUTION = [
 BYTES_PER_MB = 1024 * 1024
 TARGET_TOTAL_BYTES = int(TARGET_TOTAL_SIZE_GB * 1024 * 1024 * 1024)
 
+
 class DirectoryNode:
     """Track directory state including file count"""
     def __init__(self, path):
@@ -61,6 +62,44 @@ class DirectoryNode:
     def add_file(self, size_bytes):
         self.file_count += 1
         self.total_bytes += size_bytes
+
+
+def find_utf8_safe_boundary(data, position):
+    """
+    Adjust position to avoid cutting in the middle of a UTF-8 sequence.
+    UTF-8 continuation bytes have the pattern 0b10xxxxxx (0x80-0xBF).
+    This walks backward until we find a byte that isn't a continuation byte.
+    """
+    if position >= len(data):
+        return len(data)
+    
+    if position <= 0:
+        return 0
+    
+    # Walk backward while we're on a continuation byte
+    while position > 0 and 0x80 <= data[position] <= 0xBF:
+        position -= 1
+    
+    return position
+
+
+def find_newline_boundary(data, position, max_search=10000):
+    """
+    Find the nearest newline at or after position.
+    Falls back to UTF-8 safe boundary if no newline found.
+    """
+    if position >= len(data):
+        return len(data)
+    
+    search_end = min(position + max_search, len(data))
+    
+    for i in range(position, search_end):
+        if data[i] == ord('\n'):
+            return i + 1
+    
+    # No newline found, fall back to UTF-8 safe boundary
+    return find_utf8_safe_boundary(data, position)
+
 
 def get_random_dirname():
     """Generate semi-realistic directory names"""
@@ -74,6 +113,7 @@ def get_random_dirname():
         lambda: f"{random.choice(['alpha', 'beta', 'gamma', 'delta', 'prod', 'dev', 'test', 'staging'])}_{random.randint(1, 200)}",
     ]
     return random.choice(templates)()
+
 
 def create_balanced_directory_tree(base_path, target_dir_count):
     """Create a directory tree with a specific number of directories"""
@@ -121,6 +161,7 @@ def create_balanced_directory_tree(base_path, target_dir_count):
     
     return all_nodes
 
+
 def setup_directories():
     """Create a balanced directory tree"""
     if not os.path.exists(BASE_DIR):
@@ -136,6 +177,7 @@ def setup_directories():
     print(f"Created {len(all_nodes)} directories")
     
     return all_nodes
+
 
 def get_next_directory_for_file(all_nodes, total_bytes_written):
     """
@@ -165,6 +207,7 @@ def get_next_directory_for_file(all_nodes, total_bytes_written):
     # Return the directory that needs the most bytes
     return dirs_by_need[0][1]
 
+
 def get_random_file_size():
     """Get a file size based on distribution, clamped to min/max limits"""
     rand = random.random()
@@ -183,6 +226,7 @@ def get_random_file_size():
     size_mb = random.uniform(MIN_FILE_SIZE_MB, MAX_FILE_SIZE_MB)
     return int(size_mb * BYTES_PER_MB)
 
+
 def get_random_extension():
     """Get a random file extension based on distribution"""
     rand = random.random()
@@ -195,9 +239,11 @@ def get_random_extension():
     
     return '.txt'
 
+
 def generate_pseudo_content(size_bytes):
     """Generate pseudo-random content when we run out of Wikipedia data"""
     # Create repeating pattern with some variation
+    # Using only ASCII to avoid any encoding issues
     patterns = [
         b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ",
         b"The quick brown fox jumps over the lazy dog. ",
@@ -212,12 +258,46 @@ def generate_pseudo_content(size_bytes):
     while len(content) < size_bytes:
         # Add pattern with slight modification
         pattern = patterns[pattern_idx % len(patterns)]
-        # Add random bytes for variation
+        # Add random ASCII bytes for variation (printable range)
         variation = bytes([random.randint(32, 126) for _ in range(20)])
         content.extend(pattern + variation + b"\n")
         pattern_idx += 1
     
     return bytes(content[:size_bytes])
+
+
+def slice_buffer_safely(buffer, start_position, target_size, prefer_newline=True):
+    """
+    Slice the buffer at safe UTF-8 boundaries.
+    
+    Args:
+        buffer: The byte buffer to slice from
+        start_position: Starting position in the buffer
+        target_size: Approximate target size for the slice
+        prefer_newline: If True, try to cut at newlines for cleaner files
+    
+    Returns:
+        tuple: (content_bytes, new_position)
+    """
+    if start_position >= len(buffer):
+        return None, start_position
+    
+    # Calculate the raw end position
+    raw_end = start_position + target_size
+    
+    if raw_end >= len(buffer):
+        # We'd go past the end, so just take what's left (safely)
+        safe_end = len(buffer)
+    elif prefer_newline:
+        # Try to find a newline near the target position
+        safe_end = find_newline_boundary(buffer, raw_end)
+    else:
+        # Just find a UTF-8 safe boundary
+        safe_end = find_utf8_safe_boundary(buffer, raw_end)
+    
+    content = bytes(buffer[start_position:safe_end])
+    return content, safe_end
+
 
 def stream_and_distribute_evenly(all_nodes):
     print(f"\nStarting data generation and distribution...")
@@ -231,7 +311,6 @@ def stream_and_distribute_evenly(all_nodes):
     
     # First try to get data from Wikipedia
     wikipedia_data = bytearray()
-    wikipedia_exhausted = False
     
     try:
         print("Downloading and decompressing Wikipedia data...")
@@ -242,7 +321,6 @@ def stream_and_distribute_evenly(all_nodes):
             while downloaded_mb < 500:  # Limit initial download to 500MB compressed
                 chunk = response.read(1024 * 1024)  # Read 1MB chunks
                 if not chunk:
-                    wikipedia_exhausted = True
                     break
                 
                 downloaded_mb += 1
@@ -256,13 +334,11 @@ def stream_and_distribute_evenly(all_nodes):
                               f"decompressed to {len(wikipedia_data) / (1024**2):.1f} MB")
                     
                 except EOFError:
-                    wikipedia_exhausted = True
                     break
                     
     except Exception as e:
         print(f"Warning: Could not fetch Wikipedia data: {e}")
         print("Will use generated content instead...")
-        wikipedia_exhausted = True
     
     print(f"\nWikipedia data buffer: {len(wikipedia_data) / (1024**2):.1f} MB")
     print("Starting file distribution...\n")
@@ -275,25 +351,43 @@ def stream_and_distribute_evenly(all_nodes):
         target_size = get_random_file_size()
         
         # Get content for the file
-        if buffer_position + target_size <= len(buffer):
-            # We have enough Wikipedia data
-            file_content = bytes(buffer[buffer_position:buffer_position + target_size])
-            buffer_position += target_size
+        if buffer_position < len(buffer):
+            # We have Wikipedia data available
+            file_content, new_position = slice_buffer_safely(
+                buffer, 
+                buffer_position, 
+                target_size,
+                prefer_newline=True
+            )
             
-            # Reset buffer position if we're near the end (reuse Wikipedia data)
-            if buffer_position > len(buffer) - MAX_FILE_SIZE_MB * BYTES_PER_MB:
+            if file_content is None or len(file_content) == 0:
+                # Buffer exhausted, reset to beginning
+                buffer_position = 0
+                file_content, new_position = slice_buffer_safely(
+                    buffer,
+                    buffer_position,
+                    target_size,
+                    prefer_newline=True
+                )
+            
+            # Check if we got enough content
+            if file_content and len(file_content) < target_size * 0.5:
+                # Content too small, supplement with generated content
+                generated_part = generate_pseudo_content(target_size - len(file_content))
+                file_content = file_content + b"\n" + generated_part
+            
+            buffer_position = new_position
+            
+            # Reset buffer position if we've consumed most of it
+            if buffer_position >= len(buffer) - 1000:
                 buffer_position = 0
         else:
-            # Generate pseudo content
-            if len(buffer) > 0 and buffer_position < len(buffer):
-                # Use remaining Wikipedia data plus generated content
-                wiki_part = bytes(buffer[buffer_position:])
-                generated_part = generate_pseudo_content(target_size - len(wiki_part))
-                file_content = wiki_part + generated_part
-                buffer_position = 0  # Reset for next file
-            else:
-                # Pure generated content
-                file_content = generate_pseudo_content(target_size)
+            # No Wikipedia data, use generated content
+            file_content = generate_pseudo_content(target_size)
+        
+        # Fallback if somehow we still don't have content
+        if not file_content:
+            file_content = generate_pseudo_content(target_size)
         
         # Get the next directory in round-robin fashion
         target_node = get_next_directory_for_file(all_nodes, total_bytes_written)
@@ -313,8 +407,9 @@ def stream_and_distribute_evenly(all_nodes):
             f.write(file_content)
         
         # Update tracking
-        target_node.add_file(len(file_content))
-        total_bytes_written += len(file_content)
+        actual_size = len(file_content)
+        target_node.add_file(actual_size)
+        total_bytes_written += actual_size
         files_created += 1
         file_size_stats[extension] += 1
         distribution_stats[target_node.file_count] += 1
@@ -359,14 +454,17 @@ def stream_and_distribute_evenly(all_nodes):
         print(f"  Min files: {min(file_counts)}")
         print(f"  Max files: {max(file_counts)}")
         print(f"  Avg files: {sum(file_counts) / len(file_counts):.1f}")
-        print(f"  Std deviation: {(sum((x - (sum(file_counts) / len(file_counts)))**2 for x in file_counts) / len(file_counts))**0.5:.2f}")
+        std_dev = (sum((x - (sum(file_counts) / len(file_counts)))**2 for x in file_counts) / len(file_counts))**0.5
+        print(f"  Std deviation: {std_dev:.2f}")
     
     if size_per_dir_gb:
         print(f"\nPer-Directory Size Stats:")
         print(f"  Min size: {min(size_per_dir_gb):.3f} GB")
         print(f"  Max size: {max(size_per_dir_gb):.3f} GB")
-        print(f"  Avg size: {sum(size_per_dir_gb) / len(size_per_dir_gb):.3f} GB")
-        print(f"  Std deviation: {(sum((x - (sum(size_per_dir_gb) / len(size_per_dir_gb)))**2 for x in size_per_dir_gb) / len(size_per_dir_gb))**0.5:.3f} GB")
+        avg_size = sum(size_per_dir_gb) / len(size_per_dir_gb)
+        print(f"  Avg size: {avg_size:.3f} GB")
+        std_dev = (sum((x - avg_size)**2 for x in size_per_dir_gb) / len(size_per_dir_gb))**0.5
+        print(f"  Std deviation: {std_dev:.3f} GB")
     
     print("\nFile Type Distribution:")
     for ext, count in file_size_stats.items():
@@ -381,6 +479,16 @@ def stream_and_distribute_evenly(all_nodes):
         print(f"  {rel_path}: {node.file_count} files, {size_gb:.3f} GB")
     
     print(f"\nData location: {BASE_DIR}")
+
+
+def main():
+    try:
+        all_nodes = setup_directories()
+        stream_and_distribute_evenly(all_nodes)
+    except KeyboardInterrupt:
+        print("\nProcess stopped by user.")
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
 
 if __name__ == "__main__":
     try:

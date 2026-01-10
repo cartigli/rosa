@@ -5,6 +5,21 @@ import os
 
 # MySQL tables
 
+# files
+# original_version = Version of initial upload
+# version = Version of last edit (default/initial value is original_version)
+
+# deltas 
+# original_version = Version of initial upload
+# from_version = Previous version at edit (from files table)
+# to_version = Version at time of edit
+
+# deleted 
+# original_version = Version of initial upload
+# from_version = Previous version at deletion (from files table)
+# to_version = Version at time of edit
+
+
 INIT2 = os.getenv("""INIT2""","""
 CREATE TABLE IF NOT EXISTS interior (
      _id INT AUTO_INCREMENT NOT NULL,
@@ -19,7 +34,9 @@ CREATE TABLE IF NOT EXISTS files (
      rp VARCHAR(512) NOT NULL UNIQUE,
      content LONGBLOB NOT NULL,
      hash BINARY(8) NOT NULL,
-     version INTEGER NOT NULL,
+     original_version INTEGER NOT NULL,
+     from_version INTEGER NOT NULL,
+     track ENUM ('T', 'F') NOT NULL,
 PRIMARY KEY (id),
 INDEX rps (rp)
 );
@@ -35,9 +52,10 @@ INDEX dps (rp)
 CREATE TABLE IF NOT EXISTS deltas (
      d_id INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL,
-     patch MEDIUMTEXT NOT NULL,
-     oversion INTEGER NOT NULL,
-     xversion INTEGER NOT NULL,
+     patch LONGBLOB NOT NULL,
+     original_version INTEGER NOT NULL,
+     from_version INTEGER NOT NULL,
+     to_version INTEGER NOT NULL,
 PRIMARY KEY (d_id),
 INDEX mrps (rp)
 );
@@ -46,8 +64,10 @@ CREATE TABLE IF NOT EXISTS deleted (
      idd INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(512) NOT NULL,
      content LONGBLOB NOT NULL,
-     oversion INTEGER NOT NULL,
-     xversion INTEGER NOT NULL,
+     original_version INTEGER NOT NULL,
+     from_version INTEGER NOT NULL,
+     to_version INTEGER NOT NULL,
+     track ENUM ('T', 'F') NOT NULL,
 PRIMARY KEY (idd),
 INDEX drps (rp)
 );
@@ -55,8 +75,8 @@ INDEX drps (rp)
 CREATE TABLE IF NOT EXISTS depr_directories (
      ddid INT AUTO_INCREMENT NOT NULL,
      rp VARCHAR(256) NOT NULL,
-     oversion INT NOT NULL,
-     xversion INT NOT NULL,
+     from_version INT NOT NULL,
+     to_version INT NOT NULL,
 PRIMARY KEY (ddid),
 INDEX ddps (rp)
 );
@@ -75,9 +95,11 @@ SINIT = os.getenv("""SINIT""","""
 CREATE TABLE IF NOT EXISTS records (
      id INTEGER PRIMARY KEY,
      rp TEXT NOT NULL,
-     version INTEGER NOT NULL,
+     original_version INTEGER NOT NULL,
+     from_version INTEGER NOT NULL,
      ctime INTEGER NOT NULL,
-     bytes INTEGER NOT NULL
+     bytes INTEGER NOT NULL,
+     track CHAR NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS interior (

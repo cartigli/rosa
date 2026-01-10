@@ -50,7 +50,7 @@ def main(args=None):
 						if force is True:
 							message = f"upload v{version}"
 						else:
-							message = input("attach a message to this version (or enter for None): ") or None
+							message = input("attach a message to this version [Return for None]: ") or None
 
 						logger.info('updating records...')
 						remote_records(conn, cv, message)
@@ -62,27 +62,26 @@ def main(args=None):
 
 						if diffs:
 							logger.debug('getting altered files\' previous versions...')
-							sovquery = "SELECT version FROM files WHERE rp = ?;"
-							oversions = {}
+							sovquery = "SELECT original_version, from_version, track FROM records WHERE rp = ?;"
+							details = {}
 
 							with conn.cursor() as cursor:
 								for diff in diffs:
-									oversion = sconn.execute(sovquery, (diff,)).fetchone()
-
-									oversions[diff] = oversion[0]
+									data = sconn.execute(sovquery, (diff,)).fetchall()[0]
+									details[diff] = (data[0], data[1], data[2])
 
 							logger.info('uploading altered files...')
 							collector(conn, diffs, local.target, cv, key="altered_files") # updates altered
 
-							logger.info('generating altered files\'s patches...')
-							patches = diff_gen(diffs, local.originals, local.target) # computes & returns patches
+							logger.info('generating altered files\' patches...')
+							patches = diff_gen(diffs, details, local.originals, local.target) # computes & returns patches
 
 							logger.info('uploading altered files\' patches...')
-							upload_patches(conn, patches, cv, oversions) # uploads the patches to deltas
+							upload_patches(conn, patches, cv, details) # uploads the patches to deltas
 
 						if deleted:
 							logger.info('removing deleted files...')
-							doversions = rm_remfile(conn, sconn, deleted)
+							dodata = rm_remfile(conn, sconn, deleted)
 
 						if deletedd or newd:
 							logger.info('updating remote directories...')
@@ -96,7 +95,7 @@ def main(args=None):
 
 							if deleted:
 								logger.info('backing up deleted files...')
-								xxdeleted(conn, sconn, deleted, cv, doversions, secure)
+								xxdeleted(conn, sconn, deleted, cv, secure, dodata)
 
 					else:
 						logger.critical(f"{RED}versions did not align; pull most recent upload from server before committing{RESET}")
@@ -105,7 +104,7 @@ def main(args=None):
 			updates = list(remaining) + list(new)
 
 			with landline(local.index) as sconn:
-				refresh_index(sconn, local.target, updates) # should be (sconn, updates)
+				refresh_index(sconn, local.target, updates)
 
 		except KeyboardInterrupt:
 			logger.warning(f'\nboss killed the process; index could be corrupted; refreshing before exit...')

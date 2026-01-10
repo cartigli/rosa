@@ -133,41 +133,44 @@ def main(args=None):
 
 				if dec in('d', 'delete', 'd ', ' d'):
 					shutil_fx(os.path.dirname(local.index))
-
 		else:
-			dec = input("Initiate [i]? [Return to quit] ").lower()
+			start = time.perf_counter()
 
-			if dec in('i', 'init', 'initiate'):
-				start = time.perf_counter()
+			with phones() as conn:
+				try:
+					logger.info('scraping source directory...')
+					drps, frps = scraper(local.target)
 
-				with phones() as conn:
-					try:
-						logger.info('scraping source directory...')
-						drps, frps = scraper(local.target)
+					logger.info('initiating the index...')
+					index = _config() # don't use the class's attributes bc they don't exist
 
-						logger.info('initiating the index...')
-						index = _config() # don't use the class's attributes bc they don't exist
+					with landline(index) as sconn: # *they are None, but you get it
+						construct(sconn)
 
-						with landline(index) as sconn: # *they are None, but you get it
-							construct(sconn)
+						init_dindex(drps, sconn)
+						init_index(sconn, local.target, os.path.dirname(index))
 
-							init_dindex(drps, sconn)
-							init_index(sconn, local.target, os.path.dirname(index))
+					logger.info(f'initiating remote database...')
+					init_remote(conn, local.target, drps, frps)
 
-						logger.info(f'initiating remote database...')
-						init_remote(conn, local.target, drps, frps)
-
-					except KeyboardInterrupt as ki:
-						logger.info(f"\ninitiation process killed")
-						if index:
-							shutil_fx(os.path.dirname(index))
-
-						with conn.cursor() as cursor:
-							cursor.execute(_DROP)
-
-							while cursor.nextset():
-								pass
-						sys.exit(1)
+				except KeyboardInterrupt as ki:
+					logger.info(f"\ninitiation process killed")
+					if index:
+						shutil_fx(os.path.dirname(index))
+					with conn.cursor() as cursor:
+						cursor.execute(_DROP)
+						while cursor.nextset():
+							pass
+					sys.exit(1)
+				except Exception as e:
+					logger.error(f"\ninitiation process failed: {e}")
+					if index:
+						shutil_fx(os.path.dirname(index))
+					with conn.cursor() as cursor:
+						cursor.execute(_DROP)
+						while cursor.nextset():
+							pass
+					sys.exit(7)
 
 	except KeyboardInterrupt:
 		logger.warning(f'\nboss killed the process; abandoning...')

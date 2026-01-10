@@ -64,6 +64,7 @@ def finals(tmpd, backup):
 def main(args=None):
 	"""Reverts the local state to the most recent commitment."""
 	xdiff = False
+
 	logger, force, prints, start = mini_ps(args, NOMIC)
 
 	local = Heart()

@@ -14,6 +14,7 @@ rosa/confs/config_example.py
 rosa/confs/sql_queries.py
 rosa/confs/vqueries.py
 rosa/fxs/diff.py
+rosa/fxs/gen.py
 rosa/fxs/get.py
 rosa/fxs/get_curr.py
 rosa/fxs/get_vers.py
@@ -25,17 +26,7 @@ rosa/lib/dispatch.py
 rosa/lib/index.py
 rosa/lib/opps.py
 rosa/lib/technician.py
+rosa/xtra/__init__.py
+rosa/xtra/enc.py
 rosa/xtra/file_diff.py
-rosa/xtra/recursive.py
-rosa/xtra/rm3.py
-rosa/xtra/rp_len.py
-rosa/xtra/sqlite.py
 rosa/xtra/txt2.py
-rosa/xtra/dead/analyst.py
-rosa/xtra/dead/contrast2.py
-rosa/xtra/dead/give.py
-rosa/xtra/dead/give_all.py
-rosa/xtra/dead/index.py
-rosa/xtra/dead/queries.py
-rosa/xtra/dead/rosa_get_moment.py
-rosa/xtra/dead/xlib.py

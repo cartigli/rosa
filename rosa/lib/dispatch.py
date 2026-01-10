@@ -49,18 +49,21 @@ def phones():
 	except mysql.connector.Error as mse:
 		if mse.errno == errorcode.ER_ACCESS_DENIED_ERROR:
 			logger.error('connection failed: invalid username/password')
-			raise
+			# raise
+			sys.exit(1)
 		elif mse.errno == errorcode.ER_BAD_DB_ERROR:
 			logger.error('database does not exist; run [init] or repair the config')
-			raise
+			# raise
+			sys.exit(1)
 		elif mse.errno == errorcode.CR_CONN_HOST_ERROR:
 			logger.error('connection failed; is the server running?')
-			raise
+			# raise
+			sys.exit(1)
 		else:
 			logger.error(f"unknown error caught by mysql: {mse}")
 			raise
 
-	except (ConnectionRefusedError, TimeoutError, Exception) as e:
+	except (ConnectionRefusedError, TimeoutError) as e:
 		logger.error(f"error encountered while connecting to the server:{RESET} {e}.", exc_info=True)
 		_safety(conn)
 	else:
@@ -69,7 +72,7 @@ def phones():
 			if conn.is_connected():
 				conn.commit()
 			else:
-				logger.error('connection object is not conncted; cannot commit')
+				logger.error('connection object is not connected; cannot commit')
 		else:
 			logger.error('connection object lost; cannot commit')
 	finally:
