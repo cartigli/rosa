@@ -2,14 +2,10 @@
 """Rolls local directory back to state of latest commitment.
 
 Does not query or connect to the server EXCEPT to verify the hashes.
-**^ I am lying; it gets the versions of altered/deleted files from the server.**
-Hashes are only verified if the file's timestamp shows a discrepancy.
-
-Name should be changed. get_curr should be get & this should be get_last or similar.
 """
 
-
 import os
+import sys
 import shutil
 import subprocess
 
@@ -22,9 +18,9 @@ from rosa.lib import (
 	scrape_dindex, landline, Heart
 )
 
-NOMIC = "[get]"
+NOMIC: str = "[get]"
 
-def originals(replace, tmpd, backup):
+def originals(replace: list = [], tmpd: str = "", backup: str = ""):
 	"""Copies the originals of deleted or altered files to replace edits.
 
 	Args:
@@ -35,18 +31,18 @@ def originals(replace, tmpd, backup):
 	Returns:
 		None
 	"""
-	originals = os.path.join(backup, ".index", "originals")
+	originals: str = os.path.join(backup, ".index", "originals")
 
 	for rp in replace:
-		fp = os.path.join(originals, rp)
-		bp = os.path.join(tmpd, rp)
+		fp: str = os.path.join(originals, rp)
+		bp: str = os.path.join(tmpd, rp)
 
 		os.makedirs(os.path.dirname(bp), exist_ok=True)
 
 		# shutil.copy2(fp, bp)
 		shutil.copyfile(fp, bp)
 
-def finals(tmpd, backup):
+def finals(tmpd: str = "", backup: str = ""):
 	"""Copies the index from the backup to the temporary directory.
 
 	Args:
@@ -56,23 +52,23 @@ def finals(tmpd, backup):
 	Returns:
 		None
 	"""
-	origin = os.path.join(backup, ".index")
-	destin = os.path.join(tmpd, ".index")
+	origin: str = os.path.join(backup, ".index")
+	destin: str = os.path.join(tmpd, ".index")
 
 	os.rename(origin, destin)
 
-def main(args=None):
+def main(args: argparse = None):
 	"""Reverts the local state to the most recent commitment."""
-	xdiff = False
+	xdiff: bool = False
 
-	logger, force, prints, start = mini_ps(args, NOMIC)
+	logger, force: bool, prints: bool, start: bool = mini_ps(args, NOMIC)
 
 	local = Heart()
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
-			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
-			indexed_dirs = scrape_dindex(sconn)
+			new: list, deleted: list, diffs: list, remaining: list, xdiff: bool = query_index(conn, sconn, local.target)
+			newd: list, deletedd: list, ledeux: list = query_dindex(sconn, local.target)
 
 	if xdiff is True:
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
@@ -88,13 +84,13 @@ def main(args=None):
 
 				# ignore new files
 
-				diffs += list(deleted)
+				diffs: list += deleted
 
 				if diffs:
 					logger.info('replacing files with deltas')
 					originals(diffs, tmp_, backup) # (bad commenting)
 
-				diffs += remaining
+				diffs: list += remaining
 
 				logger.info('replacing index & originals')
 				finals(tmp_, backup) # (more bad commenting)
@@ -105,8 +101,6 @@ def main(args=None):
 
 		except KeyboardInterrupt:
 			logger.warning(f'\nboss killed the process; index could be corrupted; refreshing before exit...')
-			with landline(local.index) as sconn:
-				refresh_index(sconn, local.target, diffs)
 			sys.exit(1)
 
 	else:

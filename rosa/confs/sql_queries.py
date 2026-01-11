@@ -1,24 +1,8 @@
-"""Holds queries for interacting with the MySQL database.
-"""
+"""SQL queries for interacting with the databases."""
 
 import os
 
 # MySQL tables
-
-# files
-# original_version = Version of initial upload
-# version = Version of last edit (default/initial value is original_version)
-
-# deltas 
-# original_version = Version of initial upload
-# from_version = Previous version at edit (from files table)
-# to_version = Version at time of edit
-
-# deleted 
-# original_version = Version of initial upload
-# from_version = Previous version at deletion (from files table)
-# to_version = Version at time of edit
-
 
 INIT2 = os.getenv("""INIT2""","""
 CREATE TABLE IF NOT EXISTS interior (
@@ -140,7 +124,7 @@ WHERE table_schema = 'notation'
 AND table_name = 'files';
 """)
 
-CVERSION = os.getenv("""VERSION""","""
+CVERSION = os.getenv("""CVERSION""","""
      SELECT version, moment FROM interior
      ORDER BY moment DESC
      LIMIT 1;

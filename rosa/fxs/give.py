@@ -6,7 +6,6 @@ and updates altered files.
 Updates the local index.
 """
 
-
 import os
 import sys
 
@@ -21,20 +20,20 @@ from rosa.lib import (
 	query_dindex, landline, Heart
 )
 
-NOMIC = "[give]"
+NOMIC: str = "[give]"
 
-def main(args=None):
+def main(args: argparse = None):
 	"""Uploads the local state to the server."""
-	xdiff = False
+	xdiff: bool = False
 
-	logger, force, prints, start = mini_ps(args, NOMIC)
+	logger, force: bool, prints: bool, start: float = mini_ps(args, NOMIC)
 
 	local = Heart()
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
-			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
-			newd, deletedd, ledeux = query_dindex(sconn, local.target)
+			new: list, deleted: list, diffs: list, remaining: list, xdiff: bool = query_index(conn, sconn, local.target)
+			newd: list, deletedd: list, ledeux: list = query_dindex(sconn, local.target)
 
 	if xdiff is True:
 		logger.info(f"found {len(new)} new files, {len(deleted)} deleted files, and {len(diffs)} altered files.")
@@ -42,15 +41,15 @@ def main(args=None):
 		try:
 			with phones() as conn:
 				with landline(local.index) as sconn:
-					vok, version = version_check(conn, sconn)
+					vok: bool, version: int = version_check(conn, sconn)
 
 					if vok is True:
-						cv = version + 1
+						cv: int = version + 1
 
 						if force is True:
-							message = f"upload v{version}"
+							message: str = f"upload v{version}"
 						else:
-							message = input("attach a message to this version [Return for None]: ") or None
+							message: str = input("attach a message to this version [Return for None]: ") or None
 
 						logger.info('updating records...')
 						remote_records(conn, cv, message)
@@ -62,26 +61,26 @@ def main(args=None):
 
 						if diffs:
 							logger.debug('getting altered files\' previous versions...')
-							sovquery = "SELECT original_version, from_version, track FROM records WHERE rp = ?;"
-							details = {}
+							sovquery: str = "SELECT original_version, from_version, track FROM records WHERE rp = ?;"
+							details: dict = {}
 
 							with conn.cursor() as cursor:
 								for diff in diffs:
-									data = sconn.execute(sovquery, (diff,)).fetchall()[0]
+									data: int = sconn.execute(sovquery, (diff,)).fetchall()[0]
 									details[diff] = (data[0], data[1], data[2])
 
 							logger.info('uploading altered files...')
 							collector(conn, diffs, local.target, cv, key="altered_files") # updates altered
 
 							logger.info('generating altered files\' patches...')
-							patches = diff_gen(diffs, details, local.originals, local.target) # computes & returns patches
+							patches: list = diff_gen(diffs, details, local.originals, local.target) # computes & returns patches
 
 							logger.info('uploading altered files\' patches...')
 							upload_patches(conn, patches, cv, details) # uploads the patches to deltas
 
 						if deleted:
 							logger.info('removing deleted files...')
-							dodata = rm_remfile(conn, sconn, deleted)
+							dodata: tuple = rm_remfile(conn, sconn, deleted)
 
 						if deletedd or newd:
 							logger.info('updating remote directories...')
@@ -101,15 +100,13 @@ def main(args=None):
 						logger.critical(f"{RED}versions did not align; pull most recent upload from server before committing{RESET}")
 						return
 
-			updates = list(remaining) + list(new)
+			updates = remaining + new
 
 			with landline(local.index) as sconn:
 				refresh_index(sconn, local.target, updates)
 
 		except KeyboardInterrupt:
 			logger.warning(f'\nboss killed the process; index could be corrupted; refreshing before exit...')
-			with landline(local.index) as sconn:
-				refresh_index(sconn, local.target, updates)
 			sys.exit(1)
 
 	else:

@@ -3,7 +3,6 @@
 Uploads to, updates in, and deletes data from the server.
 """
 
-
 import os
 import logging
 from itertools import batched
@@ -12,13 +11,14 @@ from datetime import datetime, UTC
 import mysql.connector
 import xxhash
 
-from rosa.confs import MAX_ALLOWED_PACKET, RED, RESET, INIT2
+from rosa.confs import MAX_ALLOWED_PACKET, INIT2
+from rosa.lib import encoding
 
 logger = logging.getLogger('rosa.log')
 
 # INITIATE SERVER
 
-def init_remote(conn, core, drps, frps):
+def init_remote(conn: MySQL | None = None, core: str = None, drps: list = [], frps: list = []):
 	"""Initiates the first upload to and creation of the database.
 
 	Args:
@@ -30,8 +30,8 @@ def init_remote(conn, core, drps, frps):
 	Returns:
 		None
 	"""
-	message = "INITIAL"
-	version = 0
+	message: str = "INITIAL"
+	version: int = 0
 
 	with conn.cursor() as cursor:
 		# make all the tables first
@@ -49,23 +49,23 @@ def init_remote(conn, core, drps, frps):
 		# upload the new version no & message last (lightest & least data rich)
 		remote_records(conn, version, message)
 
-def remote_records(conn, version, message):
+def remote_records(conn: MySQL | None = None, version: int = None, message: str = ""):
 	"""Uploads the messave and new version.
 
 	Args:
 		conn (mysql): Connection obj.
 		version (int): Current version.
-		message (str): If any, it is the given message for the version.
-	
+		message (str): Message for the version.
+
 	Returns:
 		None
 	"""
-	moment = datetime.now(UTC).timestamp()
+	moment: float = datetime.now(UTC).timestamp()
 
 	with conn.cursor() as cursor:
 		cursor.execute("INSERT INTO interior (moment, message, version) VALUES (%s, %s, %s);", (moment, message, version))
 
-def upload_patches(conn, patches, to_version, details):
+def upload_patches(conn: MySQL | None = None, patches: list = [], to_version: int = None, details: dict = None):
 	"""Uploads the reverse patches generated for altered files.
 
 	Args:
@@ -77,11 +77,11 @@ def upload_patches(conn, patches, to_version, details):
 	Returns:
 		None
 	"""
-	query = "INSERT INTO deltas (rp, patch, original_version, to_version, from_version) VALUES (%s, %s, %s, %s, %s);"
-	values = []
+	query: str = "INSERT INTO deltas (rp, patch, original_version, to_version, from_version) VALUES (%s, %s, %s, %s, %s);"
+	values: list = []
 	for rp, patch in patches:
-		original_version = details[rp][0]
-		from_version = details[rp][1]
+		original_version: int = details[rp][0]
+		from_version: int = details[rp][1]
 		values.append((rp, patch, original_version, to_version, from_version))
 
 	with conn.cursor(prepared=True) as cursor:
@@ -90,30 +90,30 @@ def upload_patches(conn, patches, to_version, details):
 
 # EDIT SERVER
 
-def avg(files, abs_path):
+def avg(files: list = [], dirx: str = ""):
 	"""Finds abatch size for the files passed.
 
 	Args:
 		files (list): Relative paths of files.
-		abs_path (str): Source directory.
-	
+		dirx (str): Source directory.
+
 	Returns:
 		batch_count (int): Packet size divided by average file size.
 	"""
-	tsz = 0
+	tsz: int = 0
 
 	for path in files:
-		fp = os.path.join(abs_path, path)
+		fp: str = os.path.join(dirx, path)
 
-		tsz += os.stat(fp).st_size
-	
-	avg = tsz / len(files)
-	
-	batch_count = int(MAX_ALLOWED_PACKET / avg)
+		tsz: int += os.stat(fp).st_size
+
+	avg: int = tsz / len(files)
+
+	batch_count: int = int(MAX_ALLOWED_PACKET / avg)
 
 	return batch_count
 
-def collector(conn, files, abs_path, version, key=None):
+def collector(conn: MySQL | None = None, files: list = [], abs_path: str = "", version: int = None, key: bool = None):
 	"""Manages the batched uploading to the server.
 
 	Args:
@@ -122,57 +122,59 @@ def collector(conn, files, abs_path, version, key=None):
 		abs_path (str): Path to the given directory.
 		version (int): Current version.
 		key (var): Specifies files as new or altered.
-	
+
 	Returns:
 		None
 	"""
-	batch_count = avg(files[:50], abs_path)
-	batches = list(batched(files, batch_count))
+	batch_count: int = avg(files[:50], abs_path)
+	batches: list = list(batched(files, batch_count))
 
-	total = len(batches)
-	length = 100
-	fin = 0
+	total: int = len(batches)
+	length: int = 100
+	fin: int = 0
 
-	fill = '%'
-	none = '-'
+	fill: str = '%'
+	none: str = '-'
 
-	# try:
 	for _batch in batches:
 		collect_data(conn, _batch, abs_path, version, key)
 
-		fin += 1
-		i = int((fin / total )*length)
+		fin: int += 1
+		i: int = int((fin/total)*length)
 
-		base = f"[{fill*i}{none*(length - i)}] uploading batch {fin}/{total}"
+		base: str = f"[{fill*i}{none*(length - i)}] uploading batch {fin}/{total}"
 		print(base, end='\r', flush=True)
 
 	print("\x1b[2K\r", end="", flush=True)
 
 
-def collect_data(conn, dicts_, abs_path, version, key=None):
+def collect_data(conn: MySQL | None = None, dicts_: list = [], abs_path: str = "", version: int = None, key: bool = None):
 	"""Collects details about the batch passed to it.
 
 	Args:
+		conn (mysql): Connection object.
 		dicts_ (list): Batch's relative paths.
 		abs_path (str): Path to the given directory.
+		version (int): Current version.
+		key (var): Specifies files as new or altered.
 
 	Returns:
 		item_data (list): Tuples containing each files' content, hash, and relative path from the files in the given list.
 	"""
-	item_data = []
+	item_data: list = []
 
 	hasher = xxhash.xxh64()
 
 	if key == "altered_files":
 		for path in dicts_:
-			item = os.path.join(abs_path, path)
+			item: str = os.path.join(abs_path, path)
 
 			with open(item, 'rb') as f:
-				content = f.read()
+				content: bytes = f.read()
 
 			hasher.reset()
 			hasher.update(content)
-			hash_id = hasher.digest()
+			hash_id: bytes = hasher.digest()
 
 			item_data.append((content, hash_id, version, path))
 
@@ -180,39 +182,24 @@ def collect_data(conn, dicts_, abs_path, version, key=None):
 
 	if key == "new_files":
 		for path in dicts_:
-			item = os.path.join(abs_path, path)
+			item: str = os.path.join(abs_path, path)
 
 			with open(item, 'rb') as f:
-				content = f.read()
+				content: bytes = f.read()
 
 			hasher.reset()
 			hasher.update(content)
-			hash_id = hasher.digest()
+			hash_id: bytes = hasher.digest()
 
-			track = encoding(item)
+			track: str = encoding(item)
 
 			item_data.append((content, hash_id, version, version, path, track))
 
 		upload_created(conn, item_data)
 
-def encoding(obj):
-     utf = False
-
-     with open(obj, 'rb') as f:
-          raw = f.read(1024*1024)
-     
-     try:
-          raw.decode('utf-8')
-     except UnicodeDecodeError:
-          utf = "F"
-     else:
-          utf = "T"
-     
-     return utf
-
 # UPLOAD THE COLLECTED
 
-def rm_remdir(conn, sconn, gates, to_version):
+def rm_remdir(conn: MySQL | None = None, sconn: SQLite3 | None = None, gates: list = [], to_version: int = None):
 	"""Removes directories from the server via DELETE.
 
 	DML, so executemany().
@@ -220,7 +207,7 @@ def rm_remdir(conn, sconn, gates, to_version):
 	Args: 
 		conn (mysql): Connection object.
 		sconn (sqlite3): Index's connection object.
-		gates (list): Single-element tuples of remote-only directories' relative paths.
+		gates (list): Remote-only directories' relative paths.
 		to_version (int): Version of deletion for the files (Current version).
 
 	Returns:
@@ -228,61 +215,62 @@ def rm_remdir(conn, sconn, gates, to_version):
 	"""
 	logger.debug('...deleting remote-only drectory[s] from server...')
 
-	query = "INSERT INTO depr_directories (rp, to_version, from_version) VALUES (%s, %s, %s);"
-	oquery = "SELECT version FROM directories WHERE rp = %s;"
-	soquery = "SELECT version FROM directories WHERE rp = ?;"
+	query: str = "INSERT INTO depr_directories (rp, to_version, from_version) VALUES (%s, %s, %s);"
+	oquery: str = "SELECT version FROM directories WHERE rp = %s;"
+	soquery: str = "SELECT version FROM directories WHERE rp = ?;"
 
-	xquery = "DELETE FROM directories WHERE rp = %s;"
-	xvals = [(gate[0],) for gate in gates]
+	xquery: str = "DELETE FROM directories WHERE rp = %s;"
+	xvals: list = [(gate[0],) for gate in gates]
 
 	with conn.cursor() as cursor:
 		try:
 			for gate in gates:
-				from_version = sconn.execute(soquery, (gate,)).fetchone()
+				from_version: int = sconn.execute(soquery, (gate,)).fetchone()[0]
 
-				values = (gate[0], to_version, from_version[0])
+				values:tuple = (gate[0], to_version, from_version)
 				cursor.execute(query, values)
 
 			cursor.executemany(xquery, xvals)
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}error encountered when trying to delete directory[s] from server:{RESET} {c}.", exc_info=True)
+			logger.error(f"error encountered when trying to delete directory[s] from server: {c}.", exc_info=True)
 			raise
 		else:
 			logger.debug('removed remote-only directory[s] from server w.o exception')
 
-def rm_remfile(conn, sconn, cherubs):
+def rm_remfile(conn: MySQL | None = None, sconn: SQLite3 | None = None, cherubs: list = []):
 	"""Removes files from the server via DELETE.
 
 	DML so executemany().
 
 	Args:
-		conn (mysql): Connection object to query the server.
-		sconn (sqlite3): Index's connection object.
-		cherubs (list): Single-element tuple of the remote-only files' relative paths.
+		conn (mysql): Connection object to the server.
+		sconn (sqlite3): Connection object to the index.
+		cherubs (list): Remote-only files' relative paths.
 	
 	Returns:
-		doversions (dict): Previous versions.
-		dogversions (dict): Original versions.
-		dotrack (dict): Tracking values.
+		Three-element tuple containing:
+			doversions (dict): Previous versions.
+			dogversions (dict): Original versions.
+			dotrack (dict): Tracking values.
 	"""
 	logger.debug('...deleting remote-only file[s] from server...')
-	ovquery = "SELECT original_version FROM files WHERE rp = %s;"
-	sovquery = "SELECT from_version, track FROM records WHERE rp = ?;"
-	query = "DELETE FROM files WHERE rp = %s;"
-	doversions = {}
-	dogversions = {}
-	dotrack = {}
+	ovquery: str = "SELECT original_version FROM files WHERE rp = %s;"
+	sovquery: str = "SELECT from_version, track FROM records WHERE rp = ?;"
+	query: str = "DELETE FROM files WHERE rp = %s;"
+	doversions: dict = {}
+	dogversions: dict = {}
+	dotrack: dict = {}
 
 	with conn.cursor(prepared=True) as cursor:
 		try:
 			for cherub in cherubs:
 				cursor.execute(ovquery, (cherub,)) # this is the sqlite index as well, no?
-				original_version = cursor.fetchone()
+				original_version: int = cursor.fetchone()[0]
 
-				dogversions[cherub] = original_version[0]
+				dogversions[cherub] = original_version
 
-				index_data = sconn.execute(sovquery, (cherub,)).fetchone()
+				index_data: tuple = sconn.execute(sovquery, (cherub,)).fetchone()
 
 				doversions[cherub] = index_data[0]
 
@@ -291,26 +279,27 @@ def rm_remfile(conn, sconn, cherubs):
 				cursor.execute(query, (cherub,))
 
 		except (mysql.connector.Error, ConnectionError, Exception) as c:
-			logger.error(f"{RED}err encountered when trying to delete file[s] from server:{RESET} {c}", exc_info=True)
+			logger.error(f"error encountered when trying to delete file[s] from server: {c}", exc_info=True)
 			raise
 		else:
 			logger.debug('removed remote-only file[s] from server w.o exception')
 			return doversions, dogversions, dotrack
 
-def upload_dirs(conn, drps, version):
+def upload_dirs(conn: MySQL | None = None, drps: list = [], version: int = None):
 	"""Uploads directories to the server via INSERT.
 
 	DML so executemany().
 
 	Args:
 		conn (mysql): Connection object to query the server.
-		drps (list): Lists of remote-only directories' relative paths.
+		drps (list): Remote-only directories' relative paths.
+		version (int): Current version.
 
 	Returns:
 		None
 	"""
-	query = "INSERT INTO directories (rp, version) VALUES (%s, %s);"
-	values = [(rp, version) for rp in drps]
+	query: str = "INSERT INTO directories (rp, version) VALUES (%s, %s);"
+	values: list = [(rp, version) for rp in drps]
 
 	with conn.cursor(prepared=True) as cursor:
 		try:
@@ -320,47 +309,47 @@ def upload_dirs(conn, drps, version):
 			logger.error(f"err encountered while attempting to upload [new] directory[s] to server: {c}", exc_info=True)
 			raise
 
-def upload_created(conn, serpent_data):
+def upload_created(conn: MySQL | None = None, serpent_data: list = []):
 	"""Uploads new files into the database via INSERT.
 
 	DML so executemany().
 
 	Args:
 		conn (mysql): Connection object to query the server.
-		serpent_data (list): 3-element tuples containing each new files' new content, new hash, and new relative path for every file in the batch.
+		serpent_data (list): 3-element tuples containing each new files' new content, new hash, and relative path.
 
 	Returns:
 		None
 	"""
-	query = "INSERT INTO files (content, hash, original_version, from_version, rp, track) VALUES (%s, %s, %s, %s, %s, %s);"
+	query: str = "INSERT INTO files (content, hash, original_version, from_version, rp, track) VALUES (%s, %s, %s, %s, %s, %s);"
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
 			cursor.executemany(query, serpent_data)
 
 	except (mysql.connector.Error, ConnectionError, Exception) as c:
-		logger.error(f"{RED}err encountered while attempting to upload [new] file[s] to server:{RESET} {c}", exc_info=True)
+		logger.error(f"error encountered while attempting to upload [new] file[s] to server: {c}", exc_info=True)
 		raise
 
 
-def upload_edited(conn, soul_data):
+def upload_edited(conn: MySQL | None = None, soul_data: list = []):
 	"""Uploads altered files into the database via UPDATE.
 
 	DML so executemany().
 
 	Args:
 		conn (mysql): Connection object to query the server.
-		soul_data (list): 3-element tuples containing each altered files' new content, new hash, and relative path for every file in the batch.
+		soul_data (list): 3-element tuples containing each altered files' new content, new hash, and relative path.
 	
 	Returns:
 		None
 	"""
-	j = "UPDATE files SET content = %s, hash = %s, from_version = %s WHERE rp = %s;"
+	j: str = "UPDATE files SET content = %s, hash = %s, from_version = %s WHERE rp = %s;"
 
 	try:
 		with conn.cursor(prepared=True, buffered=False) as cursor:
 			cursor.executemany(j, soul_data)
 
 	except (mysql.connector.Error, ConnectionError, Exception) as c:
-		logger.error(f"err encountered while attempting to upload altered file to server:{RESET} {c}", exc_info=True)
+		logger.error(f"err encountered while attempting to upload altered file to server: {c}", exc_info=True)
 		raise

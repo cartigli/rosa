@@ -2,19 +2,16 @@
 
 import os
 
-XCONFIG = os.getenv('XCONFIG',
-            {
-    'user': 'root',
-    'pswd': 'password',
-    'name': 'database_name',
-    'addr': 'local_host' # config ex for host machine
-    }
-)
+XCONFIG = {
+    'user': os.getenv('DB_USER', 'root'),
+    'pswd': os.getenv('DB_PASS', 'password'),
+    'name': os.getenv('DB_NAME', 'database_name'),
+    'addr': os.getenv('DB_ADDR', 'local_host')
+} # EX for host machine
 
-BLACKLIST = os.getenv('BLACKLIST', ['.index', '.git', '.obsidian', '.vscode', '.DS_Store'])
+BLACKLIST = os.getenv('BLACKLIST', '.index,.git,.obsidian,.vscode,.DS_Store,.pyc,.db').split(',')
 
-# MAX_ALLOWED_PACKET = os.getenv('MAX_ALLOWED_PACKET', 100000000) # genuine server max
-MAX_ALLOWED_PACKET = os.getenv('MAX_ALLOWED_PACKET', 16_000_000) # 16 mb
+MAX_ALLOWED_PACKET = int(os.getenv('MAX_ALLOWED_PACKET', 16_000_000)) # 16 mb
 
 LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'info')
 

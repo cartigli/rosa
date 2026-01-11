@@ -6,7 +6,6 @@ Majority of the logic is for handling errors, and ensuring
 the original source directory is not altered on failure.
 """
 
-
 import os
 import sys
 import time
@@ -25,7 +24,7 @@ logger = logging.getLogger('rosa.log')
 # SETUP EDITOR FOR LOCAL DISK
 
 @contextlib.contextmanager
-def fat_boy(dir_):
+def fat_boy(dir_: str = ""):
 	"""Context manager for the temporary directory and backup of original. 
 	
 	Moves contents instead of renaming directory for C.W.D. preservation.
@@ -34,11 +33,11 @@ def fat_boy(dir_):
 		dir_ (str): Path of the source directory.
 
 	Yields: 
-		tmpd (str): The temporary directory.
-		backup (str): The original source directory as a backup.
+		tmpd (str): Temporary directory.
+		backup (str): Original directory as a backup.
 	"""
-	tmpd = None
-	backup = None
+	tmpd: str = None
+	backup: str = None
 
 	try:
 		tmpd, backup = configure(dir_)
@@ -58,7 +57,7 @@ def fat_boy(dir_):
 		sys.exit(1)
 	else:
 		try:
-			apply_atomicy(tmpd, backup, dir_)
+			apply_atomicy(dir_, tmpd, backup)
 
 		except KeyboardInterrupt as c:
 			logger.warning('boss killed it; wrap it up')
@@ -70,13 +69,13 @@ def fat_boy(dir_):
 			lil_guy(dir_, backup, tmpd)
 			sys.exit(1)
 		else:
-			logger.debug("fat boy finished w.o exception")
+			logger.debug("fat boy finished w.out exception")
 
 @contextlib.contextmanager
-def fat_boy_o(dir_):
+def fat_boy_o(dir_: str = ""):
 	"""Context manager for the temporary directory and backup of original. 
 	
-	Replaces corrupted directory with backup on error.
+	Uses os.rename(src, dst) to move directories.
 
 	Args:
 		dir_ (str): Path of the Source directory.
@@ -85,8 +84,8 @@ def fat_boy_o(dir_):
 		tmpd (str): The temporary directory the new data is being downloaded and written to. Deleted on error, renamed as source directory if not.
 		backup (str): The original source directory after being renamed to a backup location/path. Renamed to source directory on error, deleted if not.
 	"""
-	tmpd = None
-	backup = None
+	tmpd: str = ""
+	backup: str = ""
 
 	try:
 		tmpd, backup = configure_o(dir_)
@@ -121,11 +120,11 @@ def fat_boy_o(dir_):
 			logger.debug("fat boy finished w.o exception")
 
 @contextlib.contextmanager
-def sfat_boy(tmpd):
-	"""Simplified context manager for rosa [get][all] because there is no original to backup. 
+def sfat_boy(tmpd: str = ""):
+	"""Simplified context manager for rosa if no backup/original. 
 
 	Args:
-		abs_path (str): Path of the desired directory.
+		tmpd (str): Path of the desired directory.
 	
 	Yields: 
 		tmpd: A new directory.
@@ -152,14 +151,14 @@ def sfat_boy(tmpd):
 	else:
 		logger.debug('sfat_boy caught no exeptions while writing_all')
 
-def lil_guy(dir_, backup, tmpd):
+def lil_guy(xdir: str = "", backup: str = "", tmpd: str = ""):
 	"""Handles recovery if error is caught by fat_boy.
 
 	Args:
-		dir_ (str): Path of the source directory.
-		backup (str): Path to the source directory.
+		xdir (str): Original directory.
+		backup (str): Backup directory.
 		tmpd (str): Temporary directory.
-	
+
 	Returns:
 		None
 	"""
@@ -169,7 +168,7 @@ def lil_guy(dir_, backup, tmpd):
 				shutil_fx(tmpd)
 
 				for entry in os.scandir(backup):
-					destin = os.path.join(dir_, entry.name)
+					destin: str = os.path.join(xdir, entry.name)
 
 					os.rename(entry.path, destin)
 
@@ -178,27 +177,26 @@ def lil_guy(dir_, backup, tmpd):
 		elif tmpd and os.path.exists(tmpd):
 			shutil_fx(tmpd)
 			logger.error(f"lil_guy called to recover on error and couldn't find the backup. deleted temporary directory")
-
 		else:
 			logger.error('lil_guy called on error but no directories to recover were found')
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
-		logger.error(f"{RED}replacement of {dir_} and cleanup encountered an error: {e}.", exc_info=True)
-		if os.path.exists(dir_):
-			shutil_fx(dir_)
-		os.rename(backup, dir_)
+		logger.error(f"{RED}replacement of {xdir} and cleanup encountered an error: {e}.", exc_info=True)
+		if os.path.exists(xdir):
+			shutil_fx(xdir)
+		os.rename(backup, xdir)
 		raise
 	else:
 		logger.info("lil_guy's cleanup had no exceptions")
 		shutil_fx(backup)
 
-def _lil_guy_o(abs_path, backup, tmpd):
+def _lil_guy_o(xdir: str = "", backup: str = "", tmpd: str = ""):
 	"""Handles recovery if error is caught by fat_boy_o.
 
 	Args:
-		abs_path (str): Full path of the source directory from config.py
-		backup (str): Original source directory renamed to a backup location while downloading and writing.
-		tmpd (str): Temporary directory made to hold the updated source directory. Renamed to source directory if succeeds, deleted if error is caught.
+		xdir (str): Full path of the source directory.
+		backup (str): Source directory renamed as a backup.
+		tmpd (str): Temporary directory made for the updated source directory.
 	
 	Returns:
 		None
@@ -206,7 +204,7 @@ def _lil_guy_o(abs_path, backup, tmpd):
 	try:
 		if backup and os.path.exists(backup):
 			if tmpd and os.path.exists(tmpd):
-				os.rename(backup, abs_path)
+				os.rename(backup, xdir)
 
 				shutil_fx(tmpd)
 				logger.warning("moved backup back to original location & deleted the temporary directory")
@@ -219,12 +217,12 @@ def _lil_guy_o(abs_path, backup, tmpd):
 			logger.error('_lil_guy_o called on error but no directories to recover were found')
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
-		logger.error(f"{RED}replacement of {abs_path} and cleanup encountered an error: {e}.", exc_info=True)
+		logger.error(f"{RED}replacement of {xdir} and cleanup encountered an error: {e}.", exc_info=True)
 		raise
 	else:
 		logger.info("_lil_guy_o's cleanup had no exceptions")
 
-def shutil_fx(dirx):
+def shutil_fx(dirx: str = ""):
 	"""Handles deletion of directories with retries.
 
 	Args:
@@ -270,10 +268,9 @@ def shutil_fx(dirx):
 		else:
 			logger.debug(f"shutil_fx deleted {dirx}")
 
-def configure(dir_):
-	"""Configures the backup and creates the tmpd.
+def configure(dir_: str = ""):
+	"""Moves content of the source directory to a backup.
 
-	Moves content of the source directory to a backup.
 	Creates a temporary directory.
 
 	Args:
@@ -281,21 +278,21 @@ def configure(dir_):
 	
 	Returns:
 		tmpd (str): Temporary directory.
-		backup (str): Source directory renamed as a backup.
+		backup (str): Source directory's contents in a backup.
 	"""
-	dir_ = dir_.rstrip(os.sep)
+	dir_: str = dir_.rstrip(os.sep)
 
 	if os.path.exists(dir_):
-		parent = os.path.dirname(dir_)
+		parent: str = os.path.dirname(dir_)
 		try:
-			tmpd = tempfile.mkdtemp(dir=parent)
+			tmpd: str = tempfile.mkdtemp(dir=parent)
 
-			backup = os.path.join(parent, f".{time.time():.0f}")
+			backup: str = os.path.join(parent, f".{time.time():.0f}")
 			os.makedirs(backup, exist_ok=True)
 
 			for entry in os.scandir(dir_):
-				rp = entry.name # K.I.S.S.
-				destin = os.path.join(backup, rp)
+				rp: str = entry.name # K.I.S.S.
+				destin: str = os.path.join(backup, rp)
 
 				os.rename(entry.path, destin)
 
@@ -314,30 +311,30 @@ def configure(dir_):
 		logger.warning(f"{dir_} doesn't exist; fix the config or pull a version")
 		raise FileNotFoundError ('source directory does not exist')
 
-def configure_o(abs_path):
+def configure_o(dir_: str = ""):
 	"""Configures the backup and creates the tmpd.
 
 	Renames the source directory as a backup.
 	Creates a temporary directory.
 
 	Args:
-		abs_path (str): Path of the source directory.
+		dir_ (str): Path of the source directory.
 	
 	Returns:
 		tmpd (str): New (empty) temporary directory.
 		backup (str): Source directory renamed to as a backup location/path.
 	"""
-	if os.path.exists(abs_path):
-		parent = os.path.dirname(abs_path)
+	if os.path.exists(dir_):
+		parent: str = os.path.dirname(dir_)
 		try:
-			tmpd = tempfile.mkdtemp(dir=parent)
-			backup = os.path.join(parent, f".{time.time():.0f}")
+			tmpd: str = tempfile.mkdtemp(dir=parent)
+			backup: str = os.path.join(parent, f".{time.time():.0f}")
 
-			os.rename(abs_path, backup)
+			os.rename(dir_, backup)
 			logger.debug('local directory moved to backup')
 
 		except (PermissionError, FileNotFoundError, Exception) as e:
-			logger.error(f"{RED}err encountered while trying move {abs_path} to a backup location:{RESET} {e}", exc_info=True)
+			logger.error(f"{RED}err encountered while trying move {dir_} to a backup location:{RESET} {e}", exc_info=True)
 			raise
 		else:
 			logger.debug('temporary directory created & source directory contents moved to backup')
@@ -346,18 +343,18 @@ def configure_o(abs_path):
 		logger.warning(f"{dir_} doesn't exist; fix the config or pull a version")
 		raise FileNotFoundError ('source directory does not exist')
 
-def is_ignored(_str):
+def is_ignored(_str: str = ""):
 	return any(blckd in _str for blckd in BLACKLIST)
 
-def apply_atomicy(tmpd, backup, dir_):
+def apply_atomicy(dir_: str = "", tmpd: str = "", backup: str = ""):
 	"""Cleans up the 'atomic' writing for fat_boy. 
 	
 	Renames all of tmpd's contents as backup's content.
 	Deletes backup & tmpd if no errors are caught.
 
 	Args:
-		tmpd (str): Temporary directory.
 		dir_ (str): Original path of the source directory.
+		tmpd (str): Temporary directory.
 		backup (str): Path to the backup.
 
 	Returns:
@@ -365,7 +362,7 @@ def apply_atomicy(tmpd, backup, dir_):
 	"""
 	try:
 		for entry in os.scandir(tmpd):
-			destin = os.path.join(dir_, entry.name)
+			destin: str = os.path.join(dir_, entry.name)
 
 			os.rename(entry.path, destin)
 
@@ -377,21 +374,22 @@ def apply_atomicy(tmpd, backup, dir_):
 		shutil_fx(backup)
 		shutil_fx(tmpd)
 
-def apply_atomicy_o(abs_path, tmpd, backup):
+def apply_atomicy_o(dir_: str = "", tmpd: str = "", backup: str = ""):
 	"""Cleans up the 'atomic' writing for fat_boy_o. 
 	
-	Renames tmpd as source directory & deletes backup *if no errors are caught.
+	Renames tmpd as source directory.
+	Deletes backup if no errors are caught.
 
 	Args:
+		dir_ (str): Original path of the source directory [empty at this point].
 		tmpd (str): Temporary directory containing the updated directory.
-		abs_path (str): Original path of the source directory [empty at this point].
 		backup (str): Location/path the source directory was moved to.
 	
 	Returns:
 		None
 	"""
 	try:
-		os.rename(tmpd, abs_path)
+		os.rename(tmpd, dir_)
 
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		logger.critical(f"{RED}exception encountered while attempting atomic write:{RESET} {e}.", exc_info=True)
@@ -402,7 +400,7 @@ def apply_atomicy_o(abs_path, tmpd, backup):
 
 # WRITING TO DISK
 
-def save_people(people, backup, tmpd):
+def save_people(people: list = [], backup: str = "", tmpd: str = ""):
 	"""Hard-links unchanges files from the original to the tmpd.
 
 	Takes the relative paths passed and builds two new ones for each directory.
@@ -417,8 +415,8 @@ def save_people(people, backup, tmpd):
 		None
 	"""
 	for person in people:
-		curr = os.path.join(backup, person)
-		tmp_ = os.path.join(tmpd, person)
+		curr: str = os.path.join(backup, person)
+		tmp_: str = os.path.join(tmpd, person)
 
 		os.makedirs(os.path.dirname(tmp_), exist_ok=True)
 		try:
@@ -427,10 +425,8 @@ def save_people(people, backup, tmpd):
 		except (PermissionError, FileNotFoundError, KeyboardInterrupt, Exception):
 			raise
 
-def wr_batches(data, tmpd):
+def wr_batches(data: tuple = (), tmpd: str = ""):
 	"""Writes each batch's data to the tmpd as they come. 
-	
-	Each files' parent is made if does not exist (faster than checking).
 
 	Args:
 		data (2-element tuple): Tupled list of pairs (relative paths, content).
@@ -441,7 +437,7 @@ def wr_batches(data, tmpd):
 	"""
 	try:
 		for frp, content in data:
-			t_path = os.path.join(tmpd, frp)
+			t_path: str = os.path.join(tmpd, frp)
 			os.makedirs(os.path.dirname(t_path), exist_ok=True)
 
 			with open(t_path, 'w', encoding='utf-8') as t:
@@ -452,18 +448,16 @@ def wr_batches(data, tmpd):
 	except (PermissionError, FileNotFoundError, Exception) as e:
 		raise
 
-def mk_rrdir(drps, tmpd):
+def mk_rrdir(drps: list = [], tmpd: str = ""):
 	"""Writes remote directories to the disk.
 
 	Args:
-		raw_directories (list): Single-item tuples (relative paths,).
+		drps (list): Single-item tuples w.(relative paths,).
 		tmpd (str): Target directory to write the directories in.
 	
 	Returns:
 		None
 	"""
-	logger.debug('...correcting local directory tree...')
-
 	for rp in drps:
-		fp = os.path.join(tmpd, rp[0])
+		fp: str = os.path.join(tmpd, rp[0])
 		os.makedirs(fp, exist_ok=True)

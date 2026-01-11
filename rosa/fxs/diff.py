@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Identify and present changes made since the latest commitment.
-
-This only tracks differences from the latest commitment made on *this* machine.
-If the server and local index are on different versions, this will not tell you.
-It will only identify the changes you made since the latest indexing.
-"""
-
+"""Identify and present changes made since the latest commitment."""
 
 import sys
 
@@ -16,9 +10,9 @@ from rosa.lib import (
 	landline, Heart
 )
 
-NOMIC = "[diff]"
+NOMIC: str = "[diff]"
 
-def ask_to_share(diff_data, force=False):
+def ask_to_share(diff_data: list = [], force: bool = False):
 	"""Asks the user if they would like to see the details of the discrepancies found (specific files/directories).
 
 	Args:
@@ -31,20 +25,20 @@ def ask_to_share(diff_data, force=False):
 	print('discrepancy[s] found between the server and local data:')
 
 	for i in diff_data:
-		title = i["type"]
-		count = len(i["details"])
-		descr = i["message"]
+		title: str = i["type"]
+		count: int = len(i["details"])
+		descr: str = i["message"]
 
 		if count > 0:
 			if force is True:
 				print(f"found: {count} {descr}")
 				return
 			else:
-				decis0 = input(f"found {count} {descr}. do you want details? y/n: ").lower()
-				formatted = []
+				decis0: str = input(f"found {count} {descr}. do you want details? y/n: ").lower()
+				formatted: list = []
 
 				if decis0 in ('yes', 'y', ' y', 'y ', 'ye', 'yeah','sure'):
-					c = []
+					c: list = []
 					[c.append(item) for item in i["details"]]
 
 					[formatted.append(f"\n{item}") for item in c]
@@ -53,13 +47,13 @@ def ask_to_share(diff_data, force=False):
 				elif decis0 in ('n', ' n', 'n ', 'no', 'naw', 'hell naw'):
 					print('heard')
 
-def main(args=None):
+def main(args: argparse = None):
 	"""Runs the diff'ing engine before asking to show what was found, if anything."""
-	redirect = None
-	xdiff = False
-	r = False
+	redirect: str = None
+	xdiff: bool = False
+	r: bool = False
 
-	logger, force, prints, start = mini_ps(args, NOMIC)
+	logger, force: bool, prints: bool, start: float = mini_ps(args, NOMIC)
 	
 	if args:
 		if args.extra:
@@ -71,11 +65,11 @@ def main(args=None):
 
 	with phones() as conn:
 		with landline(local.index) as sconn:
-			new, deleted, diffs, remaining, xdiff = query_index(conn, sconn, local.target)
-			newd, deletedd, ledeux = query_dindex(sconn, local.target)
+			new: list, deleted: list, diffs: list, remaining: list, xdiff: bool = query_index(conn, sconn, local.target)
+			newd: list, deletedd: list, ledeux: list = query_dindex(sconn, local.target)
 
 			if r:
-				vok, vers = version_check(conn, sconn)
+				vok: bool, vers: int = version_check(conn, sconn)
 
 				if vok is True:
 					logger.info('versions: twinned')
@@ -90,7 +84,7 @@ def main(args=None):
 			if any((newd, deletedd)):
 				logger.info(f"found {len(newd)} new directories & {len(deletedd)} deleted directories.")
 
-			diff_data = []
+			diff_data: list = []
 
 			diff_data.append(
 				{ # CHERUBS

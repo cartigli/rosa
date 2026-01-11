@@ -83,27 +83,67 @@ arguments = {
 		'flag': "--silent",
 		'shorthand': "-s",
 		'action': "store_true",
-		'help': "runs with logging_level set to critical; disables print statements"
+		'help': "disables print statements"
 	},
 	'force': {
 		'flag': "--force",
 		'shorthand': "-f",
 		'action': "store_true",
-		'help': "bypasses all user checks & confirmations [show & confirm]"
+		'help': "bypasses checks & confirmations"
 	},
 	'verbose': {
 		'flag': "--verbose",
 		'shorthand': "-v",
 		'action': "store_true",
-		'help': "runs with logging_level set to debug; enables print statements"
+		'help': "enables print statements"
 	}
 }
 
-def main():
+ARGUMENTS = [
+	("--silent", "-s", "store_true", "disables print statements"),
+	("--force", "-f", "store_true", "bypasses checks & confirmations"),
+	("--verbose", "-v", "store_true", "enables print statements")
+]
+
+# def main():
+# 	prt = argparse.ArgumentParser(add_help=False)
+
+# 	for arg in arguments.values():
+# 		prt.add_argument(arg['shorthand'], arg['flag'], action=arg['action'], help=arg['help'])
+
+# 	ops = argparse.ArgumentParser()
+# 	sp = ops.add_subparsers(dest='rosa', required=True) 
+
+# 	for fx in rosa.values():
+# 		ps = 'ps_' + fx['name']
+
+# 		ps = sp.add_parser(fx['name'], parents=[prt])
+# 		ps.set_defaults(func=fx['func']) # get, diff, etc.,
+
+# 		if fx['name'] in("init", ".", "diff", "gen"):
+# 			ps.add_argument("--redirect", "-r", type=str, help="override defauluts")
+
+# 		if fx['name'] == "diff":
+# 			ps.add_argument("--extra", "-x", action="store_true", help="compare local and remote versions")
+
+# 		if fx.get('root_cmds'):
+# 			sbp = ps.add_subparsers() # for current, version
+
+# 			for sub_cmd, sb_data in fx['root_cmds'].items():
+# 				sub_parser = sbp.add_parser(sb_data['name'], parents=[prt])
+# 				sub_parser.set_defaults(func=sb_data['func'])
+	
+# 	args = ops.parse_args()
+# 	args.func(args)
+
+
+def create_parser():
 	prt = argparse.ArgumentParser(add_help=False)
 
-	for arg in arguments.values():
-		prt.add_argument(arg['shorthand'], arg['flag'], action=arg['action'], help=arg['help'])
+	# for arg in arguments.values():
+		# prt.add_argument(arg['shorthand'], arg['flag'], action=arg['action'], help=arg['help'])
+	for long, short, action, ahelp in ARGUMENTS:
+		prt.add_argument(short, long, action=action, help=ahelp)
 
 	ops = argparse.ArgumentParser()
 	sp = ops.add_subparsers(dest='rosa', required=True) 
@@ -115,7 +155,7 @@ def main():
 		ps.set_defaults(func=fx['func']) # get, diff, etc.,
 
 		if fx['name'] in("init", ".", "diff", "gen"):
-			ps.add_argument("--redirect", "-r", type=str, help="give a path instead of C.W.D.")
+			ps.add_argument("--redirect", "-r", type=str, help="override defauluts")
 
 		if fx['name'] == "diff":
 			ps.add_argument("--extra", "-x", action="store_true", help="compare local and remote versions")
@@ -127,6 +167,11 @@ def main():
 				sub_parser = sbp.add_parser(sb_data['name'], parents=[prt])
 				sub_parser.set_defaults(func=sb_data['func'])
 	
+	return ops
+
+def main():
+	ops = create_parser()
+
 	args = ops.parse_args()
 	args.func(args)
 

@@ -5,7 +5,6 @@ Cleanup large logs and delete oldest.
 Timer, counter, wrap up for runtime info.
 """
 
-
 import os
 import sys
 import time
@@ -18,20 +17,88 @@ from rosa.confs import LOGGING_LEVEL
 
 logger = logging.getLogger('rosa.log')
 
+def find_index(cd: str = ""):
+	"""Finds the index from the given directory.
+
+	Args:
+		cd (str): Current directory.
+
+	Returns:
+		index (str): The index, if found.
+	"""
+	index: str = None
+	parents: list = []
+	parents.append(cd)
+
+	while cd:
+		xd: str = cd
+		cd: str = os.path.dirname(cd)
+
+		if xd == cd:
+			break
+
+		if cd:
+			parents.append(cd)
+
+	for dir_ in parents:
+		mb: str = os.path.join(dir_, ".index", "indeces.db")
+
+		if os.path.exists(mb):
+			index: str = mb
+			break
+
+	return index
+
+class Heart:
+	"""Finds the index based off the C.W.D.
+
+	Attributes:
+		redirect (str): Optional replacement of the C.W.D (init, diff).
+		strict (bool): Optional enforcement of found index (init).
+	"""
+	def __init__(self, redirect: str = "", strict: bool = True):
+		"""Finds index and originals' paths.
+
+		Args:
+			redirect (str): Optional path.
+			strict (bool): Optional force index returned.
+		"""
+		if redirect:
+			self.origin: str = redirect
+		else:
+			self.origin: str = os.getcwd()
+
+		self.index: str = find_index(self.origin)
+
+		self.target: str = None
+		self.originals: str = None
+
+		if self.index:
+			self.target: str = os.path.dirname(os.path.dirname(self.index))
+
+			self.originals: str = os.path.join(os.path.dirname(self.index), "originals")
+
+		else:
+			self.target = self.origin
+
+			if strict is True:
+					logger.warning('not an indexed directory')
+					sys.exit(7)
+
 # INITIATE LOGGER & RECORDS MANAGER
 
-def init_logger(logging_level):
+def init_logger(logging_level: str = ""):
 	"""Initiates the logger and configures their formatting.
 
 	Args:
-		logging_level (str): Logging level from the config file.
+		logging_level (str): Logging level from the config file (overriden if flags present).
 	
 	Returns:
 		logger (logging): Logger.
 	"""
 	if logging_level:
-		file = os.path.abspath(__file__)
-		log_dest = os.path.join(os.path.dirname(os.path.dirname(file)), "rosa.log")
+		file: str = os.path.abspath(__file__)
+		log_dest: str = os.path.join(os.path.dirname(os.path.dirname(file)), "rosa.log")
 		
 		# init loggers
 		logger = logging.getLogger('rosa.log')
@@ -55,8 +122,8 @@ def init_logger(logging_level):
 		console_handler.setLevel(logging_level.upper())
 
 		# define formatting
-		console_ = "%(message)s"
-		file = "[%(asctime)s][%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
+		console_: str = "%(message)s"
+		file: str = "[%(asctime)s][%(levelname)s][%(module)s:%(lineno)s]: %(message)s"
 
 		file_format = logging.Formatter(file)
 		console_format = logging.Formatter(console_)
@@ -90,59 +157,59 @@ def doit_urself():
 	Returns:
 		None
 	"""
-	cd = os.path.abspath(__file__)
-	rosa = os.path.dirname(os.path.dirname(cd))
+	cd: str = os.path.abspath(__file__)
+	rosa: str = os.path.dirname(os.path.dirname(cd))
 
-	rosa_log = os.path.join(rosa, "rosa.log")
-	rosa_records = os.path.join(rosa, "_rosa_records")
+	rosa_log: str = os.path.join(rosa, "rosa.log")
+	rosa_records: str = os.path.join(rosa, "_rosa_records")
 
 	logger.debug(f"rosa log is @: {rosa_log}")
 	logger.debug(f"rosa records are @: {rosa_records}")
 
-	rosasz = os.stat(rosa_log).st_size
-	rosakb = rosasz / 1024
+	rosasz: float = os.stat(rosa_log).st_size
+	rosakb: float = rosasz / 1024
 
-	rosa_records_max = 5 # if 5 files when rosa_log is moved, delete oldest record
+	rosa_records_max: int = 5 # if 5 already stored, delete one
 	if rosakb >= 64.0: # 32 kb, and then move it to records
 		if os.path.exists(rosa_records):
 			if os.path.isdir(rosa_records):
-				npriors = 1 # start w.one because this is only occurring when the log is larger than 64 kb
-				previous = []
+				npriors: int = 1
+				previous: list = []
 				for file in os.scandir(rosa_records):
 					if file.is_file():
 						previous.append(file.path)
 						npriors += 1
 
 				if npriors > rosa_records_max:
-					diff = npriors - rosa_records_max
-					unwanted = previous[0:diff]
+					diff: int = npriors - rosa_records_max
+					unwanted: list = previous[0:diff]
 					for x in unwanted:
 						os.remove(x)
 
-					xtime = f"{time.time():.2f}"
+					xtime: str = f"{time.time():.2f}"
 					os.rename(rosa_log, os.path.join(rosa_records, f"rosa_log_{xtime}_"))
 
 					logger.debug('deleted record of log to make room, and moved current log to records')
 				else:
-					xtime = f"{time.time():.2f}"
+					xtime: str = f"{time.time():.2f}"
 					os.rename(rosa_log, os.path.join(rosa_records, f"rosa_log_{xtime}_"))
 
 					logger.debug('rosa_records: ok, backed up current log')
 		else:
 			os.makedirs(rosa_records, exist_ok=True)
-			xtime = f"{time.time():.2f}"
+			xtime: str = f"{time.time():.2f}"
 
 			os.rename(rosa_log, os.path.join(rosa_records, f"rosa_log_{xtime}_"))
 			logger.debug('backed up & replaced rosa.log')
 	else:
 		logger.debug('rosa.log: [ok]')
 
-def mini_ps(args, nomix):
+def mini_ps(args: argparse = None, nomix: str = ""):
 	"""Mini parser for arguments passed from the command line (argparse).
 
 	Args:
 		args (argparse): Holds the flags present at execution; must unpack them from this object & assess/adjust.
-		nomix (var): Name variable passed from each script for logging.
+		nomix (str): Name variable passed from each script for logging.
 	
 	Returns:
 		A 4-element tuple containing:
@@ -151,8 +218,8 @@ def mini_ps(args, nomix):
 			prints (bool): A value depending on if the flag -v (--verbose) was present.
 			start (float): A time.perf_counter() value obtained before the script's main function runs to time it.
 	"""
-	force = False # no checks - force
-	prints = False # no prints - prints
+	force: bool = False # no checks - force
+	prints: bool = False # no prints - prints
 
 	if args:
 		if args.force:
@@ -170,54 +237,12 @@ def mini_ps(args, nomix):
 	else:
 		logger = init_logger(LOGGING_LEVEL.upper())
 
-	start = time.perf_counter()
+	start: float = time.perf_counter()
 
 	logger.debug(f"[rosa]{nomix} executed & timer started")
 	return logger, force, prints, start
 
-def counter(start, nomix):
-	"""Counts diff between end and start for timing functions.
-
-	Args:
-		start (int): A time.perf_counter() value.
-		nomix (str): Name variable for logging.
-
-	Returns:
-		None
-	"""
-	pace = None
-
-	if start:
-		end = time.perf_counter()
-		duration = end - start
-		factor = "seconds"
-		if duration > 60:
-			duration = duration / 60
-			factor = "minutes"
-		pace = f"{duration:.4f} {factor}"
-	
-	return pace
-
-def finale(nomix, start, prints):
-	"""Wraps up each files' execution & logging statements.
-	
-	Args:
-		nomix (var): Name variable passed from each script for logging.
-		start (float): A time.perf_counter value obtained at the start of execution.
-		prints (bool): Variable specifying whether or not to print (verbosity).
-	
-	Returns:
-		None
-	"""
-	doit_urself()
-	pace = counter(start, nomix)
-
-	logger.info(f"rosa {nomix} complete [{pace}]")
-
-	if prints is True:
-		print('All set.')
-
-def diff_gen(diffs, details, originals, origin):
+def diff_gen(diffs: list = [], details: dict = {}, originals: str = "", origin: str = ""):
 	"""Generates reverse patches between two files.
 
 	Args:
@@ -227,14 +252,14 @@ def diff_gen(diffs, details, originals, origin):
 		origin (str): Target directory.
 	
 	Returns:
-		patches (dmp patches): Generated patches as text.
+		patches (list): Patches generated as bytes.
 	"""
-	patches = []
-	enc = None
+	patches: list = []
+	enc: bool = None
 
 	for rp in diffs:
-		fp_alt = os.path.join(originals, rp)
-		fp_mod = os.path.join(origin, rp)
+		fp_alt: str = os.path.join(originals, rp)
+		fp_mod: str = os.path.join(origin, rp)
 
 		if details[rp][2] == "T":
 			with open(fp_alt, 'r', encoding="utf-8") as f:
@@ -242,125 +267,78 @@ def diff_gen(diffs, details, originals, origin):
 			with open(fp_mod, 'r', encoding="utf-8") as m:
 				mod = m.read()
 
-			patch = patcher(alt, mod) # returned as binary
+			patch: bytes = patcher(alt, mod) # returned as binary
 
 			patches.append((rp, patch))
 
 		else:
 			with open(fp_alt, 'rb') as f:
-				patch = f.read()
+				patch: bytes = f.read()
 
 			patches.append((rp, patch))
 
 	return patches
 
-def patcher(old, new):
+def patcher(old: str = "", new: str = ""):
 	"""Computes the reverse patch.
 
 	Args:
-		old (str): The content of the original modded file.
+		old (str): The original content of the modded file.
 		new (str): The content of the edited file.
-	
+
 	Returns:
-		p_txt (str): The computed patch as text.
+		patch (bytes): The computed patch as bytes.
 	"""
 	dmp = dp_.diff_match_patch()
 
 	patches = dmp.patch_make(new, old)
-	ptxt = dmp.patch_toText(patches)
+	ptxt: str = dmp.patch_toText(patches)
 
-	patch = ptxt.encode("utf-8")
-
-	# patch = bsdiff4.diff(new, old)
-	# patch = xdelta3.encode(new, old)
-	# patch = fossil_delta.create(new, old)
+	patch: bytes = ptxt.encode("utf-8")
 
 	return patch
 
-def find_index(cd):
-	"""Finds the index from the current working directory.
+def counter(start: float = None, nomix: str = ""):
+	"""Counts diff between end and start for timing functions.
 
 	Args:
-		cd (Path): Current working directory.
-	
+		start (int): time.perf_counter() value.
+		nomix (str): Name variable for logging.
+
 	Returns:
-		index (Path): The index, if found.
+		pace (str): Fromatted time with factor.
 	"""
-	index = None
+	pace: bool = None
 
-	for dir_ in [cd] + list(cd.parents):
-		mb = dir_ / ".index" / "indeces.db"
+	if start:
+		end: float = time.perf_counter()
 
-		if mb.exists():
-			index = mb
-			break
+		duration: float = end - start
+		factor: str = "seconds"
 
-	return index
+		if duration > 60:
+			duration: float = duration / 60
+			factor: str = "minutes"
 
-def find_index00(cd):
-	"""Finds the index from the given directory.
+		pace: str = f"{duration:.4f} {factor}"
 
+	return pace
+
+def finale(nomix: str = "", start: float = None, prints: bool = False):
+	"""Wraps up each files' execution & logging statements.
+	
 	Args:
-		cd (str): Current directory.
+		nomix (str): Name variable passed from each script for logging.
+		start (float): A time.perf_counter value obtained at the start of execution.
+		prints (bool): Variable specifying whether or not to print (verbosity).
 	
 	Returns:
-		index (str): The index, if found.
+		None
 	"""
-	index = None
-	parents = []
-	parents.append(cd)
+	doit_urself()
+	pace: str = counter(start, nomix)
 
-	while cd:
-		xd = cd
-		cd = os.path.dirname(cd)
+	logger.info(f"rosa {nomix} complete [{pace}]")
 
-		if xd == cd:
-			break
-
-		if cd:
-			parents.append(cd)
-
-	for dir_ in parents:
-		mb = os.path.join(dir_, ".index", "indeces.db")
-
-		if os.path.exists(mb):
-			index = mb
-			break
-
-	return index
-
-class Heart:
-	"""Finds the index based off the C.W.D.
-
-	Attributes:
-		redirect (str): Optional replacement of the C.W.D (init, diff).
-		strict (bool): Optional enforcement of found index (init).
-	"""
-	def __init__(self, redirect=None, strict=True):
-		"""Finds index and originals' paths.
-
-		Args:
-			redirect (str): Optional path.
-			strict (bool): Optional force finding.
-		"""
-		if redirect:
-			self.origin = redirect
-		else:
-			self.origin = os.getcwd()
-
-		self.index = find_index00(self.origin)
-
-		self.target = None
-		self.originals = None
-
-		if self.index:
-			self.target = os.path.dirname(os.path.dirname(self.index))
-
-			self.originals = os.path.join(os.path.dirname(self.index), "originals")
-
-		else:
-			self.target = self.origin
-
-			if strict is True:
-					logger.warning('not an indexed directory')
-					sys.exit(7)
+	if prints is True:
+		print('All set.')
